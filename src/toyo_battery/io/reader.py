@@ -6,15 +6,18 @@ Discovery priority for a given cell directory ``path``:
 2. ``連続データ_py.csv``           — already-normalized output from a previous run
 3. 6-digit raw file(s) + ``*.PTN`` — factory raw; 電気量 is computed from mass
 
-All three paths converge on the same canonical schema:
+All three paths converge on the same canonical schema (canonical columns first;
+any extra source columns such as 経過時間[Sec] / 電流[mA] are preserved after
+them so downstream P1 phases can use them):
 
-    Columns: サイクル, モード, 状態, 電圧, 電気量
+    Canonical columns: サイクル, モード, 状態, 電圧, 電気量
     状態 values: {"休止", "充電", "放電"}
 
 The active-material mass (grams) is required to compute 電気量 when the source
 file does not already contain it. It comes from (in order): the ``mass=``
-argument, the first ``*.PTN`` file in the directory (third whitespace token on
-line 0), or — if neither is available — an explicit ``ValueError``.
+argument, or a single top-level ``*.PTN`` file in the directory (third
+whitespace token on line 0). If multiple ``.PTN`` files are present, the
+caller must disambiguate via ``mass=`` — the reader refuses to guess.
 """
 
 from __future__ import annotations
@@ -72,12 +75,13 @@ def read_cell_dir(
     Returns
     -------
     df : DataFrame
-        Canonical columns (see :data:`schema.CANONICAL_COLUMNS_JA` or the EN
-        equivalent if ``column_lang="en"``).
+        Canonical columns first (see :data:`schema.CANONICAL_COLUMNS_JA` or
+        the EN equivalent when ``column_lang="en"``), followed by any extra
+        columns present in the source file (e.g. 経過時間[Sec], 電流[mA]).
     mass_g : float
         Active-material mass used for the capacity calculation, in grams.
         ``math.nan`` if the source already had 電気量 precomputed and no
-        ``.PTN`` was found.
+        ``.PTN`` was found at the top level of the directory.
     """
     p = Path(path)
     if not p.is_dir():
@@ -163,12 +167,13 @@ def _finalize(df: pd.DataFrame, column_lang: ColumnLang) -> pd.DataFrame:
     missing = [c for c in CANONICAL_COLUMNS_JA if c not in df.columns]
     if missing:
         raise ValueError(f"missing canonical columns after read: {missing}")
-    out = df.loc[:, list(CANONICAL_COLUMNS_JA)].copy()
+    extras = [c for c in df.columns if c not in CANONICAL_COLUMNS_JA]
+    out = df.loc[:, [*CANONICAL_COLUMNS_JA, *extras]].copy()
     if pd.api.types.is_numeric_dtype(out["状態"]):
         out["状態"] = out["状態"].map(STATE_CODE_TO_JA).fillna(out["状態"])
     out = out.reset_index(drop=True)
     if column_lang == "en":
-        out = out.rename(columns={c: JA_TO_EN[c] for c in CANONICAL_COLUMNS_JA})
+        out = out.rename(columns={c: JA_TO_EN.get(c, c) for c in out.columns})
     return cast("pd.DataFrame", out)
 
 
@@ -182,9 +187,15 @@ def _find_raw_files(cell_dir: Path) -> list[Path]:
 def _resolve_mass(explicit: float | None, cell_dir: Path) -> float | None:
     if explicit is not None:
         return explicit
-    ptn_files = sorted(cell_dir.glob(f"**/{PTN_GLOB}"))
+    ptn_files = sorted(cell_dir.glob(PTN_GLOB))
     if not ptn_files:
         return None
+    if len(ptn_files) > 1:
+        names = [p.name for p in ptn_files]
+        raise ValueError(
+            f"multiple .PTN files found in {cell_dir} ({names}); "
+            "pass `mass=<grams>` to disambiguate"
+        )
     return read_ptn_mass(ptn_files[0])
 
 
