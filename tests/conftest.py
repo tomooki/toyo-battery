@@ -13,6 +13,11 @@ import pytest
 
 Layout = Literal["renzoku", "renzoku_py", "raw_6digit"]
 
+# Used by the renzoku fixture when include_capacity=True. Picked to be
+# distinguishable from any plausible recompute output (formula would give
+# values like 0, 500, 0, -527.78, -1027.78 for the row sequence below).
+SENTINEL_CAPACITY_BASE: float = 100.0
+
 
 @pytest.fixture
 def make_cell_dir(tmp_path: Path) -> Callable[..., Path]:
@@ -60,7 +65,7 @@ def _write_renzoku(cell_dir: Path, *, mass: float, include_capacity: bool) -> No
         (1, "CC", 2, 3.40, 3800.0, -1.0),
         (1, "CC", 2, 3.20, 7400.0, -1.0),
     ]
-    for cycle, mode, state, voltage, t_sec, current_ma in rows:
+    for idx, (cycle, mode, state, voltage, t_sec, current_ma) in enumerate(rows):
         fields = [
             str(cycle),
             mode,
@@ -70,8 +75,12 @@ def _write_renzoku(cell_dir: Path, *, mass: float, include_capacity: bool) -> No
             f"{current_ma:.3f}",
         ]
         if include_capacity:
-            capacity_mah_g = t_sec / 3600.0 * current_ma / mass
-            fields.append(f"{capacity_mah_g:.6f}")
+            # Distinct sentinel per row, deliberately NOT matching the recompute
+            # formula t/3600·I/mass. A regression where the reader recomputes
+            # an already-present 電気量 column would be visible as the sentinel
+            # being overwritten.
+            sentinel_capacity = SENTINEL_CAPACITY_BASE + idx
+            fields.append(f"{sentinel_capacity:.6f}")
         lines.append(",".join(fields))
     (cell_dir / "連続データ.csv").write_text("\n".join(lines) + "\n", encoding="shift_jis")
 

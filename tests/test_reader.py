@@ -13,6 +13,10 @@ from toyo_battery.core.cell import Cell
 from toyo_battery.io.reader import read_cell_dir, read_ptn_mass
 from toyo_battery.io.schema import CANONICAL_COLUMNS_EN, CANONICAL_COLUMNS_JA
 
+# Mirrored from conftest.SENTINEL_CAPACITY_BASE (kept as a literal here to avoid
+# the cross-conftest import dance — change both if you change either).
+_SENTINEL_CAPACITY_BASE: float = 100.0
+
 
 def test_read_renzoku_with_capacity_column(make_cell_dir: Callable[..., Path]) -> None:
     d = make_cell_dir("renzoku", mass=0.002, include_capacity_col=True)
@@ -22,7 +26,11 @@ def test_read_renzoku_with_capacity_column(make_cell_dir: Callable[..., Path]) -
     assert "経過時間[Sec]" in df.columns
     assert "電流[mA]" in df.columns
     assert len(df) == 5
-    assert set(df["状態"].unique()) <= {"休止", "充電", "放電"}
+    # value-level state mapping: rows are written as integer codes 1,1,0,2,2
+    assert df["状態"].tolist() == ["充電", "充電", "休止", "放電", "放電"]
+    # precomputed sentinel survives — reader must NOT recompute when 電気量 is present
+    expected_sentinels = [_SENTINEL_CAPACITY_BASE + i for i in range(5)]
+    assert df["電気量"].tolist() == pytest.approx(expected_sentinels)
     assert math.isnan(mass_g)  # no .PTN for this layout
 
 
@@ -260,10 +268,15 @@ def test_read_ptn_mass_non_numeric_raises(tmp_path: Path) -> None:
         read_ptn_mass(ptn)
 
 
-def test_cell_from_dir_wires_reader(make_cell_dir: Callable[..., Path]) -> None:
-    d = make_cell_dir("raw_6digit", mass=0.002, name="mycell")
+@pytest.mark.parametrize("layout", ["renzoku", "renzoku_py", "raw_6digit"])
+def test_cell_from_dir_wires_reader(make_cell_dir: Callable[..., Path], layout: str) -> None:
+    d = make_cell_dir(layout, mass=0.002, name="mycell")
     cell = Cell.from_dir(d)
     assert cell.name == "mycell"
-    assert cell.mass_g == pytest.approx(0.002)
     assert isinstance(cell.raw_df, pd.DataFrame)
     assert len(cell.raw_df) == 5
+    # only raw_6digit ships a .PTN by default; the renzoku layouts return NaN
+    if layout == "raw_6digit":
+        assert cell.mass_g == pytest.approx(0.002)
+    else:
+        assert math.isnan(cell.mass_g)
