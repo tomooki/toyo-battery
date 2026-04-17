@@ -90,6 +90,22 @@ def test_ptn_in_subdir_is_ignored(make_cell_dir: Callable[..., Path]) -> None:
         read_cell_dir(d)
 
 
+def test_unknown_state_code_raises(tmp_path: Path) -> None:
+    """An unrecognized integer 状態 code must not silently pass through."""
+    cell_dir = tmp_path / "bad_state"
+    cell_dir.mkdir()
+    raw = [
+        "# summary line 0",
+        "ｻｲｸﾙ,ﾓｰﾄﾞ,状態,電圧[V],経過時間[Sec],電流[mA]",
+        "1,CC,1,3.50,0.0,1.0",
+        "1,CC,9,3.60,3600.0,1.0",
+    ]
+    (cell_dir / "000001").write_text("\n".join(raw) + "\n", encoding="shift_jis")
+    (cell_dir / "pattern.PTN").write_text("ACTIVE_MATERIAL WEIGHT 0.002\n", encoding="shift_jis")
+    with pytest.raises(ValueError, match="unknown 状態 codes"):
+        read_cell_dir(cell_dir)
+
+
 def test_read_raw_6digit_without_mass_and_no_ptn(
     make_cell_dir: Callable[..., Path], tmp_path: Path
 ) -> None:

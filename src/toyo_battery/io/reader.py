@@ -170,7 +170,14 @@ def _finalize(df: pd.DataFrame, column_lang: ColumnLang) -> pd.DataFrame:
     extras = [c for c in df.columns if c not in CANONICAL_COLUMNS_JA]
     out = df.loc[:, [*CANONICAL_COLUMNS_JA, *extras]].copy()
     if pd.api.types.is_numeric_dtype(out["状態"]):
-        out["状態"] = out["状態"].map(STATE_CODE_TO_JA).fillna(out["状態"])
+        mapped = out["状態"].map(STATE_CODE_TO_JA)
+        unmapped_mask = mapped.isna() & out["状態"].notna()
+        if unmapped_mask.any():
+            bad = sorted(out.loc[unmapped_mask, "状態"].unique().tolist())
+            raise ValueError(
+                f"unknown 状態 codes in source: {bad} (known codes: {sorted(STATE_CODE_TO_JA)})"
+            )
+        out["状態"] = mapped
     out = out.reset_index(drop=True)
     if column_lang == "en":
         out = out.rename(columns={c: JA_TO_EN.get(c, c) for c in out.columns})
