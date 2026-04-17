@@ -11,7 +11,16 @@ any extra source columns such as 経過時間[Sec] / 電流[mA] are preserved af
 them so downstream P1 phases can use them):
 
     Canonical columns: サイクル, モード, 状態, 電圧, 電気量
-    状態 values: {"休止", "充電", "放電"}
+    状態 values: {"休止", "充電", "放電"} (or NaN where the source had no value)
+
+The column count therefore differs from legacy v2.01, which dropped the raw
+measurement columns after computing 電気量. Numerical parity with v2.01 holds
+on the canonical 5-column subset; tests that compare whole DataFrames must
+project to that subset first.
+
+When ``column_lang="en"`` is requested, only column *names* are translated.
+状態 cell values stay JP — translate via ``schema.STATE_JA_TO_EN`` downstream
+if needed.
 
 The active-material mass (grams) is required to compute 電気量 when the source
 file does not already contain it. It comes from (in order): the ``mass=``
@@ -31,6 +40,9 @@ import pandas as pd
 
 from toyo_battery.io.schema import (
     CANONICAL_COLUMNS_JA,
+    COL_CAPACITY,
+    COL_CURRENT_MA,
+    COL_ELAPSED_S,
     JA_TO_EN,
     STATE_CODE_TO_JA,
     ColumnLang,
@@ -84,8 +96,10 @@ def read_cell_dir(
         ``.PTN`` was found at the top level of the directory.
     """
     p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"{p} does not exist")
     if not p.is_dir():
-        raise FileNotFoundError(f"{p} is not a directory")
+        raise NotADirectoryError(f"{p} is not a directory")
 
     native = p / RENZOKU_DATA
     if native.exists():
@@ -95,8 +109,9 @@ def read_cell_dir(
 
     py_version = p / RENZOKU_DATA_PY
     if py_version.exists():
+        resolved_mass = _resolve_mass(mass, p)
         df = _read_renzoku_data_py(py_version, encoding, column_lang)
-        return df, _nan_if_none(mass)
+        return df, _nan_if_none(resolved_mass)
 
     raw_files = _find_raw_files(p)
     if raw_files:
@@ -133,6 +148,13 @@ def _read_raw_6digit(
     raw_files: list[Path], mass: float, encoding: str, column_lang: ColumnLang
 ) -> tuple[pd.DataFrame, float]:
     frames = [pd.read_csv(f, header=1, encoding=encoding) for f in raw_files]
+    base_cols = list(frames[0].columns)
+    for f, frame in zip(raw_files[1:], frames[1:]):
+        if list(frame.columns) != base_cols:
+            raise ValueError(
+                f"raw file {f.name} has columns differing from {raw_files[0].name}: "
+                f"{list(frame.columns)} vs {base_cols}"
+            )
     df = pd.concat(frames, axis=0, ignore_index=True)
     df = _clean_columns(df)
     df = _ensure_capacity(df, mass)
@@ -140,26 +162,29 @@ def _read_raw_6digit(
 
 
 def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
-    df.columns = df.columns.str.strip()
+    # Strip BOM (which Excel-saved files sometimes prepend) before whitespace,
+    # so a column like "\ufeffｻｲｸﾙ" still maps via _RAW_TO_CANONICAL.
+    df.columns = df.columns.str.replace("\ufeff", "", regex=False).str.strip()
     return cast("pd.DataFrame", df.rename(columns=_RAW_TO_CANONICAL))
 
 
 def _ensure_capacity(df: pd.DataFrame, mass: float | None) -> pd.DataFrame:
     """Add 電気量 = elapsed_s / 3600 * current_mA / mass, if missing."""
-    if "電気量" in df.columns:
+    if COL_CAPACITY in df.columns:
         return df
     if mass is None or not math.isfinite(mass) or mass <= 0:
         raise ValueError(
-            "cannot compute 電気量: source lacks the column and mass is missing "
+            f"cannot compute {COL_CAPACITY}: source lacks the column and mass is missing "
             "or non-positive. Pass `mass=<grams>` or provide a valid `.PTN`."
         )
-    missing = [c for c in ("経過時間[Sec]", "電流[mA]") if c not in df.columns]
+    missing = [c for c in (COL_ELAPSED_S, COL_CURRENT_MA) if c not in df.columns]
     if missing:
         raise ValueError(
-            f"cannot compute 電気量: source missing columns {missing} and has no precomputed 電気量"
+            f"cannot compute {COL_CAPACITY}: source missing columns {missing} "
+            f"and has no precomputed {COL_CAPACITY}"
         )
     out = df.copy()
-    out["電気量"] = out["経過時間[Sec]"] / 3600.0 * out["電流[mA]"] / mass
+    out[COL_CAPACITY] = out[COL_ELAPSED_S] / 3600.0 * out[COL_CURRENT_MA] / mass
     return cast("pd.DataFrame", out)
 
 
@@ -185,10 +210,14 @@ def _finalize(df: pd.DataFrame, column_lang: ColumnLang) -> pd.DataFrame:
 
 
 def _find_raw_files(cell_dir: Path) -> list[Path]:
-    direct = sorted(q for q in cell_dir.iterdir() if RAW_FILENAME_RE.fullmatch(q.name))
-    if direct:
-        return direct
-    return sorted(cell_dir.glob("**/[0-9][0-9][0-9][0-9][0-9][0-9]"))
+    """Find 6-digit raw files at the top level only.
+
+    Mirrors the top-level-only rule for ``.PTN``: stale files in subdirs (e.g.
+    ``backup/``) must not be silently absorbed into the read.
+    """
+    return sorted(
+        q for q in cell_dir.iterdir() if q.is_file() and RAW_FILENAME_RE.fullmatch(q.name)
+    )
 
 
 def _resolve_mass(explicit: float | None, cell_dir: Path) -> float | None:

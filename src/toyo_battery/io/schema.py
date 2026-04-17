@@ -19,6 +19,12 @@ CANONICAL_COLUMNS_JA: tuple[str, ...] = (
     "電気量",
 )
 
+# Non-canonical TOYO source columns referenced by the reader. Held as named
+# constants here so reader code does not have to hard-code the JP literals.
+COL_ELAPSED_S: str = "経過時間[Sec]"
+COL_CURRENT_MA: str = "電流[mA]"
+COL_CAPACITY: str = "電気量"
+
 CANONICAL_COLUMNS_EN: tuple[str, ...] = (
     "cycle",
     "mode",

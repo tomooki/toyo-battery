@@ -106,6 +106,97 @@ def test_unknown_state_code_raises(tmp_path: Path) -> None:
         read_cell_dir(cell_dir)
 
 
+def test_nan_state_is_preserved(tmp_path: Path) -> None:
+    """A row with empty 状態 should survive — NaN preserved, not raised."""
+    cell_dir = tmp_path / "nan_state"
+    cell_dir.mkdir()
+    raw = [
+        "# summary line 0",
+        "ｻｲｸﾙ,ﾓｰﾄﾞ,状態,電圧[V],経過時間[Sec],電流[mA]",
+        "1,CC,1,3.50,0.0,1.0",
+        "1,CC,,3.55,1800.0,1.0",
+        "1,CC,1,3.60,3600.0,1.0",
+    ]
+    (cell_dir / "000001").write_text("\n".join(raw) + "\n", encoding="shift_jis")
+    (cell_dir / "pattern.PTN").write_text("ACTIVE_MATERIAL WEIGHT 0.002\n", encoding="shift_jis")
+    df, _ = read_cell_dir(cell_dir)
+    assert df["状態"].iloc[0] == "充電"
+    assert pd.isna(df["状態"].iloc[1])
+    assert df["状態"].iloc[2] == "充電"
+
+
+def test_renzoku_py_honors_ptn_mass(make_cell_dir: Callable[..., Path]) -> None:
+    """The _py branch must also resolve mass from a top-level .PTN, like the native branch."""
+    d = make_cell_dir("renzoku_py")
+    (d / "pattern.PTN").write_text("ACTIVE_MATERIAL WEIGHT 0.005\n", encoding="shift_jis")
+    _, mass_g = read_cell_dir(d)
+    assert mass_g == 0.005
+
+
+def test_renzoku_py_with_multiple_ptn_raises(make_cell_dir: Callable[..., Path]) -> None:
+    d = make_cell_dir("renzoku_py")
+    (d / "p1.PTN").write_text("ACTIVE_MATERIAL WEIGHT 0.005\n", encoding="shift_jis")
+    (d / "p2.PTN").write_text("ACTIVE_MATERIAL WEIGHT 0.003\n", encoding="shift_jis")
+    with pytest.raises(ValueError, match=r"multiple \.PTN"):
+        read_cell_dir(d)
+
+
+def test_path_is_a_file_raises_not_a_directory(tmp_path: Path) -> None:
+    f = tmp_path / "not_a_dir.csv"
+    f.write_text("x", encoding="shift_jis")
+    with pytest.raises(NotADirectoryError):
+        read_cell_dir(f)
+
+
+def test_6digit_in_subdir_is_ignored(tmp_path: Path) -> None:
+    """A stale 6-digit raw file in a subdirectory must not be auto-discovered."""
+    cell_dir = tmp_path / "with_backup"
+    cell_dir.mkdir()
+    sub = cell_dir / "old_run"
+    sub.mkdir()
+    (sub / "999999").write_text(
+        "# summary\nｻｲｸﾙ,ﾓｰﾄﾞ,状態,電圧[V],経過時間[Sec],電流[mA]\n1,CC,1,3.50,0.0,1.0\n",
+        encoding="shift_jis",
+    )
+    (cell_dir / "pattern.PTN").write_text("ACTIVE_MATERIAL WEIGHT 0.002\n", encoding="shift_jis")
+    with pytest.raises(FileNotFoundError, match="no TOYO data"):
+        read_cell_dir(cell_dir)
+
+
+def test_read_raw_6digit_multi_file(tmp_path: Path) -> None:
+    cell_dir = tmp_path / "multi"
+    cell_dir.mkdir()
+    header = "ｻｲｸﾙ,ﾓｰﾄﾞ,状態,電圧[V],経過時間[Sec],電流[mA]"
+    file_a = ["# summary line 0", header, "1,CC,1,3.50,0.0,1.0", "1,CC,1,3.55,1800.0,1.0"]
+    file_b = ["# summary line 0", header, "2,CC,2,3.40,3600.0,-1.0", "2,CC,2,3.20,5400.0,-1.0"]
+    (cell_dir / "000001").write_text("\n".join(file_a) + "\n", encoding="shift_jis")
+    (cell_dir / "000002").write_text("\n".join(file_b) + "\n", encoding="shift_jis")
+    (cell_dir / "pattern.PTN").write_text("ACTIVE_MATERIAL WEIGHT 0.002\n", encoding="shift_jis")
+    df, _ = read_cell_dir(cell_dir)
+    assert len(df) == 4
+    assert df["サイクル"].tolist() == [1, 1, 2, 2]
+
+
+def test_read_raw_6digit_mismatched_columns_raises(tmp_path: Path) -> None:
+    cell_dir = tmp_path / "mismatch"
+    cell_dir.mkdir()
+    file_a = [
+        "# summary line 0",
+        "ｻｲｸﾙ,ﾓｰﾄﾞ,状態,電圧[V],経過時間[Sec],電流[mA]",
+        "1,CC,1,3.50,0.0,1.0",
+    ]
+    file_b = [
+        "# summary line 0",
+        "ｻｲｸﾙ,ﾓｰﾄﾞ,状態,電圧[V]",
+        "1,CC,1,3.50",
+    ]
+    (cell_dir / "000001").write_text("\n".join(file_a) + "\n", encoding="shift_jis")
+    (cell_dir / "000002").write_text("\n".join(file_b) + "\n", encoding="shift_jis")
+    (cell_dir / "pattern.PTN").write_text("ACTIVE_MATERIAL WEIGHT 0.002\n", encoding="shift_jis")
+    with pytest.raises(ValueError, match="columns differing"):
+        read_cell_dir(cell_dir)
+
+
 def test_read_raw_6digit_without_mass_and_no_ptn(
     make_cell_dir: Callable[..., Path], tmp_path: Path
 ) -> None:
