@@ -49,7 +49,7 @@ from toyo_battery.io.schema import (
 )
 
 RAW_FILENAME_RE = re.compile(r"[0-9]{6}")
-PTN_GLOB = "*.PTN"
+PTN_SUFFIX = ".ptn"  # matched case-insensitively (Linux CI is case-sensitive)
 RENZOKU_DATA = "連続データ.csv"
 RENZOKU_DATA_PY = "連続データ_py.csv"
 
@@ -223,7 +223,9 @@ def _find_raw_files(cell_dir: Path) -> list[Path]:
 def _resolve_mass(explicit: float | None, cell_dir: Path) -> float | None:
     if explicit is not None:
         return explicit
-    ptn_files = sorted(cell_dir.glob(PTN_GLOB))
+    ptn_files = sorted(
+        p for p in cell_dir.iterdir() if p.is_file() and p.suffix.lower() == PTN_SUFFIX
+    )
     if not ptn_files:
         return None
     if len(ptn_files) > 1:

@@ -13,9 +13,11 @@ from toyo_battery.core.cell import Cell
 from toyo_battery.io.reader import read_cell_dir, read_ptn_mass
 from toyo_battery.io.schema import CANONICAL_COLUMNS_EN, CANONICAL_COLUMNS_JA
 
-# Mirrored from conftest.SENTINEL_CAPACITY_BASE (kept as a literal here to avoid
-# the cross-conftest import dance — change both if you change either).
-_SENTINEL_CAPACITY_BASE: float = 100.0
+# Mirrored from conftest.SENTINEL_CAPACITY_BASE. We do not `from conftest import`
+# because pytest does not add the conftest directory to sys.path (the project
+# uses no tests/__init__.py and no pythonpath= config). Change both if you
+# change either.
+SENTINEL_CAPACITY_BASE: float = 100.0
 
 
 def test_read_renzoku_with_capacity_column(make_cell_dir: Callable[..., Path]) -> None:
@@ -29,7 +31,7 @@ def test_read_renzoku_with_capacity_column(make_cell_dir: Callable[..., Path]) -
     # value-level state mapping: rows are written as integer codes 1,1,0,2,2
     assert df["状態"].tolist() == ["充電", "充電", "休止", "放電", "放電"]
     # precomputed sentinel survives — reader must NOT recompute when 電気量 is present
-    expected_sentinels = [_SENTINEL_CAPACITY_BASE + i for i in range(5)]
+    expected_sentinels = [SENTINEL_CAPACITY_BASE + i for i in range(5)]
     assert df["電気量"].tolist() == pytest.approx(expected_sentinels)
     assert math.isnan(mass_g)  # no .PTN for this layout
 
@@ -147,6 +149,14 @@ def test_renzoku_py_with_multiple_ptn_raises(make_cell_dir: Callable[..., Path])
     (d / "p2.PTN").write_text("ACTIVE_MATERIAL WEIGHT 0.003\n", encoding="shift_jis")
     with pytest.raises(ValueError, match=r"multiple \.PTN"):
         read_cell_dir(d)
+
+
+def test_lowercase_ptn_extension_is_discovered(make_cell_dir: Callable[..., Path]) -> None:
+    """Linux CI is case-sensitive; `.ptn` (lowercase) must still resolve mass."""
+    d = make_cell_dir("renzoku_py")
+    (d / "pattern.ptn").write_text("ACTIVE_MATERIAL WEIGHT 0.007\n", encoding="shift_jis")
+    _, mass_g = read_cell_dir(d)
+    assert mass_g == 0.007
 
 
 def test_path_is_a_file_raises_not_a_directory(tmp_path: Path) -> None:
