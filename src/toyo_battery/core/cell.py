@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from toyo_battery.io.reader import read_cell_dir
 from toyo_battery.io.schema import ColumnLang
 
 
@@ -14,7 +15,8 @@ from toyo_battery.io.schema import ColumnLang
 class Cell:
     """Single-cell measurement + derived quantities.
 
-    Stubbed in P0. Real logic lands in P1 (reader, chdis, capacity, dqdv).
+    P1: holds the normalized raw DataFrame. Derived tables (chdis, capacity,
+    dQ/dV, stats) land in subsequent P1 branches.
     """
 
     name: str
@@ -26,8 +28,11 @@ class Cell:
     def from_dir(
         cls,
         path: str | Path,
+        *,
         mass: float | None = None,
         encoding: str = "shift_jis",
         column_lang: ColumnLang = "ja",
     ) -> Cell:
-        raise NotImplementedError("Cell.from_dir will be implemented in P1")
+        p = Path(path)
+        df, mass_g = read_cell_dir(p, mass=mass, encoding=encoding, column_lang=column_lang)
+        return cls(name=p.name, mass_g=mass_g, raw_df=df, column_lang=column_lang)
