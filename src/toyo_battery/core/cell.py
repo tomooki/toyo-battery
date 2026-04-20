@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
 
 import pandas as pd
 
+from toyo_battery.core.chdis import get_chdis_df
 from toyo_battery.io.reader import read_cell_dir
 from toyo_battery.io.schema import ColumnLang
 
@@ -15,8 +17,14 @@ from toyo_battery.io.schema import ColumnLang
 class Cell:
     """Single-cell measurement + derived quantities.
 
-    P1: holds the normalized raw DataFrame. Derived tables (chdis, capacity,
-    dQ/dV, stats) land in subsequent P1 branches.
+    ``raw_df`` is the normalized source frame. Derived tables (``chdis_df``
+    and, in subsequent branches, capacity / dQ-dV / stats) are exposed as
+    ``cached_property`` so they materialize on first access and are reused.
+
+    ``raw_df`` is treated as immutable after construction. Mutating it in
+    place (e.g. ``cell.raw_df.drop(...)``) will leave any already-accessed
+    cached properties stale. Build a new ``Cell`` from the modified frame
+    instead.
     """
 
     name: str
@@ -36,3 +44,7 @@ class Cell:
         p = Path(path)
         df, mass_g = read_cell_dir(p, mass=mass, encoding=encoding, column_lang=column_lang)
         return cls(name=p.name, mass_g=mass_g, raw_df=df, column_lang=column_lang)
+
+    @cached_property
+    def chdis_df(self) -> pd.DataFrame:
+        return get_chdis_df(self.raw_df, column_lang=self.column_lang)
