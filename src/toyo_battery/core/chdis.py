@@ -8,22 +8,27 @@ with a 3-level column MultiIndex:
     level 1  side     — "ch" or "dis"
     level 2  quantity — "電気量"/"電圧" (or EN equivalents) as in the input
 
-The TOYO 連続データ format has 電気量 reset to 0 at the start of each
-segment and accumulate monotonically within it (positive for both charge
-and discharge). Rows where 電気量 reverses within a segment
-(``diff() < 0``) are dropped — these typically come from tester-side
-bookkeeping glitches.
+Capacity sign: within a segment, ``電気量`` may be either monotone-positive
+(real TOYO 連続データ format, where the tester resets to 0 per segment) or
+signed (output of the reader's raw-6-digit path, where discharge current
+is negative and capacity accumulates negatively). The reversal filter
+operates on the **absolute** capacity so it works under either convention:
+rows where ``|電気量|.diff() < 0`` are dropped as tester-side glitches.
 
-First-cycle-is-charge normalization: if cycle 1 begins with 放電
-(discharge), *all* 状態 labels in the frame are swapped (充電 ↔ 放電).
-This is the convention used by TOYO workflows where half-cells can be
-characterized in either direction.
+First-cycle-is-charge normalization: if cycle 1 begins with 放電 (discharge),
+*all* 状態 labels in the frame are swapped (充電 ↔ 放電). This is the TOYO
+convention for half-cells characterized discharge-first. Callers with an
+unusual dataset where only cycle 1 is discharge-first (e.g. a one-off
+formation discharge followed by normal charge-first cycles) must relabel
+before calling this function. A test pins the global-swap behavior so
+regressions are visible.
 
 Rewrite note (vs. legacy TOYO_Origin_2.01): the original used string
 MultiIndex labels like ``"1-ch"`` and checked the first-cycle direction
 from ``df.at[1, "状態"]`` (row *1*, not row 0). This implementation uses
-tuple labels ``(1, "ch", "電気量")`` and checks the first row of the
-first cycle. Numerical values are unchanged.
+tuple labels ``(1, "ch", "電気量")`` and checks the first row of the first
+cycle, which is also more robust against a rest row at position 0 that
+v2.01 could misread.
 """
 
 from __future__ import annotations
@@ -75,8 +80,22 @@ def get_chdis_df(df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.Data
         Columns: MultiIndex with levels ``cycle``, ``side``, ``quantity``.
         For missing pairs (e.g. a cycle that only has a charge segment),
         rows are padded with NaN so all segments share a single row axis.
+
+    Raises
+    ------
+    KeyError
+        If the input frame is missing any of the required columns for the
+        requested ``column_lang``.
     """
     cols = _resolve_cols(column_lang)
+    required = [cols[k] for k in ("cycle", "state", "voltage", "capacity")]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise KeyError(
+            f"input missing required columns {missing} "
+            f"for column_lang={column_lang!r}; got columns={list(df.columns)}"
+        )
+
     cap_col, v_col, cycle_col, state_col = (
         cols["capacity"],
         cols["voltage"],
@@ -98,7 +117,9 @@ def get_chdis_df(df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.Data
     pieces: dict[tuple[int, str], pd.DataFrame] = {}
     for (cycle_val, state_val), g in working.groupby([cycle_col, state_col], sort=True):
         side = _STATE_TO_SIDE[str(state_val)]
-        segment = g[[cap_col, v_col]].loc[~(g[cap_col].diff() < 0)].reset_index(drop=True)
+        # abs() so the filter works whether capacity is monotone-positive
+        # (real 連続データ) or signed (reader's raw-6-digit formula output).
+        segment = g[[cap_col, v_col]].loc[~(g[cap_col].abs().diff() < 0)].reset_index(drop=True)
         pieces[(int(cycle_val), side)] = segment
 
     out = pd.concat(pieces, axis=1)

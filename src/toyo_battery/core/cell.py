@@ -20,6 +20,11 @@ class Cell:
     ``raw_df`` is the normalized source frame. Derived tables (``chdis_df``
     and, in subsequent branches, capacity / dQ-dV / stats) are exposed as
     ``cached_property`` so they materialize on first access and are reused.
+
+    ``raw_df`` is treated as immutable after construction. Mutating it in
+    place (e.g. ``cell.raw_df.drop(...)``) will leave any already-accessed
+    cached properties stale. Build a new ``Cell`` from the modified frame
+    instead.
     """
 
     name: str
