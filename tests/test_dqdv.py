@@ -7,6 +7,7 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from toyo_battery.core.cell import Cell
 from toyo_battery.core.chdis import get_chdis_df
@@ -104,6 +105,60 @@ def test_column_lang_en_uses_english_quantity_names() -> None:
     # And the JA names are absent.
     assert "電圧" not in qset
     assert "dQ/dV" not in qset
+
+
+def test_wrong_column_lang_raises_with_context() -> None:
+    """Passing JA-labeled quantities with ``column_lang='en'`` must raise a
+    helpful ``KeyError`` (mirrors :func:`chdis.get_chdis_df` behavior).
+
+    Regression test for a prior bug where the per-segment ``try/except`` in
+    ``get_dqdv_df`` silently swallowed the mismatch and returned an all-NaN
+    frame — turning a configuration bug into silent data loss.
+    """
+    raw = _linear_chdis_ch_only(lang="ja")
+    chdis = get_chdis_df(raw, column_lang="ja")  # quantity level = {電圧, 電気量}
+    with pytest.raises(KeyError, match="column_lang='en'"):
+        get_dqdv_df(chdis, column_lang="en")
+
+
+def test_cc_cv_plateau_preserves_tail_capacity() -> None:
+    """CC-CV charging: V rises to V_max, then plateaus while Q keeps growing.
+
+    ``drop_duplicates(keep="last")`` must preserve the tail Q at V_max. With
+    ``keep="first"`` the CV tail would be silently dropped and the Q value at
+    V_max would be the start of the plateau, not the end.
+    """
+    # CC segment: V rises 3.0 → 4.2 linearly, Q rises 0 → 480.
+    # CV segment: V pinned at 4.2, Q continues 480 → 530 (tail capacity).
+    n_cc = 200
+    v_cc = np.linspace(3.0, 4.2, n_cc)
+    q_cc = 400.0 * (v_cc - 3.0)  # slope 400, ends at Q=480
+    n_cv = 50
+    v_cv = np.full(n_cv, 4.2)
+    q_cv = np.linspace(480.0, 530.0, n_cv)
+
+    rows: list[tuple[int, str, float, float]] = []
+    rows.extend((1, "充電", float(vi), float(qi)) for vi, qi in zip(v_cc, q_cc))
+    rows.extend((1, "充電", float(vi), float(qi)) for vi, qi in zip(v_cv, q_cv))
+    raw = pd.DataFrame(rows, columns=["サイクル", "状態", "電圧", "電気量"])
+    chdis = get_chdis_df(raw)
+
+    out = get_dqdv_df(chdis, inter_num=100, window_length=11, polyorder=2)
+    # The interpolator sees the real Q(V=4.2) = 530, so the dQ/dV grid
+    # evaluated at V=4.2 must correspond to a Q-level near 530, not 480.
+    # We verify this indirectly: the total integrated dQ from V_min to V_max,
+    # using trapezoidal rule on the (V, dQ/dV) grid, should approximate the
+    # full Q excursion 0 → 530 (not the CC-only 0 → 480).
+    v_grid = out[(1, "ch", "電圧")].dropna().to_numpy()
+    dqdv_grid = out[(1, "ch", "dQ/dV")].dropna().to_numpy()
+    # np.trapezoid replaces np.trapz (removed in numpy 2.0); fall back for 1.x.
+    trap = getattr(np, "trapezoid", None) or np.trapz  # type: ignore[attr-defined]
+    integrated_q = float(trap(dqdv_grid, v_grid))
+    # Without the fix this would be ≈ 480 (CC only). With the fix, the
+    # interpolator reaches the CV tail and the integral approaches ≈ 530.
+    assert integrated_q > 500.0, (
+        f"CV tail capacity was dropped: integrated Q = {integrated_q:.1f} mAh, expected >500"
+    )
 
 
 def test_cell_dqdv_df_is_cached(make_cell_dir: Callable[..., Path]) -> None:

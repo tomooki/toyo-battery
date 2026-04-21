@@ -118,6 +118,14 @@ def get_dqdv_df(
     if chdis_df.empty or chdis_df.columns.empty:
         return _empty_result()
 
+    quantity_values = set(chdis_df.columns.get_level_values("quantity"))
+    missing_quantities = sorted({v_name, q_name} - quantity_values)
+    if missing_quantities:
+        raise KeyError(
+            f"input missing required quantity level values {missing_quantities} "
+            f"for column_lang={column_lang!r}; got quantities={sorted(quantity_values)}"
+        )
+
     cols_tuples = cast("list[tuple[int, str, str]]", list(chdis_df.columns))
     cycle_side_pairs: list[tuple[int, str]] = sorted(
         {(int(c), str(s)) for c, s, _q in cols_tuples},
@@ -138,9 +146,15 @@ def get_dqdv_df(
             per_segment[(cycle, side)] = None
             continue
 
+        # ``keep="last"``: chdis guarantees Q is monotone non-decreasing within
+        # each segment. After a stable sort by V, the last row among duplicate
+        # V values preserves the highest Q — which is essential for CC-CV
+        # plateaus where V saturates at V_max (charge) or V_min (discharge)
+        # while Q continues to grow. ``keep="first"`` would silently discard
+        # the CV tail capacity.
         frame = (
             frame.sort_values("v", kind="mergesort")
-            .drop_duplicates(subset="v", keep="first")
+            .drop_duplicates(subset="v", keep="last")
             .reset_index(drop=True)
         )
         if len(frame) < 2:
