@@ -17,20 +17,20 @@ def _chdis(
     segments: dict[tuple[int, str], list[tuple[float, float]]],
     *,
     quantity_cap: str = "電気量",
-    quantity_v: str = "電圧",
 ) -> pd.DataFrame:
     """Build a minimal chdis_df from ``(cycle, side) -> [(voltage, capacity)]``.
 
     Output mirrors the shape produced by :func:`toyo_battery.core.chdis.get_chdis_df`:
     a 3-level column MultiIndex ``(cycle, side, quantity)`` with NaN-padded
-    rows so all segments share a row axis.
+    rows so all segments share a row axis. ``get_cap_df`` only reads the
+    capacity quantity, so the voltage label is hardcoded (``"電圧"``).
     """
     pieces: dict[tuple[int, str], pd.DataFrame] = {}
     for (cycle, side), rows in segments.items():
         if rows:
-            df = pd.DataFrame(rows, columns=[quantity_v, quantity_cap])
+            df = pd.DataFrame(rows, columns=["電圧", quantity_cap])
         else:
-            df = pd.DataFrame(columns=[quantity_v, quantity_cap])
+            df = pd.DataFrame(columns=["電圧", quantity_cap])
         pieces[(cycle, side)] = df
     out = pd.concat(pieces, axis=1) if pieces else pd.DataFrame()
     out.columns = out.columns.set_names(["cycle", "side", "quantity"])
@@ -146,7 +146,7 @@ def test_column_lang_en_input_produces_same_english_output() -> None:
         (2, "ch"): [(3.50, 0.0), (3.60, 480.0)],
         (2, "dis"): [(3.60, 0.0), (3.40, 475.0)],
     }
-    chdis_en = _chdis(segments, quantity_cap="capacity", quantity_v="voltage")
+    chdis_en = _chdis(segments, quantity_cap="capacity")
     cap = get_cap_df(chdis_en, column_lang="en")
 
     assert list(cap.columns) == ["q_ch", "q_dis", "ce"]

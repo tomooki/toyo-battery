@@ -94,6 +94,23 @@ def get_cap_df(chdis_df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.
     cols = _resolve_cols(column_lang)
     cap_col = cols["capacity"]
 
+    # Structural check runs *before* the empty short-circuit so a
+    # flat-columns empty frame surfaces the same ``KeyError`` as a
+    # flat-columns populated frame — the error surface for a given bug
+    # should not depend on whether the input happened to contain rows.
+    if not isinstance(chdis_df.columns, pd.MultiIndex) or chdis_df.columns.nlevels != 3:
+        # Exception: a truly empty frame (no rows, no columns — `pd.DataFrame()`)
+        # is the one shape we accept without a 3-level MultiIndex, because
+        # ``chdis._empty_result`` is the canonical empty contract and we want
+        # ``get_cap_df(empty) -> empty`` to round-trip.
+        if chdis_df.empty and chdis_df.columns.empty:
+            return _empty_result()
+        raise KeyError(
+            "chdis_df.columns must be a 3-level MultiIndex "
+            "(cycle, side, quantity); "
+            f"got {chdis_df.columns!r}"
+        )
+
     # Empty on either axis → empty result with correct schema. Using ``or``
     # so a frame with column structure but zero rows (e.g. chdis after
     # every segment was reversal-filtered clean) also short-circuits,
@@ -101,17 +118,6 @@ def get_cap_df(chdis_df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.
     # surprise callers expecting ``cap_df.empty`` to track input-emptiness.
     if chdis_df.empty or chdis_df.columns.empty:
         return _empty_result()
-
-    # Validate that the chdis_df has the expected 3-level MultiIndex and
-    # carries the requested capacity quantity label. We check against the
-    # quantity level rather than attempting a cross-section so the error
-    # message is explicit about the column_lang mismatch.
-    if not isinstance(chdis_df.columns, pd.MultiIndex) or chdis_df.columns.nlevels != 3:
-        raise KeyError(
-            "chdis_df.columns must be a 3-level MultiIndex "
-            "(cycle, side, quantity); "
-            f"got {chdis_df.columns!r}"
-        )
 
     quantity_values = set(chdis_df.columns.get_level_values("quantity"))
     if cap_col not in quantity_values:
