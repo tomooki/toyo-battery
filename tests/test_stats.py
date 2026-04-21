@@ -524,13 +524,15 @@ def test_retention_threshold_out_of_range_raises(bad: float) -> None:
         stat_table([cell], target_cycles=(1,), retention_threshold=bad)
 
 
-def test_duplicate_target_cycles_raises() -> None:
-    """``target_cycles`` with duplicates raises — prevents silently-duplicated columns.
+@pytest.mark.parametrize("dup", [(1, 1, 2), (2, 1, 1), (1, 2, 1)])
+def test_duplicate_target_cycles_raises(dup: tuple[int, ...]) -> None:
+    """``target_cycles`` with duplicates raises — regardless of position.
 
     Pandas will happily emit two columns named ``Q_dis@1``; downstream
     consumers (and ``.to_csv``) then behave surprisingly. Surface the
     sloppy caller intent at the entry point rather than shipping a
-    malformed frame.
+    malformed frame. The parametrize pins position-independence: the
+    duplicate can sit at start, end, or sandwiched — all fire.
     """
     cell = _linear_cell(
         "v",
@@ -538,7 +540,7 @@ def test_duplicate_target_cycles_raises() -> None:
         cycles_q_dis={1: 990.0, 2: 880.0},
     )
     with pytest.raises(ValueError, match="target_cycles"):
-        stat_table([cell], target_cycles=(1, 1, 2))
+        stat_table([cell], target_cycles=dup)
 
 
 @pytest.mark.parametrize("layout", ["renzoku", "renzoku_py", "raw_6digit"])
