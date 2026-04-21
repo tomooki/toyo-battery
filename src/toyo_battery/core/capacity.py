@@ -9,6 +9,12 @@ The derived column names are **fixed English** (``q_ch``, ``q_dis``,
 ``column_lang`` selects which *input* quantity label (JA ``電気量`` or EN
 ``capacity``) to read from, not the output schema.
 
+Sign convention: ``ce`` inherits its sign arithmetically from
+``q_dis / q_ch``. The :mod:`chdis` contract guarantees
+``|capacity|`` is monotone non-decreasing per segment, so for well-formed
+real data both maxes are non-negative and ``ce`` sits in roughly
+``[0, 100 + epsilon]``.
+
 Rewrite note (vs. legacy TOYO_Origin_2.01): v2.01's ``get_cap_df`` pivoted
 through ``df.query('状態 in [...]')`` on the raw frame and used
 ``df["状態"][1]`` to decide whether the first cycle was charge- or
@@ -26,7 +32,7 @@ import pandas as pd
 
 from toyo_battery.io.schema import JA_TO_EN, ColumnLang
 
-# Single-entry today; retained in dict form to match the chdis/dqdv pattern
+# Single-entry today; retained in dict form to match the :mod:`chdis` pattern
 # and keep the door open for adding voltage or current when stats.py joins.
 _JA_COLS: dict[str, str] = {
     "capacity": "電気量",
@@ -71,7 +77,11 @@ def get_cap_df(chdis_df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.
         Index is ``cycle`` (int). Columns are ``["q_ch", "q_dis", "ce"]``
         (all float). ``ce`` is in percent. ``ce`` is ``NaN`` when
         ``q_ch == 0`` (not ``inf``). Missing ch or dis for a cycle yields
-        ``NaN`` for that column; the cycle row is preserved.
+        ``NaN`` for that column; the cycle row is preserved — including
+        the degenerate case where both sides are all-NaN (e.g. a cycle
+        whose columns exist but whose values were wiped by the reversal
+        filter), which produces a row of ``NaN`` values rather than being
+        dropped.
 
     Raises
     ------
@@ -125,7 +135,10 @@ def get_cap_df(chdis_df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.
     wide = wide.reindex(columns=["ch", "dis"])
 
     # Preserve every cycle from the input, including ones with only one side.
-    cycles = sorted(set(chdis_df.columns.get_level_values("cycle")))
+    # chdis already sorts by cycle via ``groupby(..., sort=True)``, but
+    # ``.unique().sort_values()`` is explicit and enforces the ``int64``
+    # contract on the index dtype in one pass.
+    cycles = chdis_df.columns.get_level_values("cycle").unique().astype("int64").sort_values()
     wide = wide.reindex(index=cycles)
 
     q_ch = wide["ch"].astype("float64")
@@ -135,15 +148,10 @@ def get_cap_df(chdis_df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.
     # pandas Series division returns ``inf`` without raising for float
     # divide-by-zero, so no ``np.errstate`` wrapper is needed; the
     # ``where(q_ch != 0, NaN)`` below overrides ``inf`` to NaN.
-    ce = 100.0 * q_dis / q_ch
-    ce = ce.where(q_ch != 0, other=np.nan)
+    ce = (100.0 * q_dis / q_ch).where(q_ch != 0, other=np.nan)
 
-    out = pd.DataFrame(
-        {
-            "q_ch": q_ch.to_numpy(dtype="float64"),
-            "q_dis": q_dis.to_numpy(dtype="float64"),
-            "ce": ce.to_numpy(dtype="float64"),
-        },
-        index=pd.Index([int(c) for c in cycles], name="cycle", dtype="int64"),
-    )
+    # Build DataFrame directly from the Series trio so dtypes round-trip
+    # without a numpy detour; name the index in place.
+    out = pd.DataFrame({"q_ch": q_ch, "q_dis": q_dis, "ce": ce})
+    out.index.name = "cycle"
     return out

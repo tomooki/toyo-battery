@@ -37,10 +37,12 @@ def _chdis(
     return out
 
 
-def _empty_chdis(*, lang: str = "ja") -> pd.DataFrame:
-    """Return an empty chdis_df with the expected 3-level MultiIndex."""
-    # Match the shape produced by chdis._empty_result.
-    _ = lang  # Empty frames carry no quantity labels so lang is not material.
+def _empty_chdis() -> pd.DataFrame:
+    """Return an empty chdis_df with the expected 3-level MultiIndex.
+
+    Matches the shape produced by :func:`chdis._empty_result`. Empty frames
+    carry no quantity labels so ``column_lang`` is not material here.
+    """
     idx = pd.MultiIndex.from_tuples([], names=["cycle", "side", "quantity"])
     return pd.DataFrame(columns=idx)
 
@@ -218,21 +220,47 @@ def test_cell_cap_df_cached_and_columns(make_cell_dir: Callable[..., Path]) -> N
     assert cell.cap_df.index.name == "cycle"
 
 
-def test_cell_cap_df_values_from_shared_fixture(make_cell_dir: Callable[..., Path]) -> None:
-    """Shared fixture: one cycle, q_ch=q_dis=1000, ce=100%.
+@pytest.mark.parametrize("layout", ["renzoku", "renzoku_py", "raw_6digit"])
+def test_cell_cap_df_values_from_shared_fixture(
+    make_cell_dir: Callable[..., Path], layout: str
+) -> None:
+    """All three on-disk layouts yield the same q_ch / q_dis / ce values.
 
-    The fixture's single cycle has elapsed=3600s, current=1mA, mass=1mg
-    → capacity = 1·3600/(3600·0.001·1000) · 1000 = 1000 mAh/g at each
-    segment end; the 電気量 column is pre-filled with exactly these values
-    (renzoku) or derived from elapsed·current/mass (raw_6digit), so both
-    paths produce q_ch = q_dis = 1000 and ce = 100.
+    The shared fixture's single cycle has elapsed=3600s, current=1mA,
+    mass=1mg → capacity = 1·3600/(3600·0.001·1000) · 1000 = 1000 mAh/g at
+    each segment end. The 電気量 column is pre-filled with exactly these
+    values (renzoku / renzoku_py) or derived from elapsed·current/mass
+    (raw_6digit), so all three paths produce q_ch = q_dis = 1000 and
+    ce = 100.
     """
-    cell = Cell.from_dir(make_cell_dir("renzoku"))
+    cell = Cell.from_dir(make_cell_dir(layout))
     cap = cell.cap_df
     assert cap.index.tolist() == [1]
     np.testing.assert_allclose(cap.loc[1, "q_ch"], 1000.0)
     np.testing.assert_allclose(cap.loc[1, "q_dis"], 1000.0)
     np.testing.assert_allclose(cap.loc[1, "ce"], 100.0)
+
+
+def test_zero_row_populated_columns_short_circuits_to_empty() -> None:
+    """Columns present but zero rows → empty cap_df (not a row of NaN).
+
+    Pins the behavior installed by the early-return ``or`` gate: a chdis
+    frame with column structure but zero rows (e.g. every segment was
+    wiped by the reversal filter) short-circuits to the empty result,
+    keeping ``cap_df.empty`` a reliable proxy for input-emptiness.
+    """
+    segments: dict[tuple[int, str], list[tuple[float, float]]] = {
+        (1, "ch"): [],
+        (1, "dis"): [],
+    }
+    chdis = _chdis(segments)
+    # Confirm the fixture hits the targeted path: has columns, zero rows.
+    assert not chdis.columns.empty
+    assert len(chdis) == 0
+
+    cap = get_cap_df(chdis)
+    assert cap.empty
+    assert list(cap.columns) == ["q_ch", "q_dis", "ce"]
 
 
 def test_cell_cap_df_respects_column_lang(make_cell_dir: Callable[..., Path]) -> None:
