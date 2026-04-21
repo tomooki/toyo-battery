@@ -8,6 +8,8 @@ suite is silently skipped when the ``[plot]`` extra is not installed.
 
 from __future__ import annotations
 
+from collections.abc import Generator
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -18,6 +20,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 
+import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.colors import to_rgba
 from matplotlib.figure import Figure
@@ -33,6 +36,17 @@ from toyo_battery.plotting.matplotlib_backend import (
 
 _RED = to_rgba("red")
 _BLACK = to_rgba("black")
+
+
+@pytest.fixture(autouse=True)
+def _close_figures() -> Generator[None, None, None]:
+    """Close all matplotlib figures after each test.
+
+    Without this, the ~dozen tests in this module each leak a Figure and
+    the suite eventually trips matplotlib's ``max_open_warning``.
+    """
+    yield
+    plt.close("all")
 
 
 def _visible(fig: Figure) -> list[Axes]:

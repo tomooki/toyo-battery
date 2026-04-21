@@ -188,11 +188,13 @@ def plot_chdis(
                 q_key = (cycle, side, q_name)
                 if v_key not in chdis.columns or q_key not in chdis.columns:
                     continue
-                v = chdis[v_key].dropna()
-                q = chdis[q_key].dropna()
-                if v.empty or q.empty:
+                # Drop NaNs jointly so x/y stay positionally aligned; per-column
+                # dropna would silently misplot if the two columns ever have
+                # asymmetric NaN patterns.
+                pair = chdis[[q_key, v_key]].dropna()
+                if pair.empty:
                     continue
-                ax.plot(q, v, color=color, linewidth=0.9)
+                ax.plot(pair[q_key], pair[v_key], color=color, linewidth=0.9)
                 drew_any = True
             if drew_any:
                 plotted.append(cycle)
@@ -208,6 +210,11 @@ def plot_chdis(
 
 def plot_cycle(cells: Sequence[Cell]) -> Figure:
     """Per-cycle discharge capacity (left Y) and Coulombic efficiency (right Y).
+
+    Unlike :func:`plot_chdis` / :func:`plot_dqdv`, this function has no
+    ``cycles=`` parameter: the whole point of a cycle plot is the
+    capacity-vs-cycle trajectory, and slicing out cycles would break the
+    trend lines rather than filter them.
 
     Parameters
     ----------
@@ -305,11 +312,11 @@ def plot_dqdv(
                 y_key = (cycle, side, dqdv_name)
                 if v_key not in dqdv.columns or y_key not in dqdv.columns:
                     continue
-                v = dqdv[v_key].dropna()
-                y = dqdv[y_key].dropna()
-                if v.empty or y.empty:
+                # Joint dropna — see plot_chdis for the rationale.
+                pair = dqdv[[v_key, y_key]].dropna()
+                if pair.empty:
                     continue
-                ax.plot(v, y, color=color, linewidth=0.9)
+                ax.plot(pair[v_key], pair[y_key], color=color, linewidth=0.9)
                 drew_any = True
             if drew_any:
                 plotted.append(cycle)
