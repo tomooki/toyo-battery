@@ -41,14 +41,17 @@ def _linear_chdis_ch_only(
 def test_linear_ramp_yields_constant_derivative() -> None:
     """Q = slope * (V - V_lo) → dQ/dV ≈ slope everywhere (within savgol bounds)."""
     slope = 500.0
+    window_length = 11
     raw = _linear_chdis_ch_only(slope=slope, v_lo=3.0, v_hi=4.2, n_points=200)
     chdis = get_chdis_df(raw)
 
-    out = get_dqdv_df(chdis)
+    out = get_dqdv_df(chdis, window_length=window_length)
     dqdv_series = out[(1, "ch", "dQ/dV")].dropna()
-    # Interior samples (trim edges where savgol_filter mode="nearest"
-    # mildly distorts) should recover the analytical slope.
-    interior = dqdv_series.iloc[5:-5]
+    # Trim the savgol edge-approximated samples (mode="nearest" biases the
+    # first/last half-window). Computing ``half`` from ``window_length``
+    # keeps the trim correct if the default window changes.
+    half = window_length // 2
+    interior = dqdv_series.iloc[half:-half]
     np.testing.assert_allclose(np.median(interior), slope, rtol=0.05)
 
 

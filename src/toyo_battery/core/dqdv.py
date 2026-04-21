@@ -210,12 +210,14 @@ def get_dqdv_df(
 
     per_segment: dict[tuple[int, str], _SegPair | None] = {}
     for cycle, side in cycle_side_pairs:
-        try:
-            v_series = chdis_df[(cycle, side, v_name)]
-            q_series = chdis_df[(cycle, side, q_name)]
-        except KeyError:
-            per_segment[(cycle, side)] = None
-            continue
+        # Both quantities are guaranteed to exist: cycle_side_pairs is
+        # derived from chdis_df.columns, and the top-level missing_quantities
+        # check already verified v_name and q_name are present in the
+        # quantity level. A KeyError here would indicate a chdis contract
+        # violation — a per-(cycle,side) quantity asymmetry — which should
+        # propagate loudly rather than be silently masked.
+        v_series = chdis_df[(cycle, side, v_name)]
+        q_series = chdis_df[(cycle, side, q_name)]
 
         frame = pd.concat({"v": v_series, "q": q_series}, axis=1).dropna()
         if frame.empty:
