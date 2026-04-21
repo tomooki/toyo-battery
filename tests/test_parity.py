@@ -88,8 +88,9 @@ _FIXTURE_V_DIS_LO: float = 3.20
 
 # Capacity (mAh/g) at the end of a segment: Q = I * Δt / 3600 / mass.
 # For I=1 mA, Δt=3600 s, mass=0.001 g → Q = 1000.
-_EXPECTED_Q: float = _FIXTURE_I_MA * _FIXTURE_DELTA_T_S / 3600.0 / _FIXTURE_MASS_G
-assert _EXPECTED_Q == 1000.0  # sanity-check the derivation at import time
+# Keep this as the analytical constant rather than deriving it through
+# floating-point division by 0.001 at import time.
+_EXPECTED_Q: float = 1000.0
 
 # Energy-weighted mean voltage over a linear V ramp with monotone-rising
 # Q is the arithmetic mean of the V endpoints: V_mean = (V_lo + V_hi)/2.
