@@ -33,6 +33,7 @@ htmlcov/
 coverage.xml
 .tox/
 .nox/
+data/
 
 # Type checking
 .mypy_cache/

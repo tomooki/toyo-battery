@@ -2,31 +2,42 @@
 
 Discovery priority for a given cell directory ``path``:
 
-1. ``連続データ.csv``              — native export from the tester (header=3, skiprows=[4,5,6])
+1. ``連続データ.csv``              — native export from the tester
+   (7-line header: 3 metadata rows, then column-name row, channel row,
+   separator row, units row; ``header=3, skiprows=[4,5,6]``)
 2. ``連続データ_py.csv``           — already-normalized output from a previous run
 3. 6-digit raw file(s) + ``*.PTN`` — factory raw; 電気量 is computed from mass
 
 All three paths converge on the same canonical schema (canonical columns first;
-any extra source columns such as 経過時間[Sec] / 電流[mA] are preserved after
-them so downstream P1 phases can use them):
+any extra source columns such as 経過時間[Sec] / 電流[mA] / 日付 / 時刻 /
+総ｻｲｸﾙ are preserved after them so downstream P1 phases can use them):
 
     Canonical columns: サイクル, モード, 状態, 電圧, 電気量
-    状態 values: {"休止", "充電", "放電"} (or NaN where the source had no value)
-
-The column count therefore differs from legacy v2.01, which dropped the raw
-measurement columns after computing 電気量. Numerical parity with v2.01 holds
-on the canonical 5-column subset; tests that compare whole DataFrames must
-project to that subset first.
+    状態 values:
+      - Native 連続データ.csv:  {"充電", "放電", "充電休止", "放電休止"}
+      - Raw 6-digit (int→JA):   {"充電", "放電", "休止"}
+      - 連続データ_py.csv:       whatever was persisted (usually the 3-value set)
 
 When ``column_lang="en"`` is requested, only column *names* are translated.
 状態 cell values stay JP — translate via ``schema.STATE_JA_TO_EN`` downstream
 if needed.
 
-The active-material mass (grams) is required to compute 電気量 when the source
-file does not already contain it. It comes from (in order): the ``mass=``
-argument, or a single top-level ``*.PTN`` file in the directory (third
-whitespace token on line 0). If multiple ``.PTN`` files are present, the
-caller must disambiguate via ``mass=`` — the reader refuses to guess.
+The active-material mass (grams) is resolved in this priority order:
+
+1. Explicit ``mass=`` argument (grams)
+2. ``重量[mg]`` from ``連続データ.csv`` metadata row 3 (converted mg → g)
+3. A ``*.PTN`` file whose first line's 3rd whitespace-separated token parses
+   as float (grams). Other ``.PTN`` files (e.g. ``*_OPTION.PTN`` config
+   files shipped alongside the main pattern file) are skipped automatically.
+
+On the raw 6-digit path the formula is::
+
+    電気量 = 経過時間[Sec] / 3600  * 電流[mA] / mass
+
+Real TOYO raw files set ``経過時間[Sec]`` to reset at each state transition
+and emit ``電流[mA]`` as an unsigned magnitude, so this formula produces
+per-segment monotone-non-decreasing 電気量 (matching the convention that
+``連続データ.csv`` already uses inline).
 """
 
 from __future__ import annotations
@@ -53,13 +64,28 @@ PTN_SUFFIX = ".ptn"  # matched case-insensitively (Linux CI is case-sensitive)
 RENZOKU_DATA = "連続データ.csv"
 RENZOKU_DATA_PY = "連続データ_py.csv"
 
+# Half-width → full-width canonical rename. The raw 6-digit header row uses
+# half-width katakana for the cycle/mode columns.
 _RAW_TO_CANONICAL = {"ｻｲｸﾙ": "サイクル", "ﾓｰﾄﾞ": "モード", "電圧[V]": "電圧"}
+
+# Metadata key used by the native 連続データ.csv to carry active-material mass.
+_METADATA_MASS_KEY = "重量[mg]"
+
+# Number of metadata rows to scan when looking for 重量[mg]. The real file
+# has exactly 3 metadata rows before the column-header row (index 3), so
+# a scan of the first 4 rows is generous.
+_METADATA_SCAN_ROWS = 4
 
 
 def read_ptn_mass(ptn_path: str | Path) -> float:
     """Extract active-material mass (grams) from a ``.PTN`` file.
 
-    TOYO convention: the mass is the third whitespace-separated token on line 0.
+    TOYO convention: the mass is the third whitespace-separated token on
+    line 0 of a main pattern file. Auxiliary ``.PTN`` files that TOYO ships
+    alongside the main one (``*_OPTION.PTN``, ``*_Option2.PTN``, etc.)
+    carry INI- or CSV-style configuration, not a mass; calling this on
+    them will raise ``ValueError``, which :func:`_resolve_mass_from_ptn`
+    relies on to skip them.
     """
     path = Path(ptn_path)
     with path.open(encoding="shift_jis", errors="replace") as f:
@@ -89,11 +115,12 @@ def read_cell_dir(
     df : DataFrame
         Canonical columns first (see :data:`schema.CANONICAL_COLUMNS_JA` or
         the EN equivalent when ``column_lang="en"``), followed by any extra
-        columns present in the source file (e.g. 経過時間[Sec], 電流[mA]).
+        columns present in the source file (e.g. 経過時間[Sec], 電流[mA],
+        日付, 時刻, 総ｻｲｸﾙ).
     mass_g : float
         Active-material mass used for the capacity calculation, in grams.
         ``math.nan`` if the source already had 電気量 precomputed and no
-        ``.PTN`` was found at the top level of the directory.
+        mass information was available anywhere.
     """
     p = Path(path)
     if not p.exists():
@@ -103,7 +130,7 @@ def read_cell_dir(
 
     native = p / RENZOKU_DATA
     if native.exists():
-        resolved_mass = _resolve_mass(mass, p)
+        resolved_mass = _resolve_mass(mass, p, native_csv=native, encoding=encoding)
         df = _read_renzoku_data(native, resolved_mass, encoding, column_lang)
         return df, _nan_if_none(resolved_mass)
 
@@ -147,6 +174,10 @@ def _read_renzoku_data_py(path: Path, encoding: str, column_lang: ColumnLang) ->
 def _read_raw_6digit(
     raw_files: list[Path], mass: float, encoding: str, column_lang: ColumnLang
 ) -> tuple[pd.DataFrame, float]:
+    # Real-format raw files have: line 0 = "0,0,0,..." summary marker,
+    # blank line(s), then the column-header row. pandas' default
+    # skip_blank_lines=True collapses the blanks, so header=1 selects the
+    # real header (the summary line is row 0 post-blank-skip).
     frames = [pd.read_csv(f, header=1, encoding=encoding) for f in raw_files]
     base_cols = list(frames[0].columns)
     for f, frame in zip(raw_files[1:], frames[1:]):
@@ -157,6 +188,7 @@ def _read_raw_6digit(
             )
     df = pd.concat(frames, axis=0, ignore_index=True)
     df = _clean_columns(df)
+    df = _drop_unnamed(df)
     df = _ensure_capacity(df, mass)
     return _finalize(df, column_lang), mass
 
@@ -168,8 +200,26 @@ def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     return cast("pd.DataFrame", df.rename(columns=_RAW_TO_CANONICAL))
 
 
+def _drop_unnamed(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop columns pandas auto-labels ``Unnamed: N``.
+
+    Raw TOYO 6-digit files have 6-7 empty separator columns between the
+    sensor block (``経過時間[Sec]/電圧[V]/電流[mA]``) and the per-row
+    metadata block (``状態/ﾓｰﾄﾞ/ｻｲｸﾙ/総ｻｲｸﾙ``). pandas names them
+    ``Unnamed: 5``, ``Unnamed: 6``, ... — noise, never useful downstream.
+    """
+    keep = [c for c in df.columns if not str(c).startswith("Unnamed:")]
+    return cast("pd.DataFrame", df.loc[:, keep])
+
+
 def _ensure_capacity(df: pd.DataFrame, mass: float | None) -> pd.DataFrame:
-    """Add 電気量 = elapsed_s / 3600 * current_mA / mass, if missing."""
+    """Add 電気量 = elapsed_s / 3600 * current_mA / mass, if missing.
+
+    The TOYO raw 6-digit format emits ``経過時間[Sec]`` reset at each
+    state transition and ``電流[mA]`` as an unsigned magnitude, so the
+    formula produces per-segment monotone-non-decreasing 電気量 matching
+    the convention that 連続データ.csv uses inline.
+    """
     if COL_CAPACITY in df.columns:
         return df
     if mass is None or not math.isfinite(mass) or mass <= 0:
@@ -220,21 +270,78 @@ def _find_raw_files(cell_dir: Path) -> list[Path]:
     )
 
 
-def _resolve_mass(explicit: float | None, cell_dir: Path) -> float | None:
+def _resolve_mass(
+    explicit: float | None,
+    cell_dir: Path,
+    *,
+    native_csv: Path | None = None,
+    encoding: str = "shift_jis",
+) -> float | None:
+    """Resolve active-material mass (grams) with the documented priority order.
+
+    1. Explicit ``mass=`` argument.
+    2. ``重量[mg]`` from native 連続データ.csv metadata (if ``native_csv`` given).
+    3. First ``.PTN`` whose first line carries a parseable mass at token[2].
+    """
     if explicit is not None:
         return explicit
+    if native_csv is not None:
+        metadata_mass = _extract_mass_from_renzoku_metadata(native_csv, encoding)
+        if metadata_mass is not None:
+            return metadata_mass
+    return _resolve_mass_from_ptn(cell_dir)
+
+
+def _resolve_mass_from_ptn(cell_dir: Path) -> float | None:
+    """Scan top-level ``*.PTN`` files and return the single parseable mass.
+
+    Raises ``ValueError`` if *more than one* ``.PTN`` yields a parseable
+    mass — the caller must disambiguate with ``mass=``. A ``.PTN`` whose
+    first line is INI-style (``[BaseCellCapacity]``), CSV-style, or simply
+    doesn't have a float at token[2] is silently skipped; this is how a
+    dir with both a main pattern and ``*_OPTION.PTN`` / ``*_Option2.PTN``
+    resolves unambiguously.
+    """
     ptn_files = sorted(
         p for p in cell_dir.iterdir() if p.is_file() and p.suffix.lower() == PTN_SUFFIX
     )
-    if not ptn_files:
-        return None
-    if len(ptn_files) > 1:
-        names = [p.name for p in ptn_files]
+    masses: list[tuple[Path, float]] = []
+    for ptn in ptn_files:
+        try:
+            masses.append((ptn, read_ptn_mass(ptn)))
+        except ValueError:
+            continue
+    if len(masses) == 1:
+        return masses[0][1]
+    if len(masses) > 1:
+        names = [p.name for p, _ in masses]
         raise ValueError(
-            f"multiple .PTN files found in {cell_dir} ({names}); "
+            f"multiple .PTN files with parseable mass in {cell_dir} ({names}); "
             "pass `mass=<grams>` to disambiguate"
         )
-    return read_ptn_mass(ptn_files[0])
+    return None
+
+
+def _extract_mass_from_renzoku_metadata(path: Path, encoding: str) -> float | None:
+    """Return mass (grams) from the ``重量[mg]`` metadata row, or ``None``.
+
+    Native 連続データ.csv has 3 metadata rows before the column-name row;
+    the 3rd carries ``,重量[mg],<value>`` where <value> is in milligrams.
+    """
+    with path.open(encoding=encoding, errors="replace") as f:
+        for _ in range(_METADATA_SCAN_ROWS):
+            line = f.readline()
+            if not line:
+                return None
+            fields = [c.strip() for c in line.rstrip("\r\n").split(",")]
+            for i, cell in enumerate(fields):
+                if cell == _METADATA_MASS_KEY and i + 1 < len(fields):
+                    try:
+                        mg = float(fields[i + 1])
+                    except ValueError:
+                        return None
+                    return mg * 1e-3
+    return None
 
 
 def _nan_if_none(value: float | None) -> float:

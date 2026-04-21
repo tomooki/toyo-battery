@@ -8,12 +8,14 @@ with a 3-level column MultiIndex:
     level 1  side     — "ch" or "dis"
     level 2  quantity — "電気量"/"電圧" (or EN equivalents) as in the input
 
-Capacity sign: within a segment, ``電気量`` may be either monotone-positive
-(real TOYO 連続データ format, where the tester resets to 0 per segment) or
-signed (output of the reader's raw-6-digit path, where discharge current
-is negative and capacity accumulates negatively). The reversal filter
-operates on the **absolute** capacity so it works under either convention:
-rows where ``|電気量|.diff() < 0`` are dropped as tester-side glitches.
+Capacity sign: real TOYO data has ``電気量`` reset to 0 at the start of each
+segment and accumulate monotone-non-decreasing within it — the native
+``連続データ.csv`` supplies such values inline, and the raw-6-digit path
+reproduces the same convention because its ``経過時間[Sec]`` resets at
+state transitions and its ``電流[mA]`` is unsigned. The reversal filter
+nonetheless takes ``|電気量|`` so that *any* signed input (e.g. a
+hand-crafted dataset with polarity applied) segments correctly. Rows
+where ``|電気量|.diff() < 0`` are dropped as tester-side glitches.
 
 First-cycle-is-charge normalization: if cycle 1 begins with 放電 (discharge),
 *all* 状態 labels in the frame are swapped (充電 ↔ 放電). This is the TOYO
