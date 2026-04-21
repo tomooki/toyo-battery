@@ -273,6 +273,14 @@ def test_retention_threshold_column_name_rounds_not_truncates(
     assert expected_column in tbl.columns, (
         f"Expected {expected_column!r} for threshold={threshold}; got columns={list(tbl.columns)}"
     )
+    # The ``int()`` regression would produce the truncated-down label (e.g.
+    # 0.29 → ``cycle_at_28pct``). Assert it's absent — makes the intent
+    # of the test explicit even if the ``assert ... in columns`` above
+    # already covers it by omission.
+    wrong_column = f"cycle_at_{expected_pct - 1}pct"
+    assert wrong_column not in tbl.columns, (
+        f"Truncation-regression label {wrong_column!r} must not appear"
+    )
 
 
 def test_retention_at_cycle_1_is_100_exactly() -> None:
@@ -290,6 +298,41 @@ def test_retention_at_cycle_1_is_100_exactly() -> None:
     )
     tbl = stat_table([cell], target_cycles=(1,))
     assert tbl.loc["solo", "retention@1"] == 100.0
+
+
+def test_q_dis_first_zero_yields_nan_retention_and_cycle_at() -> None:
+    """Literal ``q_dis[1] == 0.0`` (non-NaN) triggers the zero-denominator guard.
+
+    Distinguishes from the NaN-denominator path: a cell where cycle 1
+    *physically* went through a discharge segment that accumulated zero
+    capacity (e.g. a mistimed test, a misconfigured mass, or a genuine
+    dud first cycle) is a legitimate-shaped input, not missing data.
+    Retention / fade must still be NaN (can't divide by zero), but the
+    rest of the row must populate normally.
+    """
+    rows: list[tuple[int, str, str, float, float]] = []
+    v_ch = np.linspace(3.0, 4.2, 50)
+    q_ch = np.linspace(0.0, 1000.0, 50)
+    # Cycle 1: charge fine, but discharge Q stays at 0 throughout.
+    rows.extend((1, "1", "充電", float(v), float(q)) for v, q in zip(v_ch, q_ch))
+    v_dis = np.linspace(4.2, 3.0, 50)
+    rows.extend((1, "1", "放電", float(v), 0.0) for v in v_dis)
+    # Cycle 2: normal charge + discharge.
+    rows.extend((2, "1", "充電", float(v), float(q)) for v, q in zip(v_ch, q_ch))
+    q_dis_2 = np.linspace(0.0, 500.0, 50)
+    rows.extend((2, "1", "放電", float(v), float(q)) for v, q in zip(v_dis, q_dis_2))
+    raw = pd.DataFrame(rows, columns=["サイクル", "モード", "状態", "電圧", "電気量"])
+    cell = Cell(name="zero_dis_1", mass_g=0.001, raw_df=raw)
+    tbl = stat_table([cell], target_cycles=(1, 2))
+
+    # Zero-denominator guard fires: fade + all retentions NaN.
+    assert pd.isna(tbl.loc["zero_dis_1", "cycle_at_80pct"])
+    assert pd.isna(tbl.loc["zero_dis_1", "retention@1"])
+    assert pd.isna(tbl.loc["zero_dis_1", "retention@2"])
+    # Q_dis@1 is literally 0.0, not NaN — the segment existed.
+    np.testing.assert_allclose(tbl.loc["zero_dis_1", "Q_dis@1"], 0.0, atol=1e-12)
+    # Cycle 2 remains functional.
+    np.testing.assert_allclose(tbl.loc["zero_dis_1", "Q_dis@2"], 500.0, atol=1e-9)
 
 
 def test_q_dis_first_missing_yields_nan_retention_and_cycle_at() -> None:
@@ -460,6 +503,42 @@ def test_end_to_end_with_cell_from_dir(make_cell_dir: Callable[..., Path]) -> No
     np.testing.assert_allclose(tbl.loc["cell_A", "V_mean_dis@1"], 3.30, atol=1e-9)
     # EE = 100 * (3.30 * 1000) / (3.55 * 1000) = 100 * 3.30 / 3.55
     np.testing.assert_allclose(tbl.loc["cell_A", "EE@1"], 100.0 * 3.30 / 3.55, atol=1e-9)
+
+
+@pytest.mark.parametrize("bad", [0.0, 1.0, -0.1, 1.5, -1e-12, 1.0 + 1e-12])
+def test_retention_threshold_out_of_range_raises(bad: float) -> None:
+    """``retention_threshold`` outside the open interval (0, 1) raises ValueError.
+
+    Closed-interval endpoints (0.0 and 1.0) also raise — 0.0 is a
+    degenerate "never fade" threshold and 1.0 trivially fires on the
+    first sub-unity cycle, neither of which is a meaningful caller
+    intent. Callers expressing those extremes should pass a default
+    threshold and filter the output themselves.
+    """
+    cell = _linear_cell(
+        "v",
+        cycles_q_ch={1: 1000.0},
+        cycles_q_dis={1: 990.0},
+    )
+    with pytest.raises(ValueError, match="retention_threshold"):
+        stat_table([cell], target_cycles=(1,), retention_threshold=bad)
+
+
+def test_duplicate_target_cycles_raises() -> None:
+    """``target_cycles`` with duplicates raises — prevents silently-duplicated columns.
+
+    Pandas will happily emit two columns named ``Q_dis@1``; downstream
+    consumers (and ``.to_csv``) then behave surprisingly. Surface the
+    sloppy caller intent at the entry point rather than shipping a
+    malformed frame.
+    """
+    cell = _linear_cell(
+        "v",
+        cycles_q_ch={1: 1000.0, 2: 900.0},
+        cycles_q_dis={1: 990.0, 2: 880.0},
+    )
+    with pytest.raises(ValueError, match="target_cycles"):
+        stat_table([cell], target_cycles=(1, 1, 2))
 
 
 @pytest.mark.parametrize("layout", ["renzoku", "renzoku_py", "raw_6digit"])

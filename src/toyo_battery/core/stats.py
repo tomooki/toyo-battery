@@ -46,22 +46,20 @@ The deprecated ``scipy.integrate.simps`` is intentionally not used;
 of :func:`scipy.integrate.trapezoid`.
 
 Rewrite note (vs. legacy TOYO_Origin_2.01 ``stat_table`` L579-656): v2.01
-used V as the integration variable with ``simpson(V_lat, Q_lat)`` (argument
-order swapped — accidentally computing ``∫Q dV`` and relying on positional
-quirks in older scipy), then divided by capacity to recover a mean voltage.
-It also read ``chdis_df[str(n)+"-dis"].at[1, "電圧"]`` (row 1, not 0) and
-wrapped the entire per-n computation in a bare ``except Exception``, masking
-structural bugs as silent data loss. This rewrite uses Q as the
-integration variable directly (so the value is ``∫V dQ`` without sign
-ambiguity), reads bounds after an explicit Q sort + duplicate drop, and
-propagates NaN for genuinely-missing data only — structural mismatches
-raise loudly from upstream (:mod:`chdis`, :mod:`capacity`).
+passed positional args to ``simpson`` and read segment bounds from
+``chdis_df[str(n)+"-dis"].at[1, "電圧"]`` (row 1, not 0), then wrapped the
+entire per-n block in a bare ``except Exception`` that silently masked
+structural bugs as missing data. This rewrite uses Q as the integration
+variable via explicit keyword args (``simpson(y=v, x=q)`` ⇒ unambiguously
+``∫V dQ``), sorts + de-duplicates Q before reading bounds, and propagates
+NaN only for genuinely-missing data — structural mismatches raise loudly
+from upstream (:mod:`chdis`, :mod:`capacity`).
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import pandas as pd
@@ -114,11 +112,9 @@ def _integrate_v_dq(v_arr: NDArray[np.float64], q_arr: NDArray[np.float64]) -> f
 
     The :mod:`chdis` contract guarantees Q is monotone non-decreasing within
     a segment, so a Q-ascending sort is a stable reorder. Duplicate Q values
-    (CC-CV plateaus accumulate at the same Q level? No — plateaus accumulate
-    at the same *voltage* level, so Q remains distinct; duplicates here
-    would come from tester-side point repeats) are dropped ``keep="last"``
-    to match the :mod:`dqdv` convention and keep the latest-recorded V for
-    any Q repeat.
+    — rare in real data because CC-CV plateaus saturate V, not Q — are
+    dropped with ``keep="last"`` to match the :mod:`dqdv` convention,
+    preserving the latest-recorded V for any repeat.
 
     Returns ``NaN`` for <2 finite points; trapezoidal for exactly 2;
     Simpson's rule for 3+.
@@ -150,7 +146,7 @@ def _integrate_v_dq(v_arr: NDArray[np.float64], q_arr: NDArray[np.float64]) -> f
 def _segment_arrays(
     chdis_df: pd.DataFrame,
     cycle: int,
-    side: str,
+    side: Literal["ch", "dis"],
     v_name: str,
     q_name: str,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]] | None:
@@ -230,25 +226,19 @@ def _per_cell_row(
     cols = _resolve_cols(cell.column_lang)
     v_name, q_name = cols["voltage"], cols["capacity"]
 
-    # Q_dis_max: NaN-safe max over the column. An empty cap_df has an
-    # empty Series → .max() returns NaN (pandas convention), which is the
-    # behaviour we want for a cell whose chdis was fully wiped.
-    q_dis_max = (
-        float(cap_df["q_dis"].max())
-        if ("q_dis" in cap_df.columns and not cap_df["q_dis"].dropna().empty)
-        else float("nan")
-    )
+    # :func:`capacity.get_cap_df` unconditionally emits ``q_ch`` / ``q_dis``
+    # / ``ce`` columns (see capacity.py's empty-path branch), so no column
+    # presence guards are needed here — the frame may be row-empty, but the
+    # schema is fixed.
+    q_dis_series = cap_df["q_dis"]
+    q_dis_max = float(q_dis_series.max()) if not q_dis_series.dropna().empty else float("nan")
 
     # cycle-1 discharge capacity — the reference for retention + fade.
     q_dis_first = _safe_lookup(cap_df, 1, "q_dis")
 
     row: dict[str, float] = {
         "Q_dis_max": q_dis_max,
-        f"cycle_at_{pct}pct": _cycle_at_threshold(
-            cap_df["q_dis"] if "q_dis" in cap_df.columns else pd.Series([], dtype=float),
-            q_dis_first,
-            retention_threshold,
-        ),
+        f"cycle_at_{pct}pct": _cycle_at_threshold(q_dis_series, q_dis_first, retention_threshold),
     }
 
     for n in target_cycles:
@@ -263,12 +253,16 @@ def _per_cell_row(
 
         if dis_pair is not None:
             int_v_dq_dis = _integrate_v_dq(*dis_pair)
-            if np.isfinite(int_v_dq_dis) and np.isfinite(q_dis_n) and q_dis_n != 0.0:
-                v_mean_dis = int_v_dq_dis / q_dis_n
-            if ch_pair is not None:
-                int_v_dq_ch = _integrate_v_dq(*ch_pair)
-                if np.isfinite(int_v_dq_dis) and np.isfinite(int_v_dq_ch) and int_v_dq_ch != 0.0:
-                    ee = 100.0 * int_v_dq_dis / int_v_dq_ch
+            if np.isfinite(int_v_dq_dis):
+                if np.isfinite(q_dis_n) and q_dis_n != 0.0:
+                    v_mean_dis = int_v_dq_dis / q_dis_n
+                # Charge-side integral is only needed when the discharge
+                # side yielded a finite value — otherwise EE is NaN
+                # regardless of the charge integral.
+                if ch_pair is not None:
+                    int_v_dq_ch = _integrate_v_dq(*ch_pair)
+                    if np.isfinite(int_v_dq_ch) and int_v_dq_ch != 0.0:
+                        ee = 100.0 * int_v_dq_dis / int_v_dq_ch
 
         # Retention@n: 100.0 exactly for n=1 iff q_dis[1] is finite; else
         # 100 * q_dis[n] / q_dis[1] with NaN propagation through both
@@ -293,7 +287,7 @@ def _per_cell_row(
 
 
 def stat_table(
-    cells: list[Cell],
+    cells: Sequence[Cell],
     *,
     target_cycles: Sequence[int] = (10, 50),
     retention_threshold: float = 0.80,
@@ -303,24 +297,29 @@ def stat_table(
     Parameters
     ----------
     cells
-        List of :class:`toyo_battery.core.cell.Cell`. Each cell contributes
-        one row keyed by ``cell.name``. An empty list returns an empty
-        DataFrame with the correct column schema.
+        Sequence of :class:`toyo_battery.core.cell.Cell`. Each cell
+        contributes one row keyed by ``cell.name``. An empty sequence
+        returns an empty DataFrame with the correct column schema.
     target_cycles
         Cycle numbers at which to emit ``Q_dis@n`` / ``CE@n`` /
         ``V_mean_dis@n`` / ``EE@n`` / ``retention@n`` / ``CE_mean_1to{n}``.
         Order is preserved in the output columns so callers can pin column
         layout by tuple order. Cycles beyond a cell's maximum produce NaN
-        for that cell, but the row itself is still emitted.
+        for that cell, but the row itself is still emitted. Duplicate
+        entries raise ``ValueError`` to avoid silently-duplicated columns.
     retention_threshold
-        Fade threshold as a fraction of ``q_dis[1]``. The derived column
-        name is ``f"cycle_at_{round(retention_threshold * 100)}pct"`` so a
+        Fade threshold as a fraction of ``q_dis[1]``, in the open interval
+        ``(0, 1)`` (values at or outside the bounds raise ``ValueError``).
+        The derived column name is
+        ``f"cycle_at_{round(retention_threshold * 100)}pct"`` so a
         threshold of ``0.80`` yields ``cycle_at_80pct`` (default) and
         ``0.50`` yields ``cycle_at_50pct``. ``round`` (not ``int``) avoids
         the IEEE-754 truncation trap where e.g. ``0.29 * 100`` evaluates
         to ``28.999999999999996`` and would otherwise mislabel the column
-        ``cycle_at_28pct``. The value in that column is
-        the first cycle where ``q_dis`` dips below
+        ``cycle_at_28pct``. Python's ``round`` uses banker's rounding (tie
+        to even) — irrelevant for realistic thresholds but worth noting
+        if a caller passes an exact-half value like ``0.125``. The value
+        in that column is the first cycle where ``q_dis`` dips below
         ``retention_threshold * q_dis[1]``; NaN if the threshold is never
         crossed or if ``q_dis[1]`` is unusable.
 
@@ -331,6 +330,12 @@ def stat_table(
         order (see the module docstring). All values are float64; empty
         positions are NaN.
 
+    Raises
+    ------
+    ValueError
+        If ``retention_threshold`` is not in the open interval ``(0, 1)``,
+        or if ``target_cycles`` contains duplicate entries.
+
     Notes
     -----
     Integration over ``∫V dQ`` uses :func:`scipy.integrate.simpson` when
@@ -339,11 +344,19 @@ def stat_table(
     ``scipy.integrate.simps`` is not used; ``numpy.trapz`` (removed in
     NumPy 2.0) is avoided in favour of ``scipy.integrate.trapezoid``.
     """
+    if not (0.0 < retention_threshold < 1.0):
+        raise ValueError(
+            f"retention_threshold must lie in the open interval (0, 1); got {retention_threshold!r}"
+        )
+    target_cycles_list = list(target_cycles)
+    if len(set(target_cycles_list)) != len(target_cycles_list):
+        raise ValueError(f"target_cycles must not contain duplicates; got {target_cycles_list!r}")
+
     # ``round`` (not ``int``) because ``0.29 * 100 == 28.999999999999996``
     # under IEEE-754 and ``int`` would truncate to ``28``, silently
     # mislabelling the column. See the ``retention_threshold`` docstring.
     pct = round(retention_threshold * 100)
-    columns = _build_column_order(target_cycles, pct)
+    columns = _build_column_order(target_cycles_list, pct)
 
     if not cells:
         return _empty_result(columns)
@@ -356,9 +369,12 @@ def stat_table(
     rows: list[dict[str, float]] = []
     for cell in cells:
         names.append(cell.name)
-        rows.append(_per_cell_row(cell, target_cycles, retention_threshold, pct))
+        rows.append(_per_cell_row(cell, target_cycles_list, retention_threshold, pct))
 
-    out = pd.DataFrame(rows, index=pd.Index(names, name="cell"))
+    # ``dtype="object"`` for the populated path too, matching ``_empty_result``
+    # so ``pd.concat`` of an empty + populated stat_table doesn't trigger
+    # dtype-coercion warnings on the index.
+    out = pd.DataFrame(rows, index=pd.Index(names, dtype="object", name="cell"))
     # Enforce column order + float64 dtype end-to-end. ``reindex`` also
     # guards against any runtime dict-mutation slip that silently dropped
     # a key — an absent column would surface here as a silent all-NaN
