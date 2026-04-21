@@ -82,18 +82,18 @@ def test_column_multiindex_level_names() -> None:
 
 
 def test_inter_num_controls_row_axis_length() -> None:
-    """With ``inter_num=50`` and a 1.2 V range, ipnum ~= 60 per segment; pinning
-    the observable sanity bounds (>= 2, <= 50 when V-range < 1.0)."""
+    """With ``inter_num=50`` and a 0.4 V range, ``ipnum = int(50 * 0.4) = 20``
+    per segment — pinned exactly so a regression in the ``ipnum`` formula is
+    loud rather than silent.
+    """
     # V range 3.8-4.2 → 0.4 V window. inter_num * range = 50 * 0.4 = 20.
     raw = _linear_chdis_ch_only(v_lo=3.8, v_hi=4.2, n_points=100)
     chdis = get_chdis_df(raw)
     out = get_dqdv_df(chdis, inter_num=50, window_length=11, polyorder=2)
 
-    # Row count is the global max across segments. For a single ch segment
-    # with V range 0.4 and inter_num=50, ipnum = 20 so row axis has exactly 20.
-    assert 2 <= len(out) <= 50
-    non_nan = out[(1, "ch", "電圧")].dropna()
-    assert 2 <= len(non_nan) <= 50
+    # Single ch segment: row axis length equals ipnum exactly.
+    assert len(out) == 20
+    assert out[(1, "ch", "電圧")].notna().sum() == 20
 
 
 def test_column_lang_en_uses_english_quantity_names() -> None:
@@ -105,6 +105,26 @@ def test_column_lang_en_uses_english_quantity_names() -> None:
     # And the JA names are absent.
     assert "電圧" not in qset
     assert "dQ/dV" not in qset
+
+
+def test_even_window_length_raises() -> None:
+    """Even ``window_length`` is rejected up-front (scipy < 1.13 requires odd;
+    enforcing uniformly keeps behaviour stable across the supported range).
+    """
+    raw = _linear_chdis_ch_only()
+    chdis = get_chdis_df(raw)
+    with pytest.raises(ValueError, match="window_length must be odd"):
+        get_dqdv_df(chdis, window_length=10, polyorder=2)
+
+
+def test_truly_empty_input_returns_empty_result() -> None:
+    """``pd.DataFrame()`` with no rows and no columns returns the canonical
+    empty frame (3-level MultiIndex columns, 0 rows) — the short-circuit
+    path used by :func:`chdis._empty_result`.
+    """
+    out = get_dqdv_df(pd.DataFrame())
+    assert out.empty
+    assert list(out.columns.names) == ["cycle", "side", "quantity"]
 
 
 def test_wrong_column_lang_raises_with_context() -> None:
@@ -181,8 +201,6 @@ def test_in_memory_cell_dqdv_exercises_interpolation_path() -> None:
     populated ``dqdv_df`` (not all-NaN), unlike the narrow-range
     ``make_cell_dir("renzoku")`` fixture.
     """
-    from toyo_battery.core.cell import Cell  # local import to scope the fixture
-
     n = 200
     v_ch = np.linspace(3.0, 4.2, n)
     q_ch = 400.0 * (v_ch - 3.0)

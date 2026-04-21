@@ -90,12 +90,17 @@ def _validate_savgol_params(inter_num: int, window_length: int, polyorder: int) 
     """Validate Savitzky-Golay preconditions up-front for a helpful error.
 
     scipy raises from deep inside ``savgol_filter`` otherwise, which is
-    harder to correlate with a caller's actual input.
+    harder to correlate with a caller's actual input. ``window_length``
+    is required to be odd here — scipy 1.13+ accepts even, but the
+    project floor is ``scipy>=1.10`` where even values raise. Enforcing
+    odd uniformly keeps behaviour consistent across the supported range.
     """
     if inter_num < 1:
         raise ValueError(f"inter_num must be >= 1, got {inter_num}")
     if window_length < 1:
         raise ValueError(f"window_length must be >= 1, got {window_length}")
+    if window_length % 2 == 0:
+        raise ValueError(f"window_length must be odd, got {window_length}")
     if polyorder < 0:
         raise ValueError(f"polyorder must be >= 0, got {polyorder}")
     if polyorder >= window_length:
@@ -126,10 +131,10 @@ def get_dqdv_df(
         all-NaN columns (Savitzky-Golay requires at least ``window_length``
         samples). Must be ``>= 1``.
     window_length
-        Savitzky-Golay window length. Must be a positive integer strictly
-        greater than ``polyorder``. scipy ``< 1.13`` additionally requires
-        an odd value; 1.13+ accepts even. The module does not enforce
-        odd-ness to stay compatible with modern scipy.
+        Savitzky-Golay window length. Must be a positive odd integer
+        strictly greater than ``polyorder``. (scipy 1.13+ accepts even,
+        but the project floor is ``scipy>=1.10`` where odd is required;
+        enforcing odd uniformly avoids a version-dependent failure mode.)
     polyorder
         Savitzky-Golay polynomial order. Must be ``>= 0`` and strictly
         less than ``window_length``.
@@ -166,19 +171,25 @@ def get_dqdv_df(
     cols = _resolve_cols(column_lang)
     v_name, q_name, dqdv_name = cols["voltage"], cols["capacity"], cols["dqdv"]
 
-    if chdis_df.empty or chdis_df.columns.empty:
-        return _empty_result()
-
-    # Structural check: the 3-level MultiIndex is part of the chdis contract.
-    # Anything else is a caller bug; raise with the same framing as the
-    # missing-quantity error below so both failure modes are catchable
-    # under ``except KeyError``.
+    # Structural check runs *before* the empty short-circuit so a
+    # flat-columns empty frame surfaces the same ``KeyError`` as a
+    # flat-columns populated frame — the error surface for a given bug
+    # should not depend on whether the input happened to contain rows.
     if not isinstance(chdis_df.columns, pd.MultiIndex) or chdis_df.columns.nlevels != 3:
+        # Exception: a truly empty frame (no rows, no columns — `pd.DataFrame()`)
+        # is the one shape we accept without a 3-level MultiIndex, because
+        # ``chdis._empty_result`` is the canonical empty contract and we want
+        # ``get_dqdv_df(empty) -> empty`` to round-trip.
+        if chdis_df.empty and chdis_df.columns.empty:
+            return _empty_result()
         raise KeyError(
             "chdis_df.columns must be a 3-level MultiIndex "
             "(cycle, side, quantity); "
             f"got {chdis_df.columns!r}"
         )
+
+    if chdis_df.empty or chdis_df.columns.empty:
+        return _empty_result()
 
     quantity_values = set(chdis_df.columns.get_level_values("quantity"))
     missing_quantities = sorted({v_name, q_name} - quantity_values)
@@ -189,9 +200,12 @@ def get_dqdv_df(
         )
 
     cols_tuples = cast("list[tuple[int, str, str]]", list(chdis_df.columns))
+    # Deterministic order: (cycle, side) with explicit side rank.
+    # ``ch`` before ``dis``, any future side lands after both (stable).
+    _side_rank: dict[str, int] = {"ch": 0, "dis": 1}
     cycle_side_pairs: list[tuple[int, str]] = sorted(
         {(int(c), str(s)) for c, s, _q in cols_tuples},
-        key=lambda t: (t[0], 0 if t[1] == "ch" else 1),
+        key=lambda t: (t[0], _side_rank.get(t[1], 2), t[1]),
     )
 
     per_segment: dict[tuple[int, str], _SegPair | None] = {}
