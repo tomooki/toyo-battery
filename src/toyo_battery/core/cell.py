@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from toyo_battery.core.capacity import get_cap_df
 from toyo_battery.core.chdis import get_chdis_df
 from toyo_battery.io.reader import read_cell_dir
 from toyo_battery.io.schema import ColumnLang
@@ -48,3 +49,7 @@ class Cell:
     @cached_property
     def chdis_df(self) -> pd.DataFrame:
         return get_chdis_df(self.raw_df, column_lang=self.column_lang)
+
+    @cached_property
+    def cap_df(self) -> pd.DataFrame:
+        return get_cap_df(self.chdis_df, column_lang=self.column_lang)
