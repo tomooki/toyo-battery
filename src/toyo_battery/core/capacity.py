@@ -26,6 +26,8 @@ import pandas as pd
 
 from toyo_battery.io.schema import JA_TO_EN, ColumnLang
 
+# Single-entry today; retained in dict form to match the chdis/dqdv pattern
+# and keep the door open for adding voltage or current when stats.py joins.
 _JA_COLS: dict[str, str] = {
     "capacity": "電気量",
 }
@@ -74,14 +76,20 @@ def get_cap_df(chdis_df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.
     Raises
     ------
     KeyError
-        If ``chdis_df``'s ``quantity`` level does not contain the
-        capacity label for the requested ``column_lang``.
+        If ``chdis_df.columns`` is not a 3-level ``(cycle, side, quantity)``
+        MultiIndex (structural violation), or if the ``quantity`` level
+        does not contain the capacity label for the requested
+        ``column_lang`` (missing-quantity violation).
     """
     cols = _resolve_cols(column_lang)
     cap_col = cols["capacity"]
 
-    # Empty / no-column input → empty result with correct schema.
-    if chdis_df.empty and chdis_df.columns.empty:
+    # Empty on either axis → empty result with correct schema. Using ``or``
+    # so a frame with column structure but zero rows (e.g. chdis after
+    # every segment was reversal-filtered clean) also short-circuits,
+    # rather than producing a frame with cycle rows of all-NaN that would
+    # surprise callers expecting ``cap_df.empty`` to track input-emptiness.
+    if chdis_df.empty or chdis_df.columns.empty:
         return _empty_result()
 
     # Validate that the chdis_df has the expected 3-level MultiIndex and
@@ -106,7 +114,10 @@ def get_cap_df(chdis_df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.
     cap_only = chdis_df.xs(cap_col, axis=1, level="quantity")
 
     # Max per segment, skipping NaN. Result indexed by (cycle, side).
-    per_segment_max = cap_only.max(axis=0, skipna=True)
+    # Explicit cast to float64: for an all-NaN or 0-row input, pandas may
+    # return a Series with dtype=object which would poison downstream
+    # arithmetic; the cast pins the numeric contract end-to-end.
+    per_segment_max = cap_only.max(axis=0, skipna=True).astype("float64")
 
     # Unstack side → rows=cycle, columns=side. Reindex to ensure both
     # "ch" and "dis" exist even if only one side has any data globally.
@@ -121,10 +132,10 @@ def get_cap_df(chdis_df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.
     q_dis = wide["dis"].astype("float64")
 
     # Coulombic efficiency — guard q_ch == 0 as NaN (not inf / not error).
-    # `where(cond, other=NaN)` keeps the value where cond is True and
-    # substitutes NaN elsewhere; cast q_ch to a safe divisor first.
-    with np.errstate(divide="ignore", invalid="ignore"):
-        ce = 100.0 * q_dis / q_ch
+    # pandas Series division returns ``inf`` without raising for float
+    # divide-by-zero, so no ``np.errstate`` wrapper is needed; the
+    # ``where(q_ch != 0, NaN)`` below overrides ``inf`` to NaN.
+    ce = 100.0 * q_dis / q_ch
     ce = ce.where(q_ch != 0, other=np.nan)
 
     out = pd.DataFrame(

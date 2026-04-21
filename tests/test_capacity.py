@@ -170,14 +170,42 @@ def test_missing_required_quantity_raises_helpful_error() -> None:
 
 
 def test_wrong_column_lang_raises_with_context() -> None:
-    """Passing JA-labeled chdis with column_lang='en' surfaces a helpful error."""
+    """Passing JA-labeled chdis with column_lang='en' surfaces a helpful error.
+
+    The regex matches on structural tokens (``missing required quantity``)
+    rather than an exact reproduction of the f-string formatting, so
+    rewording the error message does not break this test.
+    """
     segments: dict[tuple[int, str], list[tuple[float, float]]] = {
         (1, "ch"): [(3.50, 0.0), (3.60, 500.0)],
         (1, "dis"): [(3.60, 0.0), (3.40, 495.0)],
     }
     chdis = _chdis(segments)  # default JA quantity labels
-    with pytest.raises(KeyError, match="column_lang='en'"):
+    with pytest.raises(KeyError, match="missing required quantity"):
         get_cap_df(chdis, column_lang="en")
+
+
+def test_cycle_with_all_nan_ch_side_preserves_row_as_nan() -> None:
+    """A cycle whose ch column exists but holds only NaN still produces a
+    row, with q_ch / ce = NaN and q_dis populated.
+
+    Mirrors the chdis post-filter shape where a segment's column is present
+    but its values were all wiped by the reversal filter.
+    """
+    segments: dict[tuple[int, str], list[tuple[float, float]]] = {
+        (1, "ch"): [],  # empty rows → column exists, all NaN after concat
+        (1, "dis"): [(3.60, 0.0), (3.40, 495.0)],
+    }
+    chdis = _chdis(segments)
+    # Confirm the fixture shape: the ch column exists but holds only NaN.
+    assert (1, "ch", "電気量") in chdis.columns
+    assert chdis[(1, "ch", "電気量")].isna().all()
+
+    cap = get_cap_df(chdis)
+    assert cap.index.tolist() == [1]
+    assert pd.isna(cap.loc[1, "q_ch"])
+    assert cap.loc[1, "q_dis"] == 495.0
+    assert pd.isna(cap.loc[1, "ce"])
 
 
 def test_cell_cap_df_cached_and_columns(make_cell_dir: Callable[..., Path]) -> None:
