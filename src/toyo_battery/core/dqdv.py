@@ -4,12 +4,14 @@ For each ``(cycle, side)`` segment in a ``chdis_df`` (produced by
 :func:`toyo_battery.core.chdis.get_chdis_df`), this module:
 
 1. Extracts the voltage and capacity series, drops NaN rows, sorts by V,
-   and removes duplicate V values.
+   and removes duplicate V values (``keep="last"`` to preserve CC-CV tail
+   capacity, which accumulates at ``V_max``/``V_min`` plateaus).
 2. Linearly interpolates Q onto a uniform V grid
    (``np.linspace(V.min(), V.max(), ipnum)`` with
    ``ipnum = max(int(inter_num * (V.max() - V.min())), 2)``).
-3. Applies :func:`scipy.signal.savgol_filter` with ``deriv=1`` to compute
-   ``dQ/dV`` on the resampled curve.
+3. Applies :func:`scipy.signal.savgol_filter` with ``deriv=1`` and
+   ``delta=dx`` to compute ``dQ/dV`` in physical units on the resampled
+   curve.
 
 Output shape: a wide DataFrame whose column MultiIndex mirrors ``chdis_df``
 (levels ``cycle``, ``side``, ``quantity``). The ``quantity`` level holds
@@ -18,14 +20,33 @@ Output shape: a wide DataFrame whose column MultiIndex mirrors ``chdis_df``
 ``RangeIndex`` shared across all segments; shorter segments are NaN-padded
 to the longest.
 
-Rewrite note (vs. legacy TOYO_Origin_2.01 L378 ``plot_dQdV_curve``): the
-original read the voltage bounds via ``chdis_df[cycle].at[1, "電圧"]`` and
-``chdis_df[cycle].at[len(...)-1, "電圧"]``. ``.at[1, ...]`` reads the
-*second* row, not the first, so the original implicitly skipped the first
-sample and was sensitive to whichever row landed at position 1 before
-sorting. This rewrite uses ``V.min()`` and ``V.max()`` after an explicit
-ascending sort with duplicate removal — deterministic, monotone, and works
-whether the source segment is a charge or a discharge.
+Numerical caveats:
+
+- The leading and trailing ``window_length // 2`` samples of each
+  ``dQ/dV`` column are edge-approximated (savgol ``mode="nearest"``) and
+  should be trimmed when precise slopes matter.
+- Discharge segments enter with V decreasing but Q still monotone
+  non-decreasing per the chdis invariant. After the ascending V sort, Q
+  becomes decreasing along the grid, so ``dQ/dV`` for discharge is
+  **negative** by construction. Callers plotting charge and discharge on
+  the same axis commonly take ``abs(dQ/dV)`` for a magnitude comparison;
+  the raw signed value is retained here so the direction of accumulation
+  is not lost.
+
+Rewrite notes (vs. legacy TOYO_Origin_2.01 ``plot_dQdV_curve`` L378-453):
+
+- v2.01 read the voltage bounds via ``chdis_df[cycle].at[1, "電圧"]`` and
+  ``chdis_df[cycle].at[len(...)-1, "電圧"]``. ``.at[1, ...]`` reads the
+  *second* row, not the first, so the original implicitly skipped the
+  first sample and was sensitive to whichever row landed at position 1
+  before sorting. This rewrite uses ``V.min()``/``V.max()`` after an
+  explicit ascending sort with duplicate removal — deterministic,
+  monotone, and works whether the source segment is charge or discharge.
+- v2.01's ``savgol_filter`` call (L423-429) omitted ``delta=``, so its
+  output was ``d(Q)/d(sample-index)`` rather than ``d(Q)/d(V)`` — the
+  legacy plots carried a sample-count-scaled axis labeled ``dQ/dV``.
+  This rewrite passes ``delta=dx`` so the output is in physical units
+  (mAh/g per V).
 """
 
 from __future__ import annotations
@@ -35,7 +56,6 @@ from typing import cast
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
-from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter
 
 from toyo_battery.io.schema import JA_TO_EN, ColumnLang
@@ -66,6 +86,22 @@ def _empty_result() -> pd.DataFrame:
     return pd.DataFrame(columns=idx)
 
 
+def _validate_savgol_params(inter_num: int, window_length: int, polyorder: int) -> None:
+    """Validate Savitzky-Golay preconditions up-front for a helpful error.
+
+    scipy raises from deep inside ``savgol_filter`` otherwise, which is
+    harder to correlate with a caller's actual input.
+    """
+    if inter_num < 1:
+        raise ValueError(f"inter_num must be >= 1, got {inter_num}")
+    if window_length < 1:
+        raise ValueError(f"window_length must be >= 1, got {window_length}")
+    if polyorder < 0:
+        raise ValueError(f"polyorder must be >= 0, got {polyorder}")
+    if polyorder >= window_length:
+        raise ValueError(f"polyorder ({polyorder}) must be < window_length ({window_length})")
+
+
 def get_dqdv_df(
     chdis_df: pd.DataFrame,
     *,
@@ -88,12 +124,15 @@ def get_dqdv_df(
         is ``max(int(inter_num * (V.max() - V.min())), 2)`` per segment.
         Segments whose interpolated length is below ``window_length`` yield
         all-NaN columns (Savitzky-Golay requires at least ``window_length``
-        samples).
+        samples). Must be ``>= 1``.
     window_length
-        Savitzky-Golay window length (must be odd and > ``polyorder``; the
-        caller is responsible for satisfying the scipy constraints).
+        Savitzky-Golay window length. Must be a positive integer strictly
+        greater than ``polyorder``. scipy ``< 1.13`` additionally requires
+        an odd value; 1.13+ accepts even. The module does not enforce
+        odd-ness to stay compatible with modern scipy.
     polyorder
-        Savitzky-Golay polynomial order.
+        Savitzky-Golay polynomial order. Must be ``>= 0`` and strictly
+        less than ``window_length``.
     column_lang
         Language of the ``quantity`` level on both input and output. When
         ``"ja"`` the output uses ``{"電圧", "dQ/dV"}``; when ``"en"`` it
@@ -106,17 +145,40 @@ def get_dqdv_df(
         Row axis: ``RangeIndex`` sized to the longest segment; shorter
         segments are NaN-padded.
 
+    Raises
+    ------
+    ValueError
+        If ``inter_num`` / ``window_length`` / ``polyorder`` violate the
+        Savitzky-Golay preconditions above.
+    KeyError
+        If ``chdis_df.columns`` is not a 3-level ``(cycle, side, quantity)``
+        MultiIndex, or if the ``quantity`` level is missing the voltage /
+        capacity labels for the requested ``column_lang``.
+
     Notes
     -----
     Non-default ``inter_num`` / ``window_length`` / ``polyorder`` must be
     passed by calling this function directly —
     :attr:`toyo_battery.core.cell.Cell.dqdv_df` uses the defaults.
     """
+    _validate_savgol_params(inter_num, window_length, polyorder)
+
     cols = _resolve_cols(column_lang)
     v_name, q_name, dqdv_name = cols["voltage"], cols["capacity"], cols["dqdv"]
 
     if chdis_df.empty or chdis_df.columns.empty:
         return _empty_result()
+
+    # Structural check: the 3-level MultiIndex is part of the chdis contract.
+    # Anything else is a caller bug; raise with the same framing as the
+    # missing-quantity error below so both failure modes are catchable
+    # under ``except KeyError``.
+    if not isinstance(chdis_df.columns, pd.MultiIndex) or chdis_df.columns.nlevels != 3:
+        raise KeyError(
+            "chdis_df.columns must be a 3-level MultiIndex "
+            "(cycle, side, quantity); "
+            f"got {chdis_df.columns!r}"
+        )
 
     quantity_values = set(chdis_df.columns.get_level_values("quantity"))
     missing_quantities = sorted({v_name, q_name} - quantity_values)
@@ -172,12 +234,15 @@ def get_dqdv_df(
 
         x_latent: NDArray[np.float64] = np.linspace(v_min, v_max, ipnum)
         dx = float(x_latent[1] - x_latent[0])
-        ip = interp1d(v_arr, q_arr, fill_value="extrapolate")
-        q_latent: NDArray[np.float64] = np.asarray(ip(x_latent), dtype=float)
-        # ``delta=dx`` makes savgol return d(Q)/d(V) in the physical units of
-        # the input (mAh/g per V), not d(Q)/d(sample-index). v2.01 omitted
-        # this and the legacy plots showed a slope-scaled axis; the rewrite
-        # fixes it.
+        # ``np.interp`` replaces legacy ``scipy.interpolate.interp1d`` for
+        # 1-D linear interpolation (scipy flags interp1d as legacy in 1.10+).
+        # Preconditions: ``v_arr`` strictly increasing (guaranteed by the
+        # sort + drop_duplicates above) and ``x_latent`` within
+        # ``[v_min, v_max]`` (linspace over the same bounds). Under these
+        # conditions ``np.interp``'s default clamping is equivalent to
+        # ``interp1d(..., fill_value="extrapolate")`` — no extrapolation
+        # actually occurs.
+        q_latent: NDArray[np.float64] = np.interp(x_latent, v_arr, q_arr)
         dy: NDArray[np.float64] = np.asarray(
             savgol_filter(
                 q_latent,
@@ -195,36 +260,24 @@ def get_dqdv_df(
         (len(pair[0]) for pair in per_segment.values() if pair is not None),
         default=0,
     )
-    if longest == 0:
-        # All segments degenerate — still return a frame whose columns mirror
-        # the input so downstream consumers can detect the empty case without
-        # KeyErrors. Rows are empty.
-        empty_data: dict[tuple[int, str, str], NDArray[np.float64]] = {}
-        for cycle, side in cycle_side_pairs:
-            empty_data[(cycle, side, v_name)] = np.array([], dtype=float)
-            empty_data[(cycle, side, dqdv_name)] = np.array([], dtype=float)
-        out = pd.DataFrame(empty_data)
-        out.columns = pd.MultiIndex.from_tuples(
-            cast("list[tuple[int, str, str]]", list(out.columns)),
-            names=["cycle", "side", "quantity"],
-        )
-        return out
-
-    columns: dict[tuple[int, str, str], NDArray[np.float64]] = {}
-    for cycle, side in cycle_side_pairs:
-        pair = per_segment[(cycle, side)]
-        v_col: NDArray[np.float64] = np.full(longest, np.nan, dtype=float)
-        d_col: NDArray[np.float64] = np.full(longest, np.nan, dtype=float)
-        if pair is not None:
-            x_latent, dy = pair
-            v_col[: len(x_latent)] = x_latent
-            d_col[: len(dy)] = dy
-        columns[(cycle, side, v_name)] = v_col
-        columns[(cycle, side, dqdv_name)] = d_col
-
-    out = pd.DataFrame(columns)
-    out.columns = pd.MultiIndex.from_tuples(
-        cast("list[tuple[int, str, str]]", list(out.columns)),
+    # The output MultiIndex is the same shape whether rows are populated
+    # or not — build it once and hand it to the DataFrame constructor.
+    out_cols = pd.MultiIndex.from_tuples(
+        [(c, s, q) for (c, s) in cycle_side_pairs for q in (v_name, dqdv_name)],
         names=["cycle", "side", "quantity"],
     )
-    return out
+    if longest == 0:
+        # All segments degenerate — return a 0-row frame with the expected
+        # columns so downstream consumers can detect the empty case without
+        # KeyErrors.
+        return pd.DataFrame(columns=out_cols, dtype=float)
+
+    data_matrix: NDArray[np.float64] = np.full((longest, len(out_cols)), np.nan, dtype=float)
+    for col_idx, (c, s, q) in enumerate(out_cols):
+        pair = per_segment[(int(c), str(s))]
+        if pair is None:
+            continue
+        x_latent_, dy_ = pair
+        n = len(x_latent_)
+        data_matrix[:n, col_idx] = x_latent_ if q == v_name else dy_
+    return pd.DataFrame(data_matrix, columns=out_cols)

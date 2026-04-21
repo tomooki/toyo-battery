@@ -113,12 +113,94 @@ def test_wrong_column_lang_raises_with_context() -> None:
 
     Regression test for a prior bug where the per-segment ``try/except`` in
     ``get_dqdv_df`` silently swallowed the mismatch and returned an all-NaN
-    frame — turning a configuration bug into silent data loss.
+    frame — turning a configuration bug into silent data loss. The match
+    pattern targets the structural phrase ``missing required quantity``
+    rather than the f-string formatting so rewording does not break it.
     """
     raw = _linear_chdis_ch_only(lang="ja")
     chdis = get_chdis_df(raw, column_lang="ja")  # quantity level = {電圧, 電気量}
-    with pytest.raises(KeyError, match="column_lang='en'"):
+    with pytest.raises(KeyError, match="missing required quantity"):
         get_dqdv_df(chdis, column_lang="en")
+
+
+def test_non_multiindex_columns_raises_structural_keyerror() -> None:
+    """A chdis_df with flat (non-MultiIndex) columns must raise a helpful
+    ``KeyError`` naming the structural violation.
+    """
+    bogus = pd.DataFrame({"voltage": [3.0, 3.5, 4.0], "capacity": [0.0, 50.0, 100.0]})
+    with pytest.raises(KeyError, match="3-level MultiIndex"):
+        get_dqdv_df(bogus)
+
+
+def test_polyorder_not_less_than_window_length_raises() -> None:
+    """``polyorder >= window_length`` surfaces a clear ``ValueError`` before
+    the per-segment loop, not from deep inside scipy.
+    """
+    raw = _linear_chdis_ch_only()
+    chdis = get_chdis_df(raw)
+    with pytest.raises(ValueError, match="polyorder"):
+        get_dqdv_df(chdis, window_length=5, polyorder=5)
+
+
+def test_invalid_inter_num_raises() -> None:
+    """``inter_num < 1`` is a caller bug → ``ValueError`` at entry."""
+    raw = _linear_chdis_ch_only()
+    chdis = get_chdis_df(raw)
+    with pytest.raises(ValueError, match="inter_num"):
+        get_dqdv_df(chdis, inter_num=0)
+
+
+def test_discharge_segment_yields_negative_dqdv() -> None:
+    """Discharge: V decreases while Q still accumulates (chdis invariant).
+
+    After the ascending-V sort inside :func:`get_dqdv_df`, Q becomes
+    decreasing along the grid, so savgol returns negative ``dQ/dV``. This
+    test pins that sign convention so a future ``abs()`` or sign-flip is a
+    visible, deliberate change.
+    """
+    n = 200
+    v_ch = np.linspace(3.0, 4.2, n)
+    q_ch = 400.0 * (v_ch - 3.0)
+    v_dis = np.linspace(4.2, 3.0, n)
+    q_dis = 400.0 * (4.2 - v_dis)
+    rows = [(1, "充電", float(vi), float(qi)) for vi, qi in zip(v_ch, q_ch)]
+    rows += [(1, "放電", float(vi), float(qi)) for vi, qi in zip(v_dis, q_dis)]
+    raw = pd.DataFrame(rows, columns=["サイクル", "状態", "電圧", "電気量"])
+    chdis = get_chdis_df(raw)
+
+    out = get_dqdv_df(chdis)
+    dis_interior = out[(1, "dis", "dQ/dV")].dropna().iloc[5:-5]
+    assert float(np.median(dis_interior)) < 0.0, (
+        "discharge dQ/dV expected negative (sign convention); "
+        f"got median={float(np.median(dis_interior)):.2f}"
+    )
+
+
+def test_in_memory_cell_dqdv_exercises_interpolation_path() -> None:
+    """End-to-end: a Cell built from a wide-V-range in-memory frame yields
+    populated ``dqdv_df`` (not all-NaN), unlike the narrow-range
+    ``make_cell_dir("renzoku")`` fixture.
+    """
+    from toyo_battery.core.cell import Cell  # local import to scope the fixture
+
+    n = 200
+    v_ch = np.linspace(3.0, 4.2, n)
+    q_ch = 400.0 * (v_ch - 3.0)
+    v_dis = np.linspace(4.2, 3.0, n)
+    q_dis = 400.0 * (4.2 - v_dis)
+    rows = [(1, "1", "充電", float(vi), float(qi)) for vi, qi in zip(v_ch, q_ch)]
+    rows += [(1, "1", "放電", float(vi), float(qi)) for vi, qi in zip(v_dis, q_dis)]
+    raw = pd.DataFrame(rows, columns=["サイクル", "モード", "状態", "電圧", "電気量"])
+
+    cell = Cell(name="synthetic", mass_g=0.001, raw_df=raw)
+    dqdv = cell.dqdv_df
+    # Wide V range (1.2 V) → ipnum = 120, well above window_length = 11.
+    # Real populated rows on both sides.
+    assert dqdv[(1, "ch", "dQ/dV")].notna().any()
+    assert dqdv[(1, "dis", "dQ/dV")].notna().any()
+    # Linear ramp → median dQ/dV near the analytical slope.
+    ch_interior = dqdv[(1, "ch", "dQ/dV")].dropna().iloc[5:-5]
+    np.testing.assert_allclose(float(np.median(ch_interior)), 400.0, rtol=0.05)
 
 
 def test_cc_cv_plateau_preserves_tail_capacity() -> None:
