@@ -45,6 +45,11 @@ from toyo_battery.io.schema import ColumnLang
 _CYCLE_COLOR_FIRST = "red"
 _CYCLE_COLOR_OTHER = "black"
 
+# Per-subplot size (inches) used when building the grid. Pinned here so a
+# tweak to the default layout touches one line rather than three.
+_SUBPLOT_W_IN = 5.0
+_SUBPLOT_H_IN = 4.0
+
 _QUANTITY_KEYS_JA: dict[str, str] = {
     "voltage": "電圧",
     "capacity": "電気量",
@@ -115,7 +120,7 @@ def _build_grid(n: int) -> tuple[Figure, list[Axes]]:
     fig, axes_array = plt.subplots(
         nrows,
         ncols,
-        figsize=(5 * ncols, 4 * nrows),
+        figsize=(_SUBPLOT_W_IN * ncols, _SUBPLOT_H_IN * nrows),
         squeeze=False,
     )
     flat: list[Axes] = [ax for row in axes_array for ax in row]
@@ -268,9 +273,10 @@ def plot_dqdv(
         One or more :class:`Cell` instances. One subplot per cell.
     cycles
         Cycles to include. ``None`` plots every cycle present in each
-        cell's ``cap_df``. Cycles missing from a given cell's
-        ``dqdv_df`` (e.g. degenerate segments that collapse to an
-        all-NaN column) are skipped silently for that cell.
+        cell's ``cap_df.index`` (the authoritative cycle inventory);
+        cycles whose ``dqdv_df`` columns collapsed to all-NaN (e.g.
+        ``ipnum < window_length`` for a narrow-voltage segment) are
+        skipped silently for that cell.
 
     Returns
     -------

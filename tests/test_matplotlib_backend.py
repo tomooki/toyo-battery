@@ -19,14 +19,20 @@ import matplotlib
 matplotlib.use("Agg")
 
 from matplotlib.axes import Axes
+from matplotlib.colors import to_rgba
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 
 from toyo_battery.core.cell import Cell
+from toyo_battery.io.schema import ColumnLang
 from toyo_battery.plotting.matplotlib_backend import (
     plot_chdis,
     plot_cycle,
     plot_dqdv,
 )
+
+_RED = to_rgba("red")
+_BLACK = to_rgba("black")
 
 
 def _visible(fig: Figure) -> list[Axes]:
@@ -38,11 +44,18 @@ def _first_visible(fig: Figure) -> Axes:
     return _visible(fig)[0]
 
 
+def _line_rgba(line: Line2D) -> tuple[float, float, float, float]:
+    """Normalize a Line2D color to an RGBA tuple so comparisons don't depend
+    on whether the backend stored it as a name, hex string, or tuple.
+    """
+    return to_rgba(line.get_color())
+
+
 def _linear_cell(
     *,
     name: str = "synthetic",
     n_cycles: int = 2,
-    column_lang: str = "ja",
+    column_lang: ColumnLang = "ja",
     n_points: int = 200,
     v_lo: float = 3.0,
     v_hi: float = 4.2,
@@ -66,7 +79,7 @@ def _linear_cell(
     else:
         columns = ["cycle", "mode", "state", "voltage", "capacity"]
     raw = pd.DataFrame(rows, columns=columns)
-    return Cell(name=name, mass_g=0.001, raw_df=raw, column_lang=column_lang)  # type: ignore[arg-type]
+    return Cell(name=name, mass_g=0.001, raw_df=raw, column_lang=column_lang)
 
 
 def test_plot_chdis_returns_figure_with_one_axes_per_cell() -> None:
@@ -95,9 +108,9 @@ def test_plot_chdis_cycle_1_red_others_black() -> None:
     ax = _first_visible(fig)
     # 2 cycles * 2 sides (ch + dis) = 4 lines
     assert len(ax.lines) == 4
-    colors = [line.get_color() for line in ax.lines]
-    assert colors.count("red") == 2
-    assert colors.count("black") == 2
+    colors = [_line_rgba(line) for line in ax.lines]
+    assert colors.count(_RED) == 2
+    assert colors.count(_BLACK) == 2
 
 
 def test_plot_chdis_respects_cycles_filter() -> None:
@@ -108,7 +121,7 @@ def test_plot_chdis_respects_cycles_filter() -> None:
     ax = _first_visible(fig)
     # Only cycle 2 -> 1 cycle * 2 sides = 2 lines, all black.
     assert len(ax.lines) == 2
-    assert all(line.get_color() == "black" for line in ax.lines)
+    assert all(_line_rgba(line) == _BLACK for line in ax.lines)
 
 
 def test_plot_chdis_default_cycles_covers_all_available() -> None:
@@ -119,9 +132,9 @@ def test_plot_chdis_default_cycles_covers_all_available() -> None:
     ax = _first_visible(fig)
     # 3 cycles * 2 sides = 6 lines; cycle 1 red (2), others black (4).
     assert len(ax.lines) == 6
-    colors = [line.get_color() for line in ax.lines]
-    assert colors.count("red") == 2
-    assert colors.count("black") == 4
+    colors = [_line_rgba(line) for line in ax.lines]
+    assert colors.count(_RED) == 2
+    assert colors.count(_BLACK) == 4
 
 
 def test_plot_cycle_dual_y_has_two_y_axes() -> None:
@@ -130,14 +143,33 @@ def test_plot_cycle_dual_y_has_two_y_axes() -> None:
 
     fig = plot_cycle([cell_a, cell_b])
 
-    # Two cells, each gets a primary + twin Axes -> 4 total.
-    assert len(fig.axes) == 4
+    # Assertions pin axis *identity* via their ylabels rather than
+    # counting total axes, which is more robust if matplotlib changes
+    # how twins are enumerated.
     primaries = [a for a in fig.axes if a.get_ylabel() == "Discharge capacity [mAh/g]"]
     twins = [a for a in fig.axes if a.get_ylabel() == "Coulombic efficiency [%]"]
     assert len(primaries) == 2
     assert len(twins) == 2
     for ax in primaries:
         assert ax.get_xlabel() == "Cycle"
+
+
+def test_plot_cycle_wires_q_dis_to_primary_and_ce_to_twin() -> None:
+    """Data-to-axis regression guard: ``q_dis`` must be on the primary
+    axis and ``ce`` on the twin. A silent swap would be visually
+    plausible but numerically catastrophic.
+    """
+    cell = _linear_cell(name="cell_A", n_cycles=3)
+
+    fig = plot_cycle([cell])
+
+    primary = next(a for a in fig.axes if a.get_ylabel() == "Discharge capacity [mAh/g]")
+    twin = next(a for a in fig.axes if a.get_ylabel() == "Coulombic efficiency [%]")
+    # Single line per axis (q_dis or ce against cycle).
+    np.testing.assert_allclose(
+        primary.lines[0].get_ydata(), cell.cap_df["q_dis"].to_numpy()
+    )
+    np.testing.assert_allclose(twin.lines[0].get_ydata(), cell.cap_df["ce"].to_numpy())
 
 
 def test_plot_dqdv_axis_labels_english_even_for_ja_cell() -> None:
@@ -182,7 +214,23 @@ def test_plot_chdis_missing_cycle_in_filter_is_skipped_silently() -> None:
 
     ax = _first_visible(fig)
     assert len(ax.lines) == 0
-    assert ax.get_title() == "synthetic"
+
+
+def test_plot_chdis_cycles_filter_spans_cells_with_different_cycle_counts() -> None:
+    """A shared ``cycles=[1, 2, 5]`` call on cells with different cycle
+    inventories: each cell keeps only the cycles it actually has, so per-cell
+    line counts reflect per-cell availability (2 sides per cycle).
+    """
+    small = _linear_cell(name="small", n_cycles=2)  # has cycles {1, 2}
+    large = _linear_cell(name="large", n_cycles=6)  # has cycles {1..6}
+
+    fig = plot_chdis([small, large], cycles=[1, 2, 5])
+
+    axes_by_title = {ax.get_title(): ax for ax in _visible(fig)}
+    # small only has {1, 2} of the requested {1, 2, 5} -> 2 cycles * 2 sides = 4.
+    assert len(axes_by_title["small"].lines) == 4
+    # large has {1, 2, 5} -> 3 cycles * 2 sides = 6.
+    assert len(axes_by_title["large"].lines) == 6
 
 
 def test_column_lang_en_cell_plots_successfully() -> None:
