@@ -314,9 +314,12 @@ def stat_table(
         for that cell, but the row itself is still emitted.
     retention_threshold
         Fade threshold as a fraction of ``q_dis[1]``. The derived column
-        name is ``f"cycle_at_{int(retention_threshold * 100)}pct"`` so a
+        name is ``f"cycle_at_{round(retention_threshold * 100)}pct"`` so a
         threshold of ``0.80`` yields ``cycle_at_80pct`` (default) and
-        ``0.50`` yields ``cycle_at_50pct``. The value in that column is
+        ``0.50`` yields ``cycle_at_50pct``. ``round`` (not ``int``) avoids
+        the IEEE-754 truncation trap where e.g. ``0.29 * 100`` evaluates
+        to ``28.999999999999996`` and would otherwise mislabel the column
+        ``cycle_at_28pct``. The value in that column is
         the first cycle where ``q_dis`` dips below
         ``retention_threshold * q_dis[1]``; NaN if the threshold is never
         crossed or if ``q_dis[1]`` is unusable.
@@ -336,7 +339,10 @@ def stat_table(
     ``scipy.integrate.simps`` is not used; ``numpy.trapz`` (removed in
     NumPy 2.0) is avoided in favour of ``scipy.integrate.trapezoid``.
     """
-    pct = int(retention_threshold * 100)
+    # ``round`` (not ``int``) because ``0.29 * 100 == 28.999999999999996``
+    # under IEEE-754 and ``int`` would truncate to ``28``, silently
+    # mislabelling the column. See the ``retention_threshold`` docstring.
+    pct = round(retention_threshold * 100)
     columns = _build_column_order(target_cycles, pct)
 
     if not cells:

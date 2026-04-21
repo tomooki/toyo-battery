@@ -243,6 +243,38 @@ def test_retention_threshold_parametrized_column_name() -> None:
     np.testing.assert_allclose(tbl.loc["fade", "cycle_at_50pct"], 3.0, atol=1e-9)
 
 
+@pytest.mark.parametrize(
+    ("threshold", "expected_pct"),
+    [
+        # 0.29 * 100 == 28.999999999999996 under IEEE-754
+        # 0.58 * 100 == 57.99999999999999
+        # int(...) would truncate to 28 / 57 — regression guard.
+        (0.29, 29),
+        (0.58, 58),
+        (0.80, 80),
+    ],
+)
+def test_retention_threshold_column_name_rounds_not_truncates(
+    threshold: float, expected_pct: int
+) -> None:
+    """Float-imprecise thresholds round to nearest integer, not truncate.
+
+    Regression for the IEEE-754 trap in ``int(retention_threshold * 100)``:
+    callers who build thresholds programmatically (e.g. ``1.0 - fade_pct``)
+    would otherwise receive a silently-mislabelled column.
+    """
+    cell = _linear_cell(
+        "fade",
+        cycles_q_ch={1: 1000.0, 2: 1000.0},
+        cycles_q_dis={1: 1000.0, 2: 100.0},
+    )
+    tbl = stat_table([cell], target_cycles=(1,), retention_threshold=threshold)
+    expected_column = f"cycle_at_{expected_pct}pct"
+    assert expected_column in tbl.columns, (
+        f"Expected {expected_column!r} for threshold={threshold}; got columns={list(tbl.columns)}"
+    )
+
+
 def test_retention_at_cycle_1_is_100_exactly() -> None:
     """``retention@1`` must be 100.0 exactly (no floating-point drift).
 
