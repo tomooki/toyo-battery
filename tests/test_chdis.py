@@ -152,7 +152,7 @@ def test_only_rest_rows_returns_empty() -> None:
 
 def test_cell_chdis_df_is_cached(make_cell_dir: Callable[..., Path]) -> None:
     """Cell.chdis_df is a cached_property — second access returns the same object."""
-    cell_dir = make_cell_dir("renzoku", include_capacity_col=True)
+    cell_dir = make_cell_dir("renzoku")
     cell = Cell.from_dir(cell_dir)
 
     first = cell.chdis_df
@@ -163,7 +163,7 @@ def test_cell_chdis_df_is_cached(make_cell_dir: Callable[..., Path]) -> None:
 
 
 def test_cell_chdis_df_respects_column_lang(make_cell_dir: Callable[..., Path]) -> None:
-    cell_dir = make_cell_dir("renzoku", include_capacity_col=True)
+    cell_dir = make_cell_dir("renzoku")
     cell = Cell.from_dir(cell_dir, column_lang="en")
     out = cell.chdis_df
     assert set(out.columns.get_level_values("quantity")) == {"capacity", "voltage"}
