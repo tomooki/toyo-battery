@@ -166,9 +166,7 @@ def test_plot_cycle_wires_q_dis_to_primary_and_ce_to_twin() -> None:
     primary = next(a for a in fig.axes if a.get_ylabel() == "Discharge capacity [mAh/g]")
     twin = next(a for a in fig.axes if a.get_ylabel() == "Coulombic efficiency [%]")
     # Single line per axis (q_dis or ce against cycle).
-    np.testing.assert_allclose(
-        primary.lines[0].get_ydata(), cell.cap_df["q_dis"].to_numpy()
-    )
+    np.testing.assert_allclose(primary.lines[0].get_ydata(), cell.cap_df["q_dis"].to_numpy())
     np.testing.assert_allclose(twin.lines[0].get_ydata(), cell.cap_df["ce"].to_numpy())
 
 
