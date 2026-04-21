@@ -1,7 +1,317 @@
-"""Matplotlib plotting backend. Requires the [plot] extra."""
+"""Matplotlib plotting backend. Requires the ``[plot]`` extra.
+
+Three user-facing functions operate on one or more :class:`toyo_battery.core.cell.Cell`
+instances and return a :class:`matplotlib.figure.Figure` (the caller handles
+``savefig``):
+
+- :func:`plot_chdis` — charge/discharge V-vs-Q curves; cycle 1 is drawn in
+  red, all other cycles in black (TOYO legacy convention).
+- :func:`plot_cycle` — per-cycle dual-Y plot: discharge capacity on the
+  left Y axis, Coulombic efficiency on the right Y axis.
+- :func:`plot_dqdv` — dQ/dV-vs-V curves, same cycle-1-red / others-black
+  coloring as :func:`plot_chdis`. Discharge dQ/dV is **negative** by
+  construction (see :mod:`toyo_battery.core.dqdv` for the sign
+  convention); raw signed values are plotted so charge and discharge
+  branches live in different half-planes.
+
+Layout: when multiple cells are passed, the returned figure contains one
+Axes per cell arranged in a near-square grid (1xN for ``N<=3``, otherwise
+``ncols = ceil(sqrt(N))``, ``nrows = ceil(N/ncols)``). Unused grid cells
+are hidden.
+
+Labels and legend text are **always English**, independent of each cell's
+``column_lang``; this avoids matplotlib JP-font configuration issues.
+Cell data access (``cell.chdis_df`` / ``cell.cap_df`` / ``cell.dqdv_df``)
+uses the correct quantity-level label for the cell's own ``column_lang``.
+
+Matplotlib is imported unconditionally at module level: this module is
+only imported when plotting is actually needed, and a missing extra
+surfaces as a standard ``ImportError`` from the import line.
+"""
 
 from __future__ import annotations
 
+import math
+from collections.abc import Sequence
 
-def plot_chdis(*args: object, **kwargs: object) -> object:
-    raise NotImplementedError("plot_chdis will be implemented in P2")
+import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
+
+from toyo_battery.core.cell import Cell
+from toyo_battery.io.schema import ColumnLang
+
+_CYCLE_COLOR_FIRST = "red"
+_CYCLE_COLOR_OTHER = "black"
+
+_QUANTITY_KEYS_JA: dict[str, str] = {
+    "voltage": "電圧",
+    "capacity": "電気量",
+    "dqdv": "dQ/dV",
+}
+_QUANTITY_KEYS_EN: dict[str, str] = {
+    "voltage": "voltage",
+    "capacity": "capacity",
+    "dqdv": "dq_dv",
+}
+
+
+def _quantity(column_lang: ColumnLang, key: str) -> str:
+    """Map a logical key (``"voltage"`` / ``"capacity"`` / ``"dqdv"``) to the
+    ``quantity``-level MultiIndex label used by a cell with the given
+    ``column_lang``.
+    """
+    table = _QUANTITY_KEYS_JA if column_lang == "ja" else _QUANTITY_KEYS_EN
+    return table[key]
+
+
+def _subplot_grid(n: int) -> tuple[int, int]:
+    """Return ``(nrows, ncols)`` for ``n`` subplots.
+
+    ``n <= 3`` → a single row. Larger counts fall back to a near-square
+    grid: ``ncols = ceil(sqrt(n))``, ``nrows = ceil(n / ncols)``.
+    """
+    if n <= 3:
+        return (1, max(n, 1))
+    ncols = math.ceil(math.sqrt(n))
+    nrows = math.ceil(n / ncols)
+    return (nrows, ncols)
+
+
+def _resolve_cycles(cell: Cell, cycles: Sequence[int] | None) -> list[int]:
+    """Return the cycles to plot for ``cell``.
+
+    ``cycles=None`` yields every cycle present in ``cell.cap_df.index``.
+    An explicit sequence is intersected with the available cycles while
+    preserving caller order; cycles missing from the cell are dropped
+    silently so a shared ``cycles=[1, 5, 10]`` call can span cells with
+    different cycle counts without raising.
+    """
+    available = {int(c) for c in cell.cap_df.index}
+    if cycles is None:
+        return sorted(available)
+    return [int(c) for c in cycles if int(c) in available]
+
+
+def _check_nonempty(cells: Sequence[Cell]) -> None:
+    """Raise ``ValueError`` if ``cells`` is empty.
+
+    Fails loudly rather than returning a blank figure — a zero-cell call
+    is almost always a caller bug.
+    """
+    if len(cells) == 0:
+        raise ValueError("cells must be a non-empty sequence of Cell instances")
+
+
+def _build_grid(n: int) -> tuple[Figure, list[Axes]]:
+    """Create a figure with one Axes per cell, hiding unused grid cells.
+
+    Returns the figure and a flat list of ``n`` visible Axes (in cell
+    order). Any extra Axes created by the grid layout are hidden in
+    place.
+    """
+    nrows, ncols = _subplot_grid(n)
+    fig, axes_array = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(5 * ncols, 4 * nrows),
+        squeeze=False,
+    )
+    flat: list[Axes] = [ax for row in axes_array for ax in row]
+    for ax in flat[n:]:
+        ax.set_visible(False)
+    return fig, flat[:n]
+
+
+def _cycle_color(cycle: int) -> str:
+    return _CYCLE_COLOR_FIRST if cycle == 1 else _CYCLE_COLOR_OTHER
+
+
+def _add_cycle_legend(ax: Axes, cycles_plotted: list[int]) -> None:
+    """Attach a 2-entry cycle-color legend when more than one cycle was drawn."""
+    if len(cycles_plotted) <= 1:
+        return
+    handles = [
+        Line2D([], [], color=_CYCLE_COLOR_FIRST, label="cycle 1"),
+        Line2D([], [], color=_CYCLE_COLOR_OTHER, label="other cycles"),
+    ]
+    ax.legend(handles=handles, loc="best")
+
+
+def plot_chdis(
+    cells: Sequence[Cell],
+    cycles: Sequence[int] | None = None,
+) -> Figure:
+    """Charge/discharge curves (capacity on X, voltage on Y).
+
+    Parameters
+    ----------
+    cells
+        One or more :class:`Cell` instances. One subplot is drawn per
+        cell.
+    cycles
+        Cycles to include. ``None`` (default) plots every cycle present
+        in each cell's ``cap_df``. When a sequence is given, cycles not
+        present in a given cell are skipped silently for that cell only.
+
+    Returns
+    -------
+    Figure
+        A new matplotlib figure. The caller is responsible for
+        ``savefig`` and ``close``.
+
+    Raises
+    ------
+    ValueError
+        If ``cells`` is empty.
+    """
+    _check_nonempty(cells)
+    fig, axes = _build_grid(len(cells))
+
+    for ax, cell in zip(axes, cells):
+        v_name = _quantity(cell.column_lang, "voltage")
+        q_name = _quantity(cell.column_lang, "capacity")
+        chdis = cell.chdis_df
+
+        plotted: list[int] = []
+        for cycle in _resolve_cycles(cell, cycles):
+            color = _cycle_color(cycle)
+            drew_any = False
+            for side in ("ch", "dis"):
+                v_key = (cycle, side, v_name)
+                q_key = (cycle, side, q_name)
+                if v_key not in chdis.columns or q_key not in chdis.columns:
+                    continue
+                v = chdis[v_key].dropna()
+                q = chdis[q_key].dropna()
+                if v.empty or q.empty:
+                    continue
+                ax.plot(q, v, color=color, linewidth=0.9)
+                drew_any = True
+            if drew_any:
+                plotted.append(cycle)
+
+        ax.set_xlabel("Capacity [mAh/g]")
+        ax.set_ylabel("Voltage [V]")
+        ax.set_title(cell.name)
+        _add_cycle_legend(ax, plotted)
+
+    fig.tight_layout()
+    return fig
+
+
+def plot_cycle(cells: Sequence[Cell]) -> Figure:
+    """Per-cycle discharge capacity (left Y) and Coulombic efficiency (right Y).
+
+    Parameters
+    ----------
+    cells
+        One or more :class:`Cell` instances. One subplot is drawn per
+        cell, each with a twin-Y (``ax.twinx()``) for efficiency.
+
+    Returns
+    -------
+    Figure
+        A new matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If ``cells`` is empty.
+    """
+    _check_nonempty(cells)
+    fig, axes = _build_grid(len(cells))
+
+    for ax, cell in zip(axes, cells):
+        cap = cell.cap_df
+        (line_q,) = ax.plot(
+            cap.index,
+            cap["q_dis"],
+            "o-",
+            color="C0",
+            label="Discharge capacity",
+        )
+        ax.set_xlabel("Cycle")
+        ax.set_ylabel("Discharge capacity [mAh/g]")
+
+        ax2 = ax.twinx()
+        (line_ce,) = ax2.plot(
+            cap.index,
+            cap["ce"],
+            "s--",
+            color="C3",
+            label="Coulombic efficiency",
+        )
+        ax2.set_ylabel("Coulombic efficiency [%]")
+
+        ax.set_title(cell.name)
+        ax.legend(handles=[line_q, line_ce], loc="lower right")
+
+    fig.tight_layout()
+    return fig
+
+
+def plot_dqdv(
+    cells: Sequence[Cell],
+    cycles: Sequence[int] | None = None,
+) -> Figure:
+    """dQ/dV vs voltage, cycle 1 red / other cycles black.
+
+    Discharge dQ/dV is negative by construction (see
+    :mod:`toyo_battery.core.dqdv`); the raw signed values are plotted so
+    charge and discharge branches live in different half-planes.
+
+    Parameters
+    ----------
+    cells
+        One or more :class:`Cell` instances. One subplot per cell.
+    cycles
+        Cycles to include. ``None`` plots every cycle present in each
+        cell's ``cap_df``. Cycles missing from a given cell's
+        ``dqdv_df`` (e.g. degenerate segments that collapse to an
+        all-NaN column) are skipped silently for that cell.
+
+    Returns
+    -------
+    Figure
+        A new matplotlib figure.
+
+    Raises
+    ------
+    ValueError
+        If ``cells`` is empty.
+    """
+    _check_nonempty(cells)
+    fig, axes = _build_grid(len(cells))
+
+    for ax, cell in zip(axes, cells):
+        v_name = _quantity(cell.column_lang, "voltage")
+        dqdv_name = _quantity(cell.column_lang, "dqdv")
+        dqdv = cell.dqdv_df
+
+        plotted: list[int] = []
+        for cycle in _resolve_cycles(cell, cycles):
+            color = _cycle_color(cycle)
+            drew_any = False
+            for side in ("ch", "dis"):
+                v_key = (cycle, side, v_name)
+                y_key = (cycle, side, dqdv_name)
+                if v_key not in dqdv.columns or y_key not in dqdv.columns:
+                    continue
+                v = dqdv[v_key].dropna()
+                y = dqdv[y_key].dropna()
+                if v.empty or y.empty:
+                    continue
+                ax.plot(v, y, color=color, linewidth=0.9)
+                drew_any = True
+            if drew_any:
+                plotted.append(cycle)
+
+        ax.set_xlabel("Voltage [V]")
+        ax.set_ylabel("dQ/dV [mAh/g/V]")
+        ax.set_title(cell.name)
+        _add_cycle_legend(ax, plotted)
+
+    fig.tight_layout()
+    return fig
