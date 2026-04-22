@@ -103,7 +103,7 @@ def push_to_origin(
         per_cell_sheets.append(sheets)
 
     if len(cells) > 1:
-        create_comparison_plots(op, per_cell_sheets)
+        create_comparison_plots(op, cells, per_cell_sheets)
 
     stat_df = stat_table(cells, target_cycles=list(stat_cycles))
     write_stat_table(op, stat_df)

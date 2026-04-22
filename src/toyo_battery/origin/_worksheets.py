@@ -19,6 +19,11 @@ confirm them — see issue #15):
   also expose a ``name`` attribute; helpers here return the sheet object
   so the caller can read ``.name`` / ``.lname`` if it wants to wire the
   sheet into a plot template.
+* The returned object also exposes ``cols_axis(types)``, where ``types``
+  is a string like ``"XYY"`` assigning one plot role per column. We call
+  this after ``from_df`` because ``from_df`` leaves every column as
+  default-``"Y"``; template-backed plots need at least one ``"X"`` column
+  designated or they render with an empty data binding.
 * Origin's sheet-name length limit is 32 characters. This module enforces
   that cap in ``_sanitize_sheet_name`` before calling ``new_sheet``.
 
@@ -86,19 +91,63 @@ def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(out)
 
 
-def _write_sheet(op: Any, sheet_name: str, df: pd.DataFrame) -> Any:
+def _write_sheet(
+    op: Any,
+    sheet_name: str,
+    df: pd.DataFrame,
+    *,
+    axis_types: str | None = None,
+) -> Any:
     """Create a worksheet and populate it from a DataFrame.
 
     Assumes ``op.new_sheet(type="w", lname=sheet_name)`` returns a
     worksheet-like object with a ``from_df`` method. Returns that object
     so callers (e.g. :mod:`._plots`) can reference the sheet when
     instantiating a template-backed graph.
+
+    ``axis_types`` — when given, is forwarded to ``wks.cols_axis`` after
+    the DataFrame is written. Each character designates one column's
+    plot role (``"X"``, ``"Y"``, ``"Z"``, ``"E"`` etc.). Without this
+    call, ``from_df`` leaves every column as plain ``"Y"``, which means
+    template-backed plots have no X source to bind against and render
+    empty. Pass ``None`` to keep the default (e.g. for ``stat_table``,
+    which is never plotted).
     """
     safe_name = _sanitize_sheet_name(sheet_name)
     flat = _flatten_columns(df)
     wks = op.new_sheet(type="w", lname=safe_name)
     wks.from_df(flat)
+    # ``None`` = caller opted out (e.g. ``stat_table``). Empty string =
+    # zero-column sheet (``_xy_pairs_axis(0)`` or ``_single_x_axis(0)``);
+    # both skip the call since there is nothing to designate.
+    if axis_types is not None and axis_types:
+        wks.cols_axis(axis_types)
     return wks
+
+
+def _xy_pairs_axis(ncols: int) -> str:
+    """Return ``"XY"`` repeated for ``ncols // 2`` pairs.
+
+    Used for ``chdis`` / ``dqdv`` sheets whose flattened columns come in
+    ``(X, Y)`` pairs — ``(電気量, 電圧)`` for chdis and ``(電圧, dqdv)``
+    for dqdv. Odd column counts fall back to ``"Y"`` for the trailing
+    column, matching Origin's per-column default.
+    """
+    pairs, tail = divmod(ncols, 2)
+    return "XY" * pairs + ("Y" if tail else "")
+
+
+def _single_x_axis(ncols: int) -> str:
+    """Return ``"X"`` followed by ``"Y"`` repeated ``ncols - 1`` times.
+
+    Used for the ``cycle`` sheet whose flattened layout is
+    ``[cycle, q_ch, q_dis, ce]`` — one leading X column and the rest Y.
+    Empty input yields ``""`` so the ``_write_sheet`` no-op guard
+    handles the zero-cycle degenerate case without a ``cols_axis`` call.
+    """
+    if ncols <= 0:
+        return ""
+    return "X" + "Y" * (ncols - 1)
 
 
 def write_cell_sheets(op: Any, cell: Any) -> dict[str, Any]:
@@ -122,10 +171,35 @@ def write_cell_sheets(op: Any, cell: Any) -> dict[str, Any]:
         callers can look up each sheet without re-computing the
         sanitized full name.
     """
+    chdis = cell.chdis_df
+    # cap_df carries the cycle number in its index; surface it as a
+    # regular column so Origin has an X source for the cycle_efficiency
+    # plot. Matches the pattern :func:`write_stat_table` already uses.
+    cap = cell.cap_df.reset_index()
+    dqdv = cell.dqdv_df
+
     sheets: dict[str, Any] = {}
-    sheets["chdis"] = _write_sheet(op, f"{cell.name}_chdis", cell.chdis_df)
-    sheets["cycle"] = _write_sheet(op, f"{cell.name}_cycle", cell.cap_df)
-    sheets["dqdv"] = _write_sheet(op, f"{cell.name}_dqdv", cell.dqdv_df)
+    sheets["chdis"] = _write_sheet(
+        op,
+        f"{cell.name}_chdis",
+        chdis,
+        axis_types=_xy_pairs_axis(chdis.shape[1]),
+    )
+    # cap_df after reset_index: [cycle, q_ch, q_dis, ce] → "XYYY".
+    # q_ch is kept as Y rather than dropped so the user can easily
+    # re-plot it without re-running the pipeline.
+    sheets["cycle"] = _write_sheet(
+        op,
+        f"{cell.name}_cycle",
+        cap,
+        axis_types=_single_x_axis(cap.shape[1]),
+    )
+    sheets["dqdv"] = _write_sheet(
+        op,
+        f"{cell.name}_dqdv",
+        dqdv,
+        axis_types=_xy_pairs_axis(dqdv.shape[1]),
+    )
     return sheets
 
 

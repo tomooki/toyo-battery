@@ -12,12 +12,24 @@ confirm them — see issue #15):
 * ``op.new_graph(template=<otpu_path>, lname=<graph_name>)`` creates a
   graph from the template and returns a graph-like object with at least
   ``.name`` and ``.lname`` attributes.
-* The returned graph exposes a ``set_xy`` / ``add_plot`` mechanism. We
-  use the lowest-common-denominator path here: resolve the first layer
-  via ``graph[0]`` (real ``originpro`` graphs are indexable by layer
-  index) and call ``add_plot(sheet, coly=<col>, colx=<col>)``. Real
-  ``.otpu`` templates supply their own plot types + axis scaling, so the
-  data bind is the only thing we do from Python.
+* The returned graph is indexable by layer (``graph[0]``, ``graph[1]``).
+  Each layer exposes ``add_plot(sheet, colx=<int>, coly=<int>)`` where
+  ``colx`` / ``coly`` are 0-based column indices on the bound sheet.
+  Passing only the sheet (``add_plot(sheet)``) leaves the plot with no
+  column designation and Origin renders an empty graph window — the
+  column indices are mandatory for data to appear, even when the
+  template already provides plot types and axis scaling.
+
+The three templates expect distinct column layouts; the bind helpers in
+this module encode the layout per category:
+
+* ``chdis`` — flatten columns come in ``(電気量, 電圧)`` pairs, one pair
+  per ``(cycle, side)``. One ``add_plot`` call per pair.
+* ``cycle`` — flat columns ``[cycle, q_ch, q_dis, ce]``. The template
+  is a dual-Y layout: left-Y layer plots ``q_dis`` vs ``cycle``, right-Y
+  layer plots ``ce`` vs ``cycle``.
+* ``dqdv`` — flatten columns come in ``(電圧, dqdv)`` pairs, one pair
+  per ``(cycle, side)``. One ``add_plot`` call per pair.
 
 Because the template handling depends on a runtime file that may not be
 present, the helpers here centralize the ``FileNotFoundError`` with a
@@ -27,12 +39,21 @@ remediation message rather than spreading that concern across callers.
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 _TEMPLATE_CHDIS = "charge_discharge.otpu"
 _TEMPLATE_CYCLE = "cycle_efficiency.otpu"
 _TEMPLATE_DQDV = "dqdv.otpu"
+
+# Column indices for cap_df after reset_index(): [cycle, q_ch, q_dis, ce].
+# Pinned here so the cycle_efficiency bind is resilient to cap_df column
+# reorderings — a future refactor that changes the order must also touch
+# these constants (and would fail a focused test).
+_CYCLE_COL_CYCLE = 0
+_CYCLE_COL_QDIS = 2
+_CYCLE_COL_CE = 3
 
 _TEMPLATE_ENV_VAR = "TOYO_ORIGIN_TEMPLATE_DIR"
 
@@ -83,60 +104,84 @@ def _require_template(name: str) -> Path:
     return path
 
 
-def _make_graph(op: Any, template_name: str, graph_name: str, sheet: Any) -> Any:
-    """Instantiate a graph from a template and bind it to a sheet.
-
-    The sheet-binding step is a single ``add_plot`` call on the graph's
-    first layer. We intentionally do not specify a plot type — the
-    ``.otpu`` template carries the type, axis limits, legend, etc.
-    """
+def _new_graph_from_template(op: Any, template_name: str, graph_name: str) -> Any:
+    """Return a graph instantiated from a template, with no data bound yet."""
     template_path = _require_template(template_name)
-    graph = op.new_graph(template=str(template_path), lname=graph_name)
-    # ``graph[0]`` is the first layer. Real ``originpro`` graphs are
-    # indexable; the mocked test uses a MagicMock where indexing returns
-    # another MagicMock, so this line is exercised in tests.
-    layer = graph[0]
-    layer.add_plot(sheet)
-    return graph
+    return op.new_graph(template=str(template_path), lname=graph_name)
+
+
+def _bind_xy_pairs(layer: Any, sheet: Any, ncols: int) -> None:
+    """Bind every ``(colx, coly)`` pair from ``sheet`` onto ``layer``.
+
+    Used for ``chdis`` and ``dqdv`` sheets, whose flattened columns line
+    up in contiguous pairs: ``(電気量, 電圧)`` for chdis,
+    ``(電圧, dqdv)`` for dqdv. Trailing odd columns — which should never
+    occur given the upstream pair-producing pipeline — are skipped
+    rather than bound as an orphan plot.
+    """
+    for i in range(0, ncols - 1, 2):
+        layer.add_plot(sheet, colx=i, coly=i + 1)
+
+
+def _bind_cycle(graph: Any, sheet: Any) -> None:
+    """Bind the cycle_efficiency dual-Y layout.
+
+    The template has two layers: ``graph[0]`` is the left Y (discharge
+    capacity), ``graph[1]`` is the right Y (Coulombic efficiency). Both
+    share ``cycle`` as X.
+    """
+    graph[0].add_plot(sheet, colx=_CYCLE_COL_CYCLE, coly=_CYCLE_COL_QDIS)
+    graph[1].add_plot(sheet, colx=_CYCLE_COL_CYCLE, coly=_CYCLE_COL_CE)
 
 
 def create_cell_plots(op: Any, cell: Any, sheets: dict[str, Any]) -> list[Any]:
     """Create the three per-cell graphs from templates.
 
     ``sheets`` is the mapping returned by
-    :func:`toyo_battery.origin._worksheets.write_cell_sheets`.
+    :func:`toyo_battery.origin._worksheets.write_cell_sheets`. ``cell``
+    is used to read the per-category column counts so the bind helpers
+    know how many plot pairs to emit.
     """
-    graphs: list[Any] = []
-    graphs.append(
-        _make_graph(op, _TEMPLATE_CHDIS, f"{cell.name}_chdis_plot", sheets["chdis"]),
-    )
-    graphs.append(
-        _make_graph(op, _TEMPLATE_CYCLE, f"{cell.name}_cycle_plot", sheets["cycle"]),
-    )
-    graphs.append(
-        _make_graph(op, _TEMPLATE_DQDV, f"{cell.name}_dqdv_plot", sheets["dqdv"]),
-    )
-    return graphs
+    chdis_graph = _new_graph_from_template(op, _TEMPLATE_CHDIS, f"{cell.name}_chdis_plot")
+    _bind_xy_pairs(chdis_graph[0], sheets["chdis"], cell.chdis_df.shape[1])
+
+    cycle_graph = _new_graph_from_template(op, _TEMPLATE_CYCLE, f"{cell.name}_cycle_plot")
+    _bind_cycle(cycle_graph, sheets["cycle"])
+
+    dqdv_graph = _new_graph_from_template(op, _TEMPLATE_DQDV, f"{cell.name}_dqdv_plot")
+    _bind_xy_pairs(dqdv_graph[0], sheets["dqdv"], cell.dqdv_df.shape[1])
+
+    return [chdis_graph, cycle_graph, dqdv_graph]
 
 
-def create_comparison_plots(op: Any, per_cell_sheets: list[dict[str, Any]]) -> list[Any]:
+def create_comparison_plots(
+    op: Any,
+    cells: Sequence[Any],
+    per_cell_sheets: list[dict[str, Any]],
+) -> list[Any]:
     """Create three overlay graphs that combine every cell's sheets.
 
-    One graph per category (``chdis``, ``cycle``, ``dqdv``); each graph's
-    first layer has one ``add_plot`` call per cell. Graph names are
+    One graph per category (``chdis``, ``cycle``, ``dqdv``); each cell's
+    sheet contributes its own set of ``add_plot`` calls. Graph names are
     fixed (``comparison_chdis_plot`` etc.) since there is no per-cell
     disambiguation to perform.
+
+    Per-category bind shape mirrors :func:`create_cell_plots`:
+    ``chdis`` / ``dqdv`` emit one ``add_plot`` per ``(cycle, side)``
+    column pair on ``graph[0]``; ``cycle`` emits two calls per cell, one
+    per dual-Y layer (``graph[0]`` = discharge capacity,
+    ``graph[1]`` = Coulombic efficiency).
     """
-    graphs: list[Any] = []
-    for category, template_name, graph_name in (
-        ("chdis", _TEMPLATE_CHDIS, "comparison_chdis_plot"),
-        ("cycle", _TEMPLATE_CYCLE, "comparison_cycle_plot"),
-        ("dqdv", _TEMPLATE_DQDV, "comparison_dqdv_plot"),
-    ):
-        template_path = _require_template(template_name)
-        graph = op.new_graph(template=str(template_path), lname=graph_name)
-        layer = graph[0]
-        for sheets in per_cell_sheets:
-            layer.add_plot(sheets[category])
-        graphs.append(graph)
-    return graphs
+    chdis_graph = _new_graph_from_template(op, _TEMPLATE_CHDIS, "comparison_chdis_plot")
+    for cell, sheets in zip(cells, per_cell_sheets):
+        _bind_xy_pairs(chdis_graph[0], sheets["chdis"], cell.chdis_df.shape[1])
+
+    cycle_graph = _new_graph_from_template(op, _TEMPLATE_CYCLE, "comparison_cycle_plot")
+    for _cell, sheets in zip(cells, per_cell_sheets):
+        _bind_cycle(cycle_graph, sheets["cycle"])
+
+    dqdv_graph = _new_graph_from_template(op, _TEMPLATE_DQDV, "comparison_dqdv_plot")
+    for cell, sheets in zip(cells, per_cell_sheets):
+        _bind_xy_pairs(dqdv_graph[0], sheets["dqdv"], cell.dqdv_df.shape[1])
+
+    return [chdis_graph, cycle_graph, dqdv_graph]
