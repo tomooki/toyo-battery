@@ -1,10 +1,10 @@
 """Graph-creation helpers for the Origin adapter.
 
-Graphs are instantiated from ``.otpu`` templates shipped by OriginLab's
-TOYO v2.01 pipeline. The templates themselves are not bundled with this
-package (license review pending — see issue #15); users either drop them
-into ``src/toyo_battery/origin/templates/`` at install time or point
-``TOYO_ORIGIN_TEMPLATE_DIR`` at an external directory.
+Graphs are instantiated from ``.otpu`` templates ported from OriginLab's
+TOYO v2.01 pipeline. The three templates ship with the wheel under
+``src/toyo_battery/origin/templates/`` and are picked up automatically;
+``TOYO_ORIGIN_TEMPLATE_DIR`` can override the lookup directory if a user
+wants to substitute their own.
 
 ``originpro`` API assumptions (documented so real-Origin verification can
 confirm them — see issue #15):
@@ -26,7 +26,6 @@ remediation message rather than spreading that concern across callers.
 
 from __future__ import annotations
 
-import importlib.resources
 import os
 from pathlib import Path
 from typing import Any
@@ -37,12 +36,22 @@ _TEMPLATE_DQDV = "dqdv.otpu"
 
 _TEMPLATE_ENV_VAR = "TOYO_ORIGIN_TEMPLATE_DIR"
 
+# Bundled template directory, resolved relative to this module's source
+# location. We deliberately avoid ``importlib.resources.files`` here:
+# ``templates/`` ships without an ``__init__.py`` (it's a data directory,
+# not a Python module), which makes ``files()`` return a
+# ``MultiplexedPath`` whose ``str()`` repr is wrapper text — not a usable
+# filesystem path. ``__file__`` is well-defined for both editable and
+# regular wheel installs (hatchling unpacks the wheel into site-packages
+# as plain files), so this resolves cleanly in every supported deployment.
+_BUNDLED_TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
+
 _NOT_FOUND_MSG = (
     "Origin template {name!r} not found at {path!s}. "
-    "Copy the v2.01 .otpu templates into the package directory "
-    "(src/toyo_battery/origin/templates/), or set the environment variable "
-    "TOYO_ORIGIN_TEMPLATE_DIR to a directory containing "
-    "charge_discharge.otpu, cycle_efficiency.otpu, and dqdv.otpu."
+    "The bundled templates ship with the wheel; this error usually means "
+    "TOYO_ORIGIN_TEMPLATE_DIR is set to an override directory that is "
+    "missing one of charge_discharge.otpu, cycle_efficiency.otpu, or "
+    "dqdv.otpu. Unset the env var to fall back to the bundled templates."
 )
 
 
@@ -57,11 +66,7 @@ def _template_path(name: str) -> Path:
     env = os.environ.get(_TEMPLATE_ENV_VAR)
     if env:
         return Path(env) / name
-    # ``importlib.resources.files`` returns a ``Traversable`` which on
-    # filesystem packages is a ``PosixPath``/``WindowsPath`` subclass —
-    # wrapping in ``Path`` normalizes the return type for downstream
-    # consumers and avoids a mypy complaint about the union.
-    return Path(str(importlib.resources.files("toyo_battery.origin.templates"))) / name
+    return _BUNDLED_TEMPLATE_DIR / name
 
 
 def _require_template(name: str) -> Path:

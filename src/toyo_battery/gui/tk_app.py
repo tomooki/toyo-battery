@@ -26,9 +26,10 @@ place those calls live.
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Sequence
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from matplotlib.backends.backend_tkagg import (  # type: ignore[attr-defined]
     FigureCanvasTkAgg,
@@ -39,6 +40,10 @@ from toyo_battery.gui._controller import GuiRequest, run
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
+
+    from toyo_battery.core.cell import Cell
+
+OnComplete = Callable[[Sequence["Cell"], Sequence["Figure"]], None]
 
 _DEFAULT_CYCLES_TEXT = "1 10 50"
 _DEFAULT_SG_WINDOW_TEXT = "11"
@@ -112,7 +117,7 @@ class _App:
     all inter-widget state lives on ``self``.
     """
 
-    def __init__(self, root: tk.Tk) -> None:
+    def __init__(self, root: tk.Tk, *, on_complete: OnComplete | None = None) -> None:
         self.root = root
         root.title("toyo-battery GUI")
 
@@ -120,6 +125,12 @@ class _App:
         # through the directory list reliably — Listbox stores only the
         # display strings.
         self._dirs: list[Path] = []
+
+        # Hook fired after a successful Run. ``None`` keeps the standalone
+        # behaviour of opening one Toplevel per figure; the Origin
+        # launcher injects a callback that pushes results into the active
+        # Origin project instead.
+        self._on_complete: OnComplete | None = on_complete
 
         self._build_widgets()
 
@@ -263,7 +274,7 @@ class _App:
 
         # Controller-level validation (empty dirs / no kinds) raises too.
         try:
-            figures = run(request)
+            result = run(request)
         except ValueError as exc:
             self._fail(f"Invalid request: {exc}")
             return
@@ -271,9 +282,17 @@ class _App:
             self._fail(f"Error running pipeline: {exc}")
             return
 
-        for fig in figures:
-            self._show_figure(fig)
-        self._status.set(f"Ran {len(figures)} figure(s).")
+        if self._on_complete is not None:
+            try:
+                self._on_complete(result.cells, result.figures)
+            except Exception as exc:
+                self._fail(f"Error in completion hook: {exc}")
+                return
+            self._status.set(f"Ran {len(result.figures)} figure(s); pushed via hook.")
+        else:
+            for fig in result.figures:
+                self._show_figure(fig)
+            self._status.set(f"Ran {len(result.figures)} figure(s).")
 
     def _show_figure(self, fig: Figure) -> None:
         """Embed ``fig`` in a new ``Toplevel`` with a matplotlib toolbar.
@@ -309,7 +328,7 @@ class _App:
         self._status.set(message)
 
 
-def launch_gui() -> None:
+def launch_gui(*, on_complete: OnComplete | None = None) -> None:
     """Start the Tk GUI and run its event loop.
 
     Callable two ways:
@@ -319,6 +338,17 @@ def launch_gui() -> None:
     * ``from toyo_battery.gui import launch_gui; launch_gui()`` — direct
       call from any host Python process, including Origin's embedded
       Python Console. The call blocks until the window is closed.
+
+    Parameters
+    ----------
+    on_complete
+        Optional callback invoked after each successful Run with
+        ``(cells, figures)``. ``None`` (the default) preserves the
+        standalone behaviour of opening one ``Toplevel`` per figure;
+        :func:`toyo_battery.origin.launch_gui` injects a callback that
+        forwards to :func:`toyo_battery.origin.push_to_origin` instead,
+        so figures are not shown and the results land directly in the
+        active Origin project.
 
     Switches matplotlib to the TkAgg backend at call time (not import
     time): a module-level ``matplotlib.use("TkAgg")`` would crash
@@ -330,7 +360,7 @@ def launch_gui() -> None:
 
     matplotlib.use("TkAgg")
     root = tk.Tk()
-    _App(root)
+    _App(root, on_complete=on_complete)
     root.mainloop()
 
 
