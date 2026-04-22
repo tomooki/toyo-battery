@@ -14,9 +14,15 @@ Three subcommands, all operating over one or more cell directories:
 The ``app`` object is a Typer instance, which is directly callable — so the
 ``[project.scripts]`` entry ``toyo-battery = toyo_battery.cli:app`` works
 without wrapping.
-"""
 
-from __future__ import annotations
+Note: this module intentionally omits ``from __future__ import annotations``.
+On Python 3.9, stringified annotations (``future-annotations`` mode) do not
+round-trip cleanly through Typer 0.12's ``get_type_hints(include_extras=True)``
+call for ``Annotated[...]`` parameter metadata — the ``typer.Option`` /
+``typer.Argument`` marker gets dropped, causing options to be silently
+reinterpreted as positional arguments. Evaluating annotations eagerly at
+function-definition time sidesteps the round-trip entirely.
+"""
 
 from pathlib import Path
 from typing import Annotated, Optional
@@ -171,7 +177,7 @@ def _parse_kinds(raw: str) -> list[str]:
 def _load_cell(
     path: Path,
     *,
-    mass: float | None,
+    mass: Optional[float],
     encoding: str,
     column_lang: ColumnLang,
 ) -> Cell:
