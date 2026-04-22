@@ -157,14 +157,21 @@ class _App:
         self._dirs_list.grid(row=0, column=0, rowspan=3, sticky="nsew", padx=_PADX, pady=_PADY)
 
         # Enable multi-folder drag-and-drop when tkinterdnd2 is installed AND
-        # the current root was constructed with TkinterDnD.Tk (plain tk.Tk
-        # roots don't carry the dnd extension, so the listbox won't have
-        # drop_target_register bound even if the import above succeeded).
-        if _DND_AVAILABLE and hasattr(self.root, "tk") and callable(
-            getattr(self._dirs_list, "drop_target_register", None)
-        ):
-            self._dirs_list.drop_target_register(DND_FILES)  # type: ignore[attr-defined]
-            self._dirs_list.dnd_bind("<<Drop>>", self._on_drop)  # type: ignore[attr-defined]
+        # the tkdnd Tcl extension actually loaded into this interpreter.
+        # Importing tkinterdnd2 monkey-patches ``drop_target_register`` onto
+        # every Tk widget regardless of whether the root is a ``TkinterDnD.Tk``
+        # instance, so ``hasattr`` / ``callable`` checks are not sufficient —
+        # calling the method on a plain ``tk.Tk`` root raises ``TclError:
+        # invalid command name "tkdnd::drop_target"``. We wrap the
+        # registration in ``try/except`` so the GUI still launches if
+        # ``_make_root`` fell back to plain ``tk.Tk`` (tkdnd shared library
+        # unavailable on the host).
+        if _DND_AVAILABLE:
+            try:
+                self._dirs_list.drop_target_register(DND_FILES)  # type: ignore[attr-defined]
+                self._dirs_list.dnd_bind("<<Drop>>", self._on_drop)  # type: ignore[attr-defined]
+            except tk.TclError:
+                pass
 
         ttk.Button(dirs_frame, text="Add...", command=self._on_add).grid(
             row=0, column=1, sticky="ew", padx=_PADX, pady=_PADY
