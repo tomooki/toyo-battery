@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Default Savitzky-Golay `window_length` for dQ/dV smoothing restored to
+  `11` (reverting [#69]). Applies uniformly across
+  `echemplot.core.dqdv.get_dqdv_df`, `Cell.dqdv_df`, `plot_dqdv`,
+  `echemplot.origin.push_to_origin`, and the Tk GUI's `SG window_length`
+  entry. Callers that explicitly pass `window_length=21` / `sg_window=21`
+  are unaffected.
+
 ## [0.1.5] - 2026-04-23
 
 ### Fixed
