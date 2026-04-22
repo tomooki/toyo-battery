@@ -376,9 +376,9 @@ def test_each_per_cell_graph_binds_its_own_sheet(
     for graph, expected_sheet in zip(graph_objs[:3], sheet_objs[:3]):
         # MagicMock's __getitem__ returns the same inner mock regardless
         # of index, so both graph[0] and graph[1] share call_args_list.
-        # chdis / dqdv emit multiple add_plot calls (one per cycle×side
-        # pair); cycle emits two (one per layer). Every call must point
-        # at the same sheet.
+        # chdis / dqdv emit multiple add_plot calls (one per (cycle,
+        # side) pair); cycle emits two (one per layer). Every call must
+        # point at the same sheet.
         calls = graph.__getitem__.return_value.add_plot.call_args_list
         assert calls, f"no add_plot calls on {graph!r}"
         for call in calls:
@@ -451,7 +451,7 @@ def test_cols_axis_is_set_per_category(
     empty. ``stat_table`` is never plotted so it skips the call.
     """
     _stub_templates(monkeypatch, tmp_path)
-    mock_op, sheet_objs, _ = _install_tracking_originpro(monkeypatch)
+    _, sheet_objs, _ = _install_tracking_originpro(monkeypatch)
     cell = _linear_cell("A")
 
     from toyo_battery.origin import push_to_origin
@@ -487,7 +487,7 @@ def test_cap_df_written_with_cycle_as_column(
     but nothing is plotted.
     """
     _stub_templates(monkeypatch, tmp_path)
-    mock_op, sheet_objs, _ = _install_tracking_originpro(monkeypatch)
+    _, sheet_objs, _ = _install_tracking_originpro(monkeypatch)
     cell = _linear_cell("A")
 
     from toyo_battery.origin import push_to_origin
@@ -503,4 +503,4 @@ def test_cap_df_written_with_cycle_as_column(
         f"cycle column missing from cap_df write: {list(written.columns)}"
     )
     # Order must match the _CYCLE_COL_* constants in _plots.py.
-    assert list(written.columns)[0] == "cycle", list(written.columns)
+    assert next(iter(written.columns)) == "cycle", list(written.columns)
