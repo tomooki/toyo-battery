@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `toyo_battery.gui.launch_gui()` public entry point for launching the Tk GUI
+  from a host Python process (including Origin's embedded Python Console).
+  Documented in `docs/ORIGIN_SETUP.md`.
+
+### Changed
+- Renamed internal `toyo_battery.gui.main` → `launch_gui`. The CLI entry
+  `python -m toyo_battery.gui` is unaffected.
+
 ## [0.0.1] - 2026-04-22
 
 ### Added
