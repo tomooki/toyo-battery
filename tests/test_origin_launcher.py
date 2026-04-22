@@ -83,6 +83,10 @@ def test_launch_gui_passes_callback_that_calls_push_to_origin(
 
     origin_mod.launch_gui(project_path=str(tmp_path / "p.opju"), stat_cycles=(7, 13))
 
+    # Issue #60: the Origin launcher must put the Tk GUI into its
+    # constrained ``origin_mode`` so ineffective options are greyed out.
+    assert captured.get("origin_mode") is True
+
     on_complete = captured.get("on_complete")
     assert callable(on_complete), "launcher must inject an on_complete callback"
 

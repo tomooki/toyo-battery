@@ -128,6 +128,13 @@ def launch_gui(
     graphs, and a ``stat_table`` sheet without writing any PNG/CSV
     intermediates.
 
+    The Tk GUI is launched with ``origin_mode=True``, which greys out
+    the options that have no effect on the Origin push path (plot-kind
+    checkboxes, cycles entry, and the voltage/capacity/dQ-dV range
+    entries) and shows an inline note; only ``SG window_length`` stays
+    editable because it flows into the dQ/dV worksheet written by
+    :func:`push_to_origin`.
+
     The originpro check runs **before** Tk is constructed so a missing
     embedded-Python build fails fast with the canonical
     :func:`_require_originpro` message rather than after the user has
@@ -169,7 +176,7 @@ def launch_gui(
         for fig in figures:
             plt.close(fig)
 
-    _launch_tk_gui(on_complete=_push)
+    _launch_tk_gui(on_complete=_push, origin_mode=True)
 
 
 __all__ = [
