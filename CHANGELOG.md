@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-04-22
+
 ### Added
 - `toyo_battery.gui.launch_gui()` public entry point for launching the Tk GUI
   from a host Python process (including Origin's embedded Python Console).
@@ -51,5 +53,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-alpha.** Public API is unstable and may change without deprecation in
   0.0.x releases.
 
-[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/tomooki/toyo-battery/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/tomooki/toyo-battery/releases/tag/v0.0.1
