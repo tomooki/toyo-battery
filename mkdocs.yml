@@ -1,0 +1,42 @@
+site_name: toyo-battery
+site_description: OSS Python toolkit for TOYO battery cycler data.
+site_url: https://tomooki.github.io/toyo-battery/
+repo_url: https://github.com/tomooki/toyo-battery
+repo_name: tomooki/toyo-battery
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+    - search.highlight
+  palette:
+    - scheme: default
+      primary: indigo
+    - scheme: slate
+      primary: indigo
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_root_heading: true
+            docstring_style: google
+            merge_init_into_class: true
+nav:
+  - Home: index.md
+  - Quick start: quickstart.md
+  - API Reference:
+      - Cell: api/cell.md
+      - IO: api/io.md
+      - Core: api/core.md
+      - Plotting: api/plotting.md
+  - Origin setup: ORIGIN_SETUP.md
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - toc:
+      permalink: true

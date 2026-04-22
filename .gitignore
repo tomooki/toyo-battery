@@ -77,3 +77,6 @@ CLAUDE.md
 # Build artifacts
 *.whl
 *.tar.gz
+
+# MkDocs build output
+/site/
