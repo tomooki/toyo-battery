@@ -397,6 +397,8 @@ def test_app_default_mode_keeps_widgets_enabled() -> None:
             assert str(widget["state"]) != "disabled"
     finally:
         root.destroy()
+
+
 def test_add_dir_deduplicates_paths(tmp_path: Path) -> None:
     """``_add_dir`` is the single path through which both Add-button and
     drag-and-drop reach the state list; adding the same directory twice
