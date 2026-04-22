@@ -286,6 +286,121 @@ def test_flatten_columns_passes_single_level_columns_through() -> None:
     assert list(_flatten_columns(df).columns) == ["q_ch", "q_dis"]
 
 
+def test_flatten_columns_yields_numpy_object_column_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Flattened column Index must be numpy-object, not pandas ``StringDtype``.
+
+    ``originpro.worksheet.from_df`` dispatches on ``.dtype.char``, which
+    pandas extension dtypes don't expose. With
+    ``future.infer_string=True``, ``pd.Index([...])`` on strings yields
+    ``StringDtype`` and the push path fails with
+    ``AttributeError: 'StringDtype' object has no attribute 'char'``
+    (issue #75). Pinning ``dtype=object`` in ``_flatten_columns`` guards
+    against that configuration regardless of the caller's pandas option.
+    """
+    from echemplot.origin._worksheets import _flatten_columns
+
+    monkeypatch.setattr(pd.options.future, "infer_string", True)
+    df = pd.DataFrame(
+        [[1.0, 2.0]],
+        columns=pd.MultiIndex.from_tuples(
+            [(1, "ch", "q"), (1, "dis", "q")],
+            names=["cycle", "side", "quantity"],
+        ),
+    )
+    flat = _flatten_columns(df)
+    assert isinstance(flat.columns.dtype, np.dtype)
+    assert flat.columns.dtype == object
+
+
+# ----------------------------------------------------------------------
+# _coerce_for_originpro — extension-dtype defence for originpro.from_df
+# ----------------------------------------------------------------------
+
+
+def test_coerce_for_originpro_converts_stringdtype_column_to_object() -> None:
+    """StringDtype columns must become object so ``from_df`` sees ``.dtype.char``."""
+    from echemplot.origin._worksheets import _coerce_for_originpro
+
+    df = pd.DataFrame({"cell": pd.array(["a", "b"], dtype="string"), "x": [1.0, 2.0]})
+    out = _coerce_for_originpro(df)
+    assert out["cell"].dtype == object
+    assert out["cell"].dtype.char == "O"
+    assert out["x"].dtype == np.float64
+    assert list(out["cell"]) == ["a", "b"]
+
+
+def test_coerce_for_originpro_rebuilds_string_column_index_as_object(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A ``StringDtype`` column Index must be rebuilt as numpy-object.
+
+    ``from_df`` touches ``df.columns.dtype`` in addition to per-column
+    dtypes; with ``future.infer_string=True`` the Index dtype alone can
+    trip the same ``AttributeError``.
+    """
+    from echemplot.origin._worksheets import _coerce_for_originpro
+
+    monkeypatch.setattr(pd.options.future, "infer_string", True)
+    df = pd.DataFrame({"a": [1.0], "b": [2.0]})
+    # Re-constructing the Index under the opted-in option produces StringDtype.
+    df.columns = pd.Index(["a", "b"])
+    assert not isinstance(df.columns.dtype, np.dtype)  # precondition
+
+    out = _coerce_for_originpro(df)
+    assert isinstance(out.columns.dtype, np.dtype)
+    assert out.columns.dtype == object
+    assert list(out.columns) == ["a", "b"]
+
+
+def test_coerce_for_originpro_is_identity_for_numpy_dtypes() -> None:
+    """Numeric-only frames with an object-dtype column Index short-circuit.
+
+    The column Index is pinned to ``dtype=object`` explicitly so the
+    assertion stays stable across pandas versions — recent releases
+    construct ``pd.DataFrame({...}).columns`` as ``StringDtype`` when
+    ``future.infer_string`` is on (py3.11/3.12 CI resolves a pandas
+    build where that is the case), which would legitimately send the
+    frame through the rebuild path and defeat the identity check.
+    """
+    from echemplot.origin._worksheets import _coerce_for_originpro
+
+    df = pd.DataFrame({"a": [1.0], "b": [2.0]})
+    df.columns = pd.Index(["a", "b"], dtype=object)
+    assert _coerce_for_originpro(df) is df
+
+
+def test_push_to_origin_succeeds_under_future_infer_string(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Regression for issue #75: completion hook failed with
+    ``'StringDtype' object has no attribute 'char'`` when the host pandas
+    had ``future.infer_string`` enabled, because the Index built in
+    ``_flatten_columns`` and the ``cell`` column from
+    ``stat_table.reset_index()`` both surfaced as ``StringDtype``. Every
+    frame handed to ``from_df`` must expose numpy-native dtypes on both
+    the values and the column Index.
+    """
+    mock_op = _install_mock_originpro(monkeypatch)
+    _stub_templates(monkeypatch, tmp_path)
+    monkeypatch.setattr(pd.options.future, "infer_string", True)
+    cell = _linear_cell("A")
+
+    from echemplot.origin import push_to_origin
+
+    push_to_origin([cell], stat_cycles=(1,))
+
+    # Every from_df call must receive numpy-native dtypes so originpro's
+    # ``.dtype.char`` dispatch survives. Guards against any future dtype
+    # inflation slipping past ``_coerce_for_originpro``.
+    for sheet_call in mock_op.new_sheet.return_value.from_df.call_args_list:
+        frame = sheet_call.args[0]
+        assert isinstance(frame.columns.dtype, np.dtype), frame.columns.dtype
+        for col in frame.columns:
+            assert isinstance(frame[col].dtype, np.dtype), (col, frame[col].dtype)
+
+
 # ----------------------------------------------------------------------
 # project_path round-trip
 # ----------------------------------------------------------------------
