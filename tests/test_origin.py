@@ -1,4 +1,4 @@
-"""Tests for :mod:`toyo_battery.origin`.
+"""Tests for :mod:`echemplot.origin`.
 
 Real ``originpro`` is not available outside Origin's embedded Python, so
 these tests build a fake module on ``sys.modules`` before calling
@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from toyo_battery.core.cell import Cell
+from echemplot.core.cell import Cell
 
 # ----------------------------------------------------------------------
 # Fixtures
@@ -52,7 +52,7 @@ def _install_mock_originpro(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
 
 def _stub_templates(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    """Point ``TOYO_ORIGIN_TEMPLATE_DIR`` at a dir with zero-byte templates.
+    """Point ``ECHEMPLOT_ORIGIN_TEMPLATE_DIR`` at a dir with zero-byte templates.
 
     Used by tests that exercise the env-var override path explicitly, and
     by the bulk of the suite to keep the assertions focused on call
@@ -65,7 +65,7 @@ def _stub_templates(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     tpl_dir.mkdir()
     for name in ("charge_discharge.otpu", "cycle_efficiency.otpu", "dqdv.otpu"):
         (tpl_dir / name).write_bytes(b"")
-    monkeypatch.setenv("TOYO_ORIGIN_TEMPLATE_DIR", str(tpl_dir))
+    monkeypatch.setenv("ECHEMPLOT_ORIGIN_TEMPLATE_DIR", str(tpl_dir))
     return tpl_dir
 
 
@@ -80,7 +80,7 @@ def test_require_originpro_raises_when_missing(monkeypatch: pytest.MonkeyPatch) 
     # to raise ``ImportError`` — this is the canonical way to simulate an
     # unimportable module in the stdlib.
     monkeypatch.setitem(sys.modules, "originpro", None)
-    from toyo_battery.origin import _require_originpro
+    from echemplot.origin import _require_originpro
 
     with pytest.raises(ImportError, match="OriginLab's embedded Python"):
         _require_originpro()
@@ -90,7 +90,7 @@ def test_require_originpro_returns_module_when_present(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     mock_op = _install_mock_originpro(monkeypatch)
-    from toyo_battery.origin import _require_originpro
+    from echemplot.origin import _require_originpro
 
     assert _require_originpro() is mock_op
 
@@ -107,7 +107,7 @@ def test_push_to_origin_single_cell_creates_sheets_and_plots(
     _stub_templates(monkeypatch, tmp_path)
     cell = _linear_cell("A")
 
-    from toyo_battery.origin import push_to_origin
+    from echemplot.origin import push_to_origin
 
     push_to_origin([cell], stat_cycles=(1,))
 
@@ -133,7 +133,7 @@ def test_push_to_origin_calls_require_originpro_once(
     _stub_templates(monkeypatch, tmp_path)
     cell = _linear_cell("A")
 
-    import toyo_battery.origin as origin_mod
+    import echemplot.origin as origin_mod
 
     calls = {"n": 0}
     real = origin_mod._require_originpro
@@ -160,7 +160,7 @@ def test_push_to_origin_multi_cell_includes_comparison_plots(
     cell_a = _linear_cell("A")
     cell_b = _linear_cell("B", q_ch=800.0, q_dis=760.0)
 
-    from toyo_battery.origin import push_to_origin
+    from echemplot.origin import push_to_origin
 
     push_to_origin([cell_a, cell_b], stat_cycles=(1,))
 
@@ -187,9 +187,9 @@ def test_push_to_origin_missing_template_raises_with_remediation(
     # Point at an empty directory so no templates can be resolved.
     empty = tmp_path / "empty"
     empty.mkdir()
-    monkeypatch.setenv("TOYO_ORIGIN_TEMPLATE_DIR", str(empty))
+    monkeypatch.setenv("ECHEMPLOT_ORIGIN_TEMPLATE_DIR", str(empty))
 
-    from toyo_battery.origin import push_to_origin
+    from echemplot.origin import push_to_origin
 
     cell = _linear_cell("A")
     with pytest.raises(FileNotFoundError) as excinfo:
@@ -197,22 +197,22 @@ def test_push_to_origin_missing_template_raises_with_remediation(
 
     msg = str(excinfo.value)
     assert "charge_discharge.otpu" in msg
-    assert "TOYO_ORIGIN_TEMPLATE_DIR" in msg
+    assert "ECHEMPLOT_ORIGIN_TEMPLATE_DIR" in msg
 
 
 def test_default_templates_resolve_from_bundled_directory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Without ``TOYO_ORIGIN_TEMPLATE_DIR`` set, the three required ``.otpu``
+    """Without ``ECHEMPLOT_ORIGIN_TEMPLATE_DIR`` set, the three required ``.otpu``
     templates must resolve to non-empty files inside the package.
 
     Guards the "default install only" UX: a fresh ``pip install
-    toyo-battery[origin]`` inside Origin must produce graphs without any
+    echemplot[origin]`` inside Origin must produce graphs without any
     template-copy step. Regressing this means ``push_to_origin`` would
     raise ``FileNotFoundError`` for every Origin user.
     """
-    monkeypatch.delenv("TOYO_ORIGIN_TEMPLATE_DIR", raising=False)
-    from toyo_battery.origin._plots import _require_template
+    monkeypatch.delenv("ECHEMPLOT_ORIGIN_TEMPLATE_DIR", raising=False)
+    from echemplot.origin._plots import _require_template
 
     for name in ("charge_discharge.otpu", "cycle_efficiency.otpu", "dqdv.otpu"):
         path = _require_template(name)
@@ -235,7 +235,7 @@ def test_long_cell_name_is_truncated_to_origin_limit(
     long_name = "a" * 50
     cell = _linear_cell(long_name)
 
-    from toyo_battery.origin import push_to_origin
+    from echemplot.origin import push_to_origin
 
     push_to_origin([cell], stat_cycles=(1,))
 
@@ -244,7 +244,7 @@ def test_long_cell_name_is_truncated_to_origin_limit(
 
 
 def test_sanitize_sheet_name_preserves_short_names() -> None:
-    from toyo_battery.origin._worksheets import _sanitize_sheet_name
+    from echemplot.origin._worksheets import _sanitize_sheet_name
 
     assert _sanitize_sheet_name("A_chdis") == "A_chdis"
     assert _sanitize_sheet_name("x" * 32) == "x" * 32
@@ -252,7 +252,7 @@ def test_sanitize_sheet_name_preserves_short_names() -> None:
 
 def test_sanitize_sheet_name_disambiguates_long_prefix_collisions() -> None:
     """Two overlong names sharing a 31-char prefix must yield distinct sheets."""
-    from toyo_battery.origin._worksheets import _sanitize_sheet_name
+    from echemplot.origin._worksheets import _sanitize_sheet_name
 
     a = "x" * 40 + "A"
     b = "x" * 40 + "B"
@@ -266,7 +266,7 @@ def test_sanitize_sheet_name_disambiguates_long_prefix_collisions() -> None:
 
 
 def test_flatten_columns_joins_multiindex_levels_with_underscore() -> None:
-    from toyo_battery.origin._worksheets import _flatten_columns
+    from echemplot.origin._worksheets import _flatten_columns
 
     df = pd.DataFrame(
         [[1.0, 2.0]],
@@ -280,7 +280,7 @@ def test_flatten_columns_joins_multiindex_levels_with_underscore() -> None:
 
 
 def test_flatten_columns_passes_single_level_columns_through() -> None:
-    from toyo_battery.origin._worksheets import _flatten_columns
+    from echemplot.origin._worksheets import _flatten_columns
 
     df = pd.DataFrame({"q_ch": [1.0], "q_dis": [2.0]})
     assert list(_flatten_columns(df).columns) == ["q_ch", "q_dis"]
@@ -299,7 +299,7 @@ def test_push_to_origin_opens_and_saves_when_project_path_given(
     cell = _linear_cell("A")
     project = str(tmp_path / "proj.opju")
 
-    from toyo_battery.origin import push_to_origin
+    from echemplot.origin import push_to_origin
 
     push_to_origin([cell], project_path=project, stat_cycles=(1,))
 
@@ -314,7 +314,7 @@ def test_push_to_origin_skips_open_save_when_project_path_none(
     _stub_templates(monkeypatch, tmp_path)
     cell = _linear_cell("A")
 
-    from toyo_battery.origin import push_to_origin
+    from echemplot.origin import push_to_origin
 
     push_to_origin([cell], stat_cycles=(1,))
     assert not mock_op.open.called
@@ -365,7 +365,7 @@ def test_each_per_cell_graph_binds_its_own_sheet(
     _, sheet_objs, graph_objs = _install_tracking_originpro(monkeypatch)
     cell = _linear_cell("A")
 
-    from toyo_battery.origin import push_to_origin
+    from echemplot.origin import push_to_origin
 
     push_to_origin([cell], stat_cycles=(1,))
 
@@ -397,7 +397,7 @@ def test_add_plot_passes_column_indices(monkeypatch: pytest.MonkeyPatch, tmp_pat
     _, _, graph_objs = _install_tracking_originpro(monkeypatch)
     cell = _linear_cell("A")
 
-    from toyo_battery.origin import push_to_origin
+    from echemplot.origin import push_to_origin
 
     push_to_origin([cell], stat_cycles=(1,))
 
@@ -419,7 +419,7 @@ def test_cycle_plot_binds_both_layers(monkeypatch: pytest.MonkeyPatch, tmp_path:
     _, _, graph_objs = _install_tracking_originpro(monkeypatch)
     cell = _linear_cell("A")
 
-    from toyo_battery.origin import push_to_origin
+    from echemplot.origin import push_to_origin
 
     push_to_origin([cell], stat_cycles=(1,))
 
@@ -448,7 +448,7 @@ def test_cols_axis_is_set_per_category(monkeypatch: pytest.MonkeyPatch, tmp_path
     _, sheet_objs, _ = _install_tracking_originpro(monkeypatch)
     cell = _linear_cell("A")
 
-    from toyo_battery.origin import push_to_origin
+    from echemplot.origin import push_to_origin
 
     push_to_origin([cell], stat_cycles=(1,))
 
@@ -484,7 +484,7 @@ def test_cap_df_written_with_cycle_as_column(
     _, sheet_objs, _ = _install_tracking_originpro(monkeypatch)
     cell = _linear_cell("A")
 
-    from toyo_battery.origin import push_to_origin
+    from echemplot.origin import push_to_origin
 
     push_to_origin([cell], stat_cycles=(1,))
 

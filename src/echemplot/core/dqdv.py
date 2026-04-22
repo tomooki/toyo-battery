@@ -1,7 +1,7 @@
 """dQ/dV computation via interpolation + Savitzky-Golay derivative.
 
 For each ``(cycle, side)`` segment in a ``chdis_df`` (produced by
-:func:`toyo_battery.core.chdis.get_chdis_df`), this module:
+:func:`echemplot.core.chdis.get_chdis_df`), this module:
 
 1. Extracts the voltage and capacity series, drops NaN rows, sorts by V,
    and removes duplicate V values (``keep="last"`` to preserve CC-CV tail
@@ -58,7 +58,7 @@ import pandas as pd
 from numpy.typing import NDArray
 from scipy.signal import savgol_filter
 
-from toyo_battery.io.schema import JA_TO_EN, ColumnLang
+from echemplot.io.schema import JA_TO_EN, ColumnLang
 
 _JA_COLS: dict[str, str] = {
     "voltage": "電圧",
@@ -120,7 +120,7 @@ def get_dqdv_df(
     Parameters
     ----------
     chdis_df
-        Output of :func:`toyo_battery.core.chdis.get_chdis_df`. Its column
+        Output of :func:`echemplot.core.chdis.get_chdis_df`. Its column
         MultiIndex must have levels ``cycle``, ``side``, ``quantity`` with
         the ``quantity`` level using the names resolved by ``column_lang``
         (voltage + capacity).
@@ -164,7 +164,7 @@ def get_dqdv_df(
     -----
     Non-default ``inter_num`` / ``window_length`` / ``polyorder`` must be
     passed by calling this function directly —
-    :attr:`toyo_battery.core.cell.Cell.dqdv_df` uses the defaults.
+    :attr:`echemplot.core.cell.Cell.dqdv_df` uses the defaults.
     """
     _validate_savgol_params(inter_num, window_length, polyorder)
 

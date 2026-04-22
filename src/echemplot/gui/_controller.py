@@ -14,18 +14,18 @@ Design notes:
 - :func:`run` returns a :class:`RunResult` carrying both the loaded cells
   and the generated figures. The cells are exposed (not just the figures)
   so the Origin launcher can hand them to
-  :func:`toyo_battery.origin.push_to_origin` without re-loading.
+  :func:`echemplot.origin.push_to_origin` without re-loading.
 - Axis ranges are optional; when present they are applied by iterating
   ``fig.axes`` after the matplotlib backend has drawn. For :func:`plot_cycle`
   the dual-Y twin is matched by y-label rather than position so the
   capacity range never accidentally lands on the efficiency axis.
 - The Savitzky-Golay ``window_length`` is not reachable through the cached
-  :attr:`toyo_battery.core.cell.Cell.dqdv_df` property, which hard-codes
+  :attr:`echemplot.core.cell.Cell.dqdv_df` property, which hard-codes
   the defaults. The controller forwards ``request.sg_window`` straight to
-  :func:`toyo_battery.plotting.matplotlib_backend.plot_dqdv` as the
+  :func:`echemplot.plotting.matplotlib_backend.plot_dqdv` as the
   ``sg_window_length`` kwarg; the backend reuses the cached
   :attr:`Cell.dqdv_df` at defaults and recomputes via
-  :func:`toyo_battery.core.dqdv.get_dqdv_df` on overrides. ``Cell``
+  :func:`echemplot.core.dqdv.get_dqdv_df` on overrides. ``Cell``
   instances are never mutated.
 """
 
@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from toyo_battery.core.cell import Cell
+from echemplot.core.cell import Cell
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
@@ -87,7 +87,7 @@ class GuiRequest:
         by the cycle-vs-capacity plot. Empty sequence = plot every cycle.
     sg_window
         Savitzky-Golay ``window_length`` passed to
-        :func:`toyo_battery.core.dqdv.get_dqdv_df`. Must be an odd integer
+        :func:`echemplot.core.dqdv.get_dqdv_df`. Must be an odd integer
         ``>= 1``; even or non-positive values raise ``ValueError``.
     voltage_range, capacity_range, dqdv_range
         Optional ``(lo, hi)`` tuples applied to the corresponding plot's
@@ -172,7 +172,7 @@ def run(request: GuiRequest) -> RunResult:
     # only when ``run`` is actually called — importing the controller by
     # itself (for unit tests, or during Tk view construction before the
     # Run button is clicked) stays cheap.
-    from toyo_battery.plotting.matplotlib_backend import (
+    from echemplot.plotting.matplotlib_backend import (
         plot_chdis,
         plot_cycle,
         plot_dqdv,

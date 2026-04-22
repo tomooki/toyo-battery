@@ -1,4 +1,4 @@
-# toyo-battery
+# echemplot
 
 OSS Python toolkit for TOYO battery cycler data.
 
@@ -8,23 +8,23 @@ Pure Python, installable from PyPI — including into OriginLab's embedded
 Python.
 
 !!! warning "Pre-alpha"
-    Status: **0.0.1 — pre-alpha scaffold.** Core logic is being ported from
+    Status: **0.1.x — pre-alpha.** Core logic is being ported from
     the private `TOYO_origin` scripts. Public API is unstable.
 
 ## Installation
 
 ```bash
 # Core only
-pip install toyo-battery
+pip install echemplot
 
 # With Matplotlib plotting
-pip install "toyo-battery[plot]"
+pip install "echemplot[plot]"
 
 # Everything except Origin
-pip install "toyo-battery[all]"
+pip install "echemplot[all]"
 ```
 
-The `toyo_battery.origin` submodule uses `originpro` (shipped with Origin)
+The `echemplot.origin` submodule uses `originpro` (shipped with Origin)
 and is only importable inside Origin's Python environment. See
 [Origin setup](ORIGIN_SETUP.md) for installing into Origin's embedded Python.
 

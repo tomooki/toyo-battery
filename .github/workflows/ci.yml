@@ -46,7 +46,7 @@ jobs:
       - name: Sync deps
         run: uv sync --all-extras --dev --python ${{ matrix.python }}
       - name: Pytest
-        run: uv run --python ${{ matrix.python }} pytest --cov=toyo_battery --cov-report=term-missing
+        run: uv run --python ${{ matrix.python }} pytest --cov=echemplot --cov-report=term-missing
 
   build:
     name: Build sdist+wheel

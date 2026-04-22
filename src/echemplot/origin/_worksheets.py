@@ -2,7 +2,7 @@
 
 These helpers translate pandas DataFrames into Origin worksheets via the
 ``originpro`` API. All functions in this module assume that
-:func:`toyo_battery.origin._require_originpro` has already succeeded and
+:func:`echemplot.origin._require_originpro` has already succeeded and
 accept the resulting ``op`` module as a parameter rather than re-importing
 it — this keeps the helpers unit-testable by passing in a mock.
 
@@ -87,7 +87,7 @@ def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
     out.columns = pd.Index(flat_names)
     # Explicit DataFrame wrap pins the return type against pandas-stubs
     # occasionally inferring ``.copy`` as ``Any``. Matches the idiom used
-    # in :mod:`toyo_battery.core.stats`.
+    # in :mod:`echemplot.core.stats`.
     return pd.DataFrame(out)
 
 
@@ -157,9 +157,9 @@ def write_cell_sheets(op: Any, cell: Any) -> dict[str, Any]:
     ----------
     op
         The ``originpro`` module handle returned by
-        :func:`toyo_battery.origin._require_originpro`.
+        :func:`echemplot.origin._require_originpro`.
     cell
-        A :class:`toyo_battery.core.cell.Cell` (typed as ``Any`` here to
+        A :class:`echemplot.core.cell.Cell` (typed as ``Any`` here to
         keep the mocked-originpro test path import-light).
 
     Returns
@@ -207,7 +207,7 @@ def write_stat_table(op: Any, stat_df: pd.DataFrame) -> Any:
     """Create the ``stat_table`` worksheet from a pre-computed DataFrame.
 
     ``stat_df`` is the output of
-    :func:`toyo_battery.core.stats.stat_table`. Its index (``cell``) is
+    :func:`echemplot.core.stats.stat_table`. Its index (``cell``) is
     reset into a regular column before writing so Origin users see the
     cell name as data rather than as a hidden row label.
     """

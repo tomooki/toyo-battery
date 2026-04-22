@@ -2,8 +2,8 @@
 
 ## Reader
 
-::: toyo_battery.io.reader
+::: echemplot.io.reader
 
 ## Schema
 
-::: toyo_battery.io.schema
+::: echemplot.io.schema

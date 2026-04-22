@@ -1,4 +1,4 @@
-site_name: toyo-battery
+site_name: echemplot
 site_description: OSS Python toolkit for TOYO battery cycler data.
 site_url: https://tomooki.github.io/toyo-battery/
 repo_url: https://github.com/tomooki/toyo-battery

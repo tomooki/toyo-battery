@@ -1,4 +1,4 @@
-"""Tests for toyo_battery.io.reader."""
+"""Tests for echemplot.io.reader."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ from typing import Callable
 import pandas as pd
 import pytest
 
-from toyo_battery.core.cell import Cell
-from toyo_battery.io.reader import read_cell_dir, read_ptn_mass
-from toyo_battery.io.schema import CANONICAL_COLUMNS_EN, CANONICAL_COLUMNS_JA
+from echemplot.core.cell import Cell
+from echemplot.io.reader import read_cell_dir, read_ptn_mass
+from echemplot.io.schema import CANONICAL_COLUMNS_EN, CANONICAL_COLUMNS_JA
 
 
 def _write_fixed_column_ptn(path: Path, mass_g: float) -> None:

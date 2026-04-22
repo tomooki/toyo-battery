@@ -1,4 +1,4 @@
-"""Tests for :mod:`toyo_battery.core.stats`."""
+"""Tests for :mod:`echemplot.core.stats`."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from toyo_battery.core.cell import Cell
-from toyo_battery.core.stats import stat_table
+from echemplot.core.cell import Cell
+from echemplot.core.stats import stat_table
 
 
 def _linear_cell(

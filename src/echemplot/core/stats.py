@@ -1,6 +1,6 @@
 """Per-cell summary statistics (``stat_table``).
 
-Aggregates a list of :class:`toyo_battery.core.cell.Cell` objects into a
+Aggregates a list of :class:`echemplot.core.cell.Cell` objects into a
 single wide summary table — one row per cell, with a deterministic set of
 capacity / efficiency / retention columns keyed off a caller-supplied
 ``target_cycles``. This is the table that downstream users typically
@@ -66,10 +66,10 @@ import pandas as pd
 from numpy.typing import NDArray
 from scipy.integrate import simpson, trapezoid
 
-from toyo_battery.io.schema import JA_TO_EN, ColumnLang
+from echemplot.io.schema import JA_TO_EN, ColumnLang
 
 if TYPE_CHECKING:
-    from toyo_battery.core.cell import Cell
+    from echemplot.core.cell import Cell
 
 _JA_COLS: dict[str, str] = {
     "voltage": "電圧",
@@ -297,7 +297,7 @@ def stat_table(
     Parameters
     ----------
     cells
-        Sequence of :class:`toyo_battery.core.cell.Cell`. Each cell
+        Sequence of :class:`echemplot.core.cell.Cell`. Each cell
         contributes one row keyed by ``cell.name``. An empty sequence
         returns an empty DataFrame with the correct column schema.
     target_cycles

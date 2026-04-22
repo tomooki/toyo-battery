@@ -1,6 +1,6 @@
 """Charge/discharge segmentation.
 
-Splits a raw DataFrame (from :func:`toyo_battery.io.reader.read_cell_dir`)
+Splits a raw DataFrame (from :func:`echemplot.io.reader.read_cell_dir`)
 into per-cycle charge/discharge segments. The output is a wide DataFrame
 with a 3-level column MultiIndex:
 
@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from toyo_battery.io.schema import JA_TO_EN, ColumnLang
+from echemplot.io.schema import JA_TO_EN, ColumnLang
 
 _CHARGE = "充電"
 _DISCHARGE = "放電"
@@ -68,7 +68,7 @@ def get_chdis_df(df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.Data
     Parameters
     ----------
     df
-        Output of :func:`toyo_battery.io.reader.read_cell_dir`. Must contain
+        Output of :func:`echemplot.io.reader.read_cell_dir`. Must contain
         サイクル/状態/電圧/電気量 columns (or their EN equivalents when
         ``column_lang="en"``). ``状態`` cell values are always JA
         (``充電``/``放電``/``休止``) regardless of ``column_lang``.

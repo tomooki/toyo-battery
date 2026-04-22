@@ -3,8 +3,8 @@ requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "toyo-battery"
-version = "0.0.3"
+name = "echemplot"
+version = "0.1.0"
 description = "OSS Python toolkit for TOYO battery cycler data (charge/discharge, dQ/dV, cycle stats). Installable from PyPI into Origin's embedded Python."
 readme = "README.md"
 license = { text = "MIT" }
@@ -46,7 +46,7 @@ all = [
 ]
 
 [project.scripts]
-toyo-battery = "toyo_battery.cli:app"
+echemplot = "echemplot.cli:app"
 
 [project.urls]
 Homepage      = "https://github.com/tomooki/toyo-battery"
@@ -72,11 +72,11 @@ docs = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/toyo_battery"]
+packages = ["src/echemplot"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "src/toyo_battery",
+    "src/echemplot",
     "tests",
     "README.md",
     "LICENSE",
@@ -98,7 +98,7 @@ ignore = ["E501"]
 [tool.mypy]
 python_version = "3.9"
 strict = true
-files = ["src/toyo_battery"]
+files = ["src/echemplot"]
 plugins = []
 
 [[tool.mypy.overrides]]
@@ -106,7 +106,7 @@ module = ["originpro.*", "scipy.*", "matplotlib.*", "plotly.*", "kaleido.*", "ty
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "toyo_battery.cli"
+module = "echemplot.cli"
 disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
@@ -115,7 +115,7 @@ testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 
 [tool.coverage.run]
-source = ["toyo_battery"]
+source = ["echemplot"]
 branch = true
 
 [tool.coverage.report]

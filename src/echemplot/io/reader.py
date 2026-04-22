@@ -49,7 +49,7 @@ from typing import cast
 
 import pandas as pd
 
-from toyo_battery.io.schema import (
+from echemplot.io.schema import (
     CANONICAL_COLUMNS_JA,
     COL_CAPACITY,
     COL_CURRENT_MA,

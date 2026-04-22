@@ -8,11 +8,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from toyo_battery.core.capacity import get_cap_df
-from toyo_battery.core.chdis import get_chdis_df
-from toyo_battery.core.dqdv import get_dqdv_df
-from toyo_battery.io.reader import read_cell_dir
-from toyo_battery.io.schema import ColumnLang
+from echemplot.core.capacity import get_cap_df
+from echemplot.core.chdis import get_chdis_df
+from echemplot.core.dqdv import get_dqdv_df
+from echemplot.io.reader import read_cell_dir
+from echemplot.io.schema import ColumnLang
 
 
 @dataclass
@@ -59,7 +59,7 @@ class Cell:
     def dqdv_df(self) -> pd.DataFrame:
         """dQ/dV with default parameters. For non-default ``inter_num`` /
         ``window_length`` / ``polyorder``, call
-        :func:`toyo_battery.core.dqdv.get_dqdv_df` directly on
+        :func:`echemplot.core.dqdv.get_dqdv_df` directly on
         ``cell.chdis_df``.
         """
         return get_dqdv_df(self.chdis_df, column_lang=self.column_lang)

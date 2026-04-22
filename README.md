@@ -1,4 +1,4 @@
-# toyo-battery
+# echemplot
 
 OSS Python toolkit for TOYO battery cycler data.
 
@@ -7,37 +7,37 @@ cycle capacity, Coulombic efficiency, dQ/dV curves, and summary statistics.
 Pure Python, installable from PyPI — including into OriginLab's embedded
 Python.
 
-- PyPI: <https://pypi.org/project/toyo-battery/>
+- PyPI: <https://pypi.org/project/echemplot/>
 - Docs: <https://tomooki.github.io/toyo-battery/>
 - Changelog: [CHANGELOG.md](./CHANGELOG.md)
 
-> Status: **pre-alpha (0.0.x)**. Public API is unstable and may change
-> without deprecation until 0.1.0.
+> Status: **pre-alpha (0.1.x)**. Public API is unstable and may change
+> without deprecation until a future stable release.
 
 ## Installation
 
 ```bash
 # Core library only (numpy, pandas, scipy)
-pip install toyo-battery
+pip install echemplot
 
 # Pick one or more extras:
-pip install "toyo-battery[plot]"    # Matplotlib plotting
-pip install "toyo-battery[plotly]"  # Plotly + Kaleido (static image export)
-pip install "toyo-battery[cli]"     # toyo-battery CLI (typer + rich)
-pip install "toyo-battery[gui]"     # Tk desktop app (matplotlib)
+pip install "echemplot[plot]"    # Matplotlib plotting
+pip install "echemplot[plotly]"  # Plotly + Kaleido (static image export)
+pip install "echemplot[cli]"     # echemplot CLI (typer + rich)
+pip install "echemplot[gui]"     # Tk desktop app (matplotlib)
 
 # Everything non-Origin in one shot
-pip install "toyo-battery[all]"
+pip install "echemplot[all]"
 ```
 
-The `[origin]` extra has no runtime deps — the `toyo_battery.origin` submodule
+The `[origin]` extra has no runtime deps — the `echemplot.origin` submodule
 imports `originpro` lazily, so it only works inside Origin's embedded Python
 (see below).
 
 ## Quick start
 
 ```python
-from toyo_battery import Cell
+from echemplot import Cell
 
 cell = Cell.from_dir("path/to/cell_dir")
 
@@ -53,28 +53,28 @@ export), `連続データ_py.csv` (pre-normalized), or 6-digit raw files with a
 
 ## CLI
 
-Install with `pip install "toyo-battery[cli]"`. All subcommands accept one or
+Install with `pip install "echemplot[cli]"`. All subcommands accept one or
 more cell directories plus the shared options `--mass`, `--encoding`,
 `--column-lang`.
 
 ```bash
 # {name}_chdis.csv / {name}_cap.csv / {name}_dqdv.csv per cell
-toyo-battery process cell_A cell_B --out ./csvs
+echemplot process cell_A cell_B --out ./csvs
 
 # chdis / cycle / dqdv PNGs (one figure per kind, one Axes per cell)
-toyo-battery plot cell_A cell_B --out ./pngs \
+echemplot plot cell_A cell_B --out ./pngs \
     --kinds chdis,cycle,dqdv --cycles 1,10,50
 
 # Single stat_table CSV spanning all cells at the given target cycles
-toyo-battery stats cell_A cell_B --cycles 10,50 --out stats.csv
+echemplot stats cell_A cell_B --cycles 10,50 --out stats.csv
 ```
 
 ## GUI
 
-Install with `pip install "toyo-battery[gui]"` and launch:
+Install with `pip install "echemplot[gui]"` and launch:
 
 ```bash
-python -m toyo_battery.gui
+python -m echemplot.gui
 ```
 
 Tk app for interactive directory selection, plot-kind toggles, per-axis
@@ -86,9 +86,9 @@ Matplotlib and Plotly backends expose the same three functions — pick by
 import path:
 
 ```python
-from toyo_battery import Cell
-from toyo_battery.plotting.matplotlib_backend import plot_chdis, plot_cycle, plot_dqdv
-# or: from toyo_battery.plotting.plotly_backend import plot_chdis, plot_cycle, plot_dqdv
+from echemplot import Cell
+from echemplot.plotting.matplotlib_backend import plot_chdis, plot_cycle, plot_dqdv
+# or: from echemplot.plotting.plotly_backend import plot_chdis, plot_cycle, plot_dqdv
 
 cells = [Cell.from_dir(p) for p in ("cell_A", "cell_B")]
 fig = plot_cycle(cells)
@@ -105,7 +105,7 @@ import subprocess
 import sys
 
 subprocess.check_call(
-    [sys.executable, "-m", "pip", "install", "toyo-battery[origin]"]
+    [sys.executable, "-m", "pip", "install", "echemplot[origin]"]
 )
 ```
 
@@ -115,18 +115,18 @@ line opens the directory picker and pushes results into the active Origin
 project:
 
 ```python
-from toyo_battery.origin import launch_gui
+from echemplot.origin import launch_gui
 launch_gui()
 ```
 
-For scripted use, `toyo_battery.origin.push_to_origin(cells, ...)` populates
+For scripted use, `echemplot.origin.push_to_origin(cells, ...)` populates
 the current Origin project with per-cell worksheets, template graphs, and a
 stat sheet. It imports `originpro` lazily, so the submodule is importable
 outside Origin (`push_to_origin` itself raises there).
 
 To run the same Tk GUI **outside** Origin (matplotlib `Toplevel` previews,
 no Origin write-back), install the `[gui]` extra and call
-`from toyo_battery.gui import launch_gui; launch_gui()` instead.
+`from echemplot.gui import launch_gui; launch_gui()` instead.
 
 See [docs/ORIGIN_SETUP.md](./docs/ORIGIN_SETUP.md) for the full workflow.
 

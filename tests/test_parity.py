@@ -1,4 +1,4 @@
-"""Analytical parity tests for :func:`toyo_battery.core.stats.stat_table`.
+"""Analytical parity tests for :func:`echemplot.core.stats.stat_table`.
 
 These tests pin every column of ``stat_table`` against **closed-form
 analytical expected values** derived from the shared ``make_cell_dir``
@@ -72,8 +72,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from toyo_battery.core.cell import Cell
-from toyo_battery.core.stats import stat_table
+from echemplot.core.cell import Cell
+from echemplot.core.stats import stat_table
 
 # Fixture parameters — mirrored from ``tests/conftest.py`` so the
 # analytical expected values below are derived from the fixture's
@@ -220,7 +220,7 @@ def test_stat_table_column_schema_parity(make_cell_dir: Callable[..., Path]) -> 
     tbl = stat_table([cell], target_cycles=(1,))
 
     # Exact column order for ``target_cycles=(1,)``. Mirrors the order
-    # defined in :func:`toyo_battery.core.stats._build_column_order`.
+    # defined in :func:`echemplot.core.stats._build_column_order`.
     assert list(tbl.columns) == [
         "Q_dis_max",
         "cycle_at_80pct",

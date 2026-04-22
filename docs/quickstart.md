@@ -1,12 +1,12 @@
 # Quick start
 
 This page walks through loading one cell directory and inspecting the
-derived tables that `toyo-battery` exposes.
+derived tables that `echemplot` exposes.
 
 ## Install
 
 ```bash
-pip install "toyo-battery[plot]"
+pip install "echemplot[plot]"
 ```
 
 The `[plot]` extra pulls in Matplotlib, which is required for the plotting
@@ -19,7 +19,7 @@ point — it discovers the TOYO files in the directory, picks the right
 reader, resolves the active-material mass, and returns a `Cell` instance.
 
 ```python
-from toyo_battery.core.cell import Cell
+from echemplot.core.cell import Cell
 
 cell = Cell.from_dir("path/to/cell_dir")
 print(cell.name, cell.mass_g)
@@ -64,7 +64,7 @@ deterministic capacity / efficiency / retention columns keyed off a
 caller-supplied `target_cycles`.
 
 ```python
-from toyo_battery.core.stats import stat_table
+from echemplot.core.stats import stat_table
 
 cells = [Cell.from_dir(p) for p in cell_dirs]
 summary = stat_table(cells, target_cycles=(10, 50, 100))
@@ -77,7 +77,7 @@ The Matplotlib backend exposes three helpers that each return a
 `matplotlib.figure.Figure` — the caller handles `savefig` / `close`.
 
 ```python
-from toyo_battery.plotting.matplotlib_backend import (
+from echemplot.plotting.matplotlib_backend import (
     plot_chdis,
     plot_cycle,
     plot_dqdv,

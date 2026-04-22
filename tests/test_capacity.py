@@ -1,4 +1,4 @@
-"""Tests for :mod:`toyo_battery.core.capacity`."""
+"""Tests for :mod:`echemplot.core.capacity`."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from toyo_battery.core.capacity import get_cap_df
-from toyo_battery.core.cell import Cell
+from echemplot.core.capacity import get_cap_df
+from echemplot.core.cell import Cell
 
 
 def _chdis(
@@ -20,7 +20,7 @@ def _chdis(
 ) -> pd.DataFrame:
     """Build a minimal chdis_df from ``(cycle, side) -> [(voltage, capacity)]``.
 
-    Output mirrors the shape produced by :func:`toyo_battery.core.chdis.get_chdis_df`:
+    Output mirrors the shape produced by :func:`echemplot.core.chdis.get_chdis_df`:
     a 3-level column MultiIndex ``(cycle, side, quantity)`` with NaN-padded
     rows so all segments share a row axis. ``get_cap_df`` only reads the
     capacity quantity, so the voltage label is hardcoded (``"電圧"``).

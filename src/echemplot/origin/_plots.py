@@ -2,9 +2,9 @@
 
 Graphs are instantiated from ``.otpu`` templates ported from OriginLab's
 TOYO v2.01 pipeline. The three templates ship with the wheel under
-``src/toyo_battery/origin/templates/`` and are picked up automatically;
-``TOYO_ORIGIN_TEMPLATE_DIR`` can override the lookup directory if a user
-wants to substitute their own.
+``src/echemplot/origin/templates/`` and are picked up automatically;
+``ECHEMPLOT_ORIGIN_TEMPLATE_DIR`` can override the lookup directory if a
+user wants to substitute their own.
 
 ``originpro`` API assumptions (documented so real-Origin verification can
 confirm them — see issue #15):
@@ -55,7 +55,7 @@ _CYCLE_COL_CYCLE = 0
 _CYCLE_COL_QDIS = 2
 _CYCLE_COL_CE = 3
 
-_TEMPLATE_ENV_VAR = "TOYO_ORIGIN_TEMPLATE_DIR"
+_TEMPLATE_ENV_VAR = "ECHEMPLOT_ORIGIN_TEMPLATE_DIR"
 
 # Bundled template directory, resolved relative to this module's source
 # location. We deliberately avoid ``importlib.resources.files`` here:
@@ -70,7 +70,7 @@ _BUNDLED_TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 _NOT_FOUND_MSG = (
     "Origin template {name!r} not found at {path!s}. "
     "The bundled templates ship with the wheel; this error usually means "
-    "TOYO_ORIGIN_TEMPLATE_DIR is set to an override directory that is "
+    "ECHEMPLOT_ORIGIN_TEMPLATE_DIR is set to an override directory that is "
     "missing one of charge_discharge.otpu, cycle_efficiency.otpu, or "
     "dqdv.otpu. Unset the env var to fall back to the bundled templates."
 )
@@ -138,7 +138,7 @@ def create_cell_plots(op: Any, cell: Any, sheets: dict[str, Any]) -> list[Any]:
     """Create the three per-cell graphs from templates.
 
     ``sheets`` is the mapping returned by
-    :func:`toyo_battery.origin._worksheets.write_cell_sheets`. ``cell``
+    :func:`echemplot.origin._worksheets.write_cell_sheets`. ``cell``
     is used to read the per-category column counts so the bind helpers
     know how many plot pairs to emit.
     """

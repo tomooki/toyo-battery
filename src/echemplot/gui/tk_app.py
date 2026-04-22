@@ -1,11 +1,11 @@
 """Tk application. Requires the [gui] extra.
 
-Launch with ``python -m toyo_battery.gui.tk_app`` (or
-``python -m toyo_battery.gui`` via the module's ``__main__``).
+Launch with ``python -m echemplot.gui.tk_app`` (or
+``python -m echemplot.gui`` via the module's ``__main__``).
 
 This module is the view only: it parses widget state, hands a
-:class:`toyo_battery.gui._controller.GuiRequest` to
-:func:`toyo_battery.gui._controller.run`, and displays the resulting
+:class:`echemplot.gui._controller.GuiRequest` to
+:func:`echemplot.gui._controller.run`, and displays the resulting
 :class:`matplotlib.figure.Figure` objects in one ``Toplevel`` per plot.
 All non-UI logic — directory loading, plot dispatch, axis-range
 application, Savitzky-Golay window propagation — lives in the
@@ -36,12 +36,12 @@ from matplotlib.backends.backend_tkagg import (  # type: ignore[attr-defined]
     NavigationToolbar2Tk,
 )
 
-from toyo_battery.gui._controller import GuiRequest, run
+from echemplot.gui._controller import GuiRequest, run
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
-    from toyo_battery.core.cell import Cell
+    from echemplot.core.cell import Cell
 
 OnComplete = Callable[[Sequence["Cell"], Sequence["Figure"]], None]
 
@@ -119,7 +119,7 @@ class _App:
 
     def __init__(self, root: tk.Tk, *, on_complete: OnComplete | None = None) -> None:
         self.root = root
-        root.title("toyo-battery GUI")
+        root.title("echemplot GUI")
 
         # State owned by the instance (not the widgets) so it round-trips
         # through the directory list reliably — Listbox stores only the
@@ -305,7 +305,7 @@ class _App:
         import matplotlib.pyplot as plt  # local: pyplot only at show-time
 
         top = tk.Toplevel(self.root)
-        top.title("toyo-battery plot")
+        top.title("echemplot plot")
         canvas = FigureCanvasTkAgg(fig, master=top)  # type: ignore[no-untyped-call]
         canvas.draw()  # type: ignore[no-untyped-call]
         toolbar = NavigationToolbar2Tk(canvas, top)  # type: ignore[no-untyped-call]
@@ -324,7 +324,7 @@ class _App:
 
     def _fail(self, message: str) -> None:
         """Surface ``message`` via a modal error and the status bar."""
-        messagebox.showerror("toyo-battery", message, parent=self.root)
+        messagebox.showerror("echemplot", message, parent=self.root)
         self._status.set(message)
 
 
@@ -333,9 +333,9 @@ def launch_gui(*, on_complete: OnComplete | None = None) -> None:
 
     Callable two ways:
 
-    * ``python -m toyo_battery.gui`` — standalone CLI (via
-      :mod:`toyo_battery.gui.__main__`).
-    * ``from toyo_battery.gui import launch_gui; launch_gui()`` — direct
+    * ``python -m echemplot.gui`` — standalone CLI (via
+      :mod:`echemplot.gui.__main__`).
+    * ``from echemplot.gui import launch_gui; launch_gui()`` — direct
       call from any host Python process, including Origin's embedded
       Python Console. The call blocks until the window is closed.
 
@@ -345,8 +345,8 @@ def launch_gui(*, on_complete: OnComplete | None = None) -> None:
         Optional callback invoked after each successful Run with
         ``(cells, figures)``. ``None`` (the default) preserves the
         standalone behaviour of opening one ``Toplevel`` per figure;
-        :func:`toyo_battery.origin.launch_gui` injects a callback that
-        forwards to :func:`toyo_battery.origin.push_to_origin` instead,
+        :func:`echemplot.origin.launch_gui` injects a callback that
+        forwards to :func:`echemplot.origin.push_to_origin` instead,
         so figures are not shown and the results land directly in the
         active Origin project.
 
