@@ -17,6 +17,18 @@ jobs:
           enable-cache: true
       - name: Set up Python 3.12
         run: uv python install 3.12
+      - name: Verify tag matches pyproject version
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -e
+          tag="${GITHUB_REF_NAME#v}"
+          pyver=$(uv run --with tomli --python 3.12 python -c "import tomli, pathlib; print(tomli.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
+          if [ "$tag" != "$pyver" ]; then
+            echo "FAIL: tag $GITHUB_REF_NAME does not match pyproject version $pyver"
+            exit 1
+          fi
+          echo "OK: tag $GITHUB_REF_NAME matches pyproject version $pyver"
       - name: Build
         run: uv build
       - name: Assert pure-Python wheel
