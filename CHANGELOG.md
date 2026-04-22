@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-04-23
+
+### Fixed
+- `echemplot.core.cell` (and anything importing it, including
+  `push_to_origin` and the Origin-mode GUI) no longer raises
+  `ImportError: cannot import name 'NDArray' from 'numpy.typing'` on
+  Origin's embedded Python 3.11. Origin ships a NumPy that predates
+  `numpy.typing.NDArray` (NumPy < 1.21) and is not reliably upgradable
+  from inside Origin's site-packages. `NDArray` was used only for
+  static type hints in `core/dqdv.py` and `core/stats.py`; both modules
+  already carry `from __future__ import annotations`, so the imports —
+  and the module-scope `_SegPair` alias in `dqdv.py` — now live under
+  `TYPE_CHECKING`, eliminating the runtime dependency on
+  `numpy.typing.NDArray`. ([#86])
+
 ## [0.1.4] - 2026-04-23
 
 ### Fixed
