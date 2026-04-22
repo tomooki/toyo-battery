@@ -74,6 +74,9 @@ network_setting.json
 CLAUDE.md
 .claude/
 
+# Internal-only Japanese install guide
+docs/ORIGIN_SETUP_JA.md
+
 # Build artifacts
 *.whl
 *.tar.gz
