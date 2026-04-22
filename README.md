@@ -40,8 +40,10 @@ Open Origin, go to **Connectivity → Python Packages**, then in the Origin
 Python console:
 
 ```python
-import pip
-pip.main(["install", "toyo-battery"])
+import subprocess
+import sys
+
+subprocess.check_call([sys.executable, "-m", "pip", "install", "toyo-battery"])
 ```
 
 The `toyo_battery.origin` submodule uses `originpro` (shipped with Origin)

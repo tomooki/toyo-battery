@@ -10,8 +10,12 @@ OriginLab's embedded Python the same way as numpy/pandas/scipy.
 3. Install:
 
    ```python
-   import pip
-   pip.main(["install", "--upgrade", "toyo-battery"])
+   import subprocess
+   import sys
+
+   subprocess.check_call(
+       [sys.executable, "-m", "pip", "install", "--upgrade", "toyo-battery"]
+   )
    ```
 
 4. Confirm:
