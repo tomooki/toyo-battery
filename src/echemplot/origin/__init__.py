@@ -223,9 +223,10 @@ def launch_gui(
         )
         # Close the figures the controller built. The Origin path
         # bypasses ``_show_figure`` (which would otherwise own the close
-        # via ``WM_DELETE_WINDOW``), so without an explicit close a long
-        # session of repeated Run clicks accumulates figures in pyplot's
-        # global registry and eventually trips ``max_open_warning``.
+        # via ``WM_DELETE_WINDOW``), so a single Run still leaves several
+        # figures pinned in pyplot's global registry — the Tk root is
+        # destroyed right after this callback returns, but pyplot doesn't
+        # know about that and would keep the figures alive indefinitely.
         import matplotlib.pyplot as plt
 
         for fig in figures:

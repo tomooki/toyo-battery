@@ -413,6 +413,14 @@ class _App:
                 self._fail(f"Error in completion hook: {exc}")
                 return
             self._status.set(f"Ran {len(result.figures)} figure(s); pushed via hook.")
+            if self._origin_mode:
+                # Origin-mode is a one-shot batch: ``launch_gui`` runs Tk's
+                # ``mainloop()`` inside the Origin Python Console, so the
+                # Console stays blocked until this root is destroyed. After
+                # a successful push there is nothing left to do, so we close
+                # the window automatically instead of forcing the user to
+                # click the OS close button to regain the Console.
+                self.root.destroy()
         else:
             for fig in result.figures:
                 self._show_figure(fig)
@@ -483,8 +491,11 @@ def launch_gui(
         entry, and the voltage/capacity/dQ-dV range entries) and shows
         an inline note explaining why. Only ``SG window_length`` stays
         editable because it flows into the dQ/dV worksheet the Origin
-        push writes. :func:`echemplot.origin.launch_gui` sets this;
-        standalone callers should leave it at the ``False`` default.
+        push writes. After a successful Run the window is destroyed
+        automatically so the Origin Python Console (which is blocked on
+        this ``mainloop()``) is released without a manual window close.
+        :func:`echemplot.origin.launch_gui` sets this; standalone callers
+        should leave it at the ``False`` default.
 
     Switches matplotlib to the TkAgg backend at call time (not import
     time): a module-level ``matplotlib.use("TkAgg")`` would crash
