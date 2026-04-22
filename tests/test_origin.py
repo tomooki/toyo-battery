@@ -387,9 +387,7 @@ def test_each_per_cell_graph_binds_its_own_sheet(
             )
 
 
-def test_add_plot_passes_column_indices(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_add_plot_passes_column_indices(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Every ``add_plot`` call must carry ``colx`` and ``coly`` kwargs.
 
     Without these, Origin renders the template's axes/legend but binds
@@ -411,9 +409,7 @@ def test_add_plot_passes_column_indices(
             assert "coly" in call.kwargs, f"missing coly on {graph!r}: {call}"
 
 
-def test_cycle_plot_binds_both_layers(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_cycle_plot_binds_both_layers(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """cycle_efficiency's dual-Y template has two layers — bind both.
 
     ``graph[0]`` takes discharge capacity (col 2), ``graph[1]`` takes
@@ -441,9 +437,7 @@ def test_cycle_plot_binds_both_layers(
     assert all(call.kwargs["colx"] == 0 for call in call_list), call_list
 
 
-def test_cols_axis_is_set_per_category(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_cols_axis_is_set_per_category(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Worksheets for plot-targeted categories must declare X/Y designations.
 
     ``from_df`` leaves every column as ``"Y"``; without a ``cols_axis``
