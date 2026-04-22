@@ -108,8 +108,8 @@ class _App:
     """The single Tk window that owns all widgets and event handlers.
 
     Kept as a class (rather than a pile of module-level closures) so
-    ``main`` can construct one instance per ``mainloop`` call and all
-    inter-widget state lives on ``self``.
+    ``launch_gui`` can construct one instance per ``mainloop`` call and
+    all inter-widget state lives on ``self``.
     """
 
     def __init__(self, root: tk.Tk) -> None:
@@ -309,8 +309,16 @@ class _App:
         self._status.set(message)
 
 
-def main() -> None:
-    """Entry point for ``python -m toyo_battery.gui.tk_app``.
+def launch_gui() -> None:
+    """Start the Tk GUI and run its event loop.
+
+    Callable two ways:
+
+    * ``python -m toyo_battery.gui`` — standalone CLI (via
+      :mod:`toyo_battery.gui.__main__`).
+    * ``from toyo_battery.gui import launch_gui; launch_gui()`` — direct
+      call from any host Python process, including Origin's embedded
+      Python Console. The call blocks until the window is closed.
 
     Switches matplotlib to the TkAgg backend at call time (not import
     time): a module-level ``matplotlib.use("TkAgg")`` would crash
@@ -327,4 +335,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    launch_gui()

@@ -35,6 +35,24 @@ OriginLab's embedded Python the same way as numpy/pandas/scipy.
    still works — calling `push_to_origin` will raise `ImportError` with a clear
    message.)
 
+## Launching the GUI from Origin
+
+With the `[gui]` extra installed (`pip install "toyo-battery[gui]"`), the Tk
+GUI can be launched directly from Origin's Python Console:
+
+```python
+from toyo_battery.gui import launch_gui
+launch_gui()
+```
+
+Notes:
+
+- `launch_gui()` runs Tk's `mainloop()` **in the Origin process**. The Origin
+  Python Console is blocked until you close the GUI window.
+- Origin's embedded CPython must include `_tkinter` (OriginLab 2022 and later
+  do). If it doesn't, the call raises `ImportError` from `import tkinter`; use
+  a separate system Python in that case.
+
 ## Origin Python version check (please report back)
 
 Please run this inside Origin's Python Console and paste the result into the
