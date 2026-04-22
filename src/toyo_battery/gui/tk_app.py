@@ -276,7 +276,15 @@ class _App:
         self._status.set(f"Ran {len(figures)} figure(s).")
 
     def _show_figure(self, fig: Figure) -> None:
-        """Embed ``fig`` in a new ``Toplevel`` with a matplotlib toolbar."""
+        """Embed ``fig`` in a new ``Toplevel`` with a matplotlib toolbar.
+
+        Closing the Toplevel also closes the matplotlib figure via
+        ``plt.close`` so a long-running session doesn't accumulate figures
+        in pyplot's global registry (which would eventually trip the
+        max_open_warning).
+        """
+        import matplotlib.pyplot as plt  # local: pyplot only at show-time
+
         top = tk.Toplevel(self.root)
         top.title("toyo-battery plot")
         canvas = FigureCanvasTkAgg(fig, master=top)  # type: ignore[no-untyped-call]
@@ -286,6 +294,14 @@ class _App:
         canvas.get_tk_widget().pack(  # type: ignore[no-untyped-call]
             side=tk.TOP, fill=tk.BOTH, expand=True
         )
+
+        # Default args bind ``fig`` and ``top`` by value — avoids late-binding
+        # bugs if ``_show_figure`` is called multiple times in quick succession.
+        def _on_close(fig: Figure = fig, top: tk.Toplevel = top) -> None:
+            plt.close(fig)
+            top.destroy()
+
+        top.protocol("WM_DELETE_WINDOW", _on_close)
 
     def _fail(self, message: str) -> None:
         """Surface ``message`` via a modal error and the status bar."""

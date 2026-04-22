@@ -245,6 +245,27 @@ def test_plot_chdis_cycles_filter_spans_cells_with_different_cycle_counts() -> N
     assert len(axes_by_title["large"].lines) == 6
 
 
+def test_plot_dqdv_sg_override_changes_curve() -> None:
+    """``plot_dqdv`` with a non-default ``sg_window_length`` must produce
+    different y-values than the default.
+
+    Guards the new SG-override plumbing on the matplotlib backend — at the
+    defaults the cached :attr:`Cell.dqdv_df` is reused, but any override
+    must force a recompute via :func:`get_dqdv_df`.
+    """
+    cell = _linear_cell(n_cycles=1)
+
+    fig_default = plot_dqdv([cell])
+    fig_wide = plot_dqdv([cell], sg_window_length=21)
+
+    y_default = np.asarray(_first_visible(fig_default).lines[0].get_ydata(), dtype=float)
+    y_wide = np.asarray(_first_visible(fig_wide).lines[0].get_ydata(), dtype=float)
+    # Same sample count (interpolation grid is independent of the SG window)
+    # but the smoothed derivatives should disagree.
+    assert y_default.shape == y_wide.shape
+    assert not np.allclose(y_default, y_wide, equal_nan=True)
+
+
 def test_column_lang_en_cell_plots_successfully() -> None:
     """A Cell built with ``column_lang='en'`` still plots (regression guard
     for the internal ``_quantity`` lookup).
