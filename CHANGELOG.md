@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.3] - 2026-04-22
+
+### Fixed
+- `push_to_origin` opened graph windows from the bundled `.otpu` templates
+  but rendered them without any data lines. Root cause: `Layer.add_plot`
+  was called without `colx` / `coly`, so `originpro` left the plot with
+  no column designation. Secondary cause: `cap_df` was written with its
+  `cycle` index still as an index, so the `cycle_efficiency` template
+  had no `cycle` column to bind as X.
+- `toyo_battery.origin` now passes explicit 0-based `colx` / `coly`
+  indices on every `add_plot` call (one call per `(cycle, side)` pair
+  for `chdis` / `dqdv`, plus dual-Y bindings for the `cycle_efficiency`
+  template — `graph[0]` = discharge capacity, `graph[1]` = Coulombic
+  efficiency). Worksheets additionally call `wks.cols_axis(...)` after
+  `from_df` so each column's X/Y role is designated up front.
+
 ## [0.0.2] - 2026-04-22
 
 ### Added
@@ -53,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-alpha.** Public API is unstable and may change without deprecation in
   0.0.x releases.
 
-[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/tomooki/toyo-battery/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/tomooki/toyo-battery/releases/tag/v0.0.1
