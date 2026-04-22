@@ -49,8 +49,11 @@ all = [
 toyo-battery = "toyo_battery.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/tomooki/toyo-battery"
-Issues = "https://github.com/tomooki/toyo-battery/issues"
+Homepage      = "https://github.com/tomooki/toyo-battery"
+Issues        = "https://github.com/tomooki/toyo-battery/issues"
+Repository    = "https://github.com/tomooki/toyo-battery"
+Documentation = "https://tomooki.github.io/toyo-battery/"
+Changelog     = "https://github.com/tomooki/toyo-battery/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
