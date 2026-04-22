@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-04-22
+
+### Added
+- Multi-folder drag-and-drop support on the GUI's cell-directory list
+  when `tkinterdnd2` is installed (shipped in the `[gui]` / `[all]`
+  extras as an optional dependency). Dropping multiple folders from the
+  host file manager queues them all at once. When `tkinterdnd2` or the
+  underlying tkdnd Tcl extension is unavailable the GUI silently falls
+  back to Add-button-only; no user-visible error surfaces. ([#63])
+- `origin_mode` keyword on `echemplot.gui.launch_gui`. When `True`, the
+  plot-kind checkboxes, cycles entry, and voltage/capacity/dQ-dV range
+  entries are greyed out and annotated with an inline note explaining
+  that only `SG window_length` reaches the Origin push path.
+  `echemplot.origin.launch_gui` now sets this automatically. ([#60])
+- `sg_window` / `sg_polyorder` parameters on
+  `echemplot.origin.push_to_origin`. At the defaults the cached
+  `Cell.dqdv_df` is reused as before; non-default values trigger a
+  one-off `get_dqdv_df` recompute per cell so the dQ/dV worksheet
+  reflects the caller's choice. The Tk view's `OnComplete` callback
+  signature gained a third `sg_window: int` argument so the Origin
+  launcher can forward the GUI value. ([#60])
+
+### Changed
+- Origin template graphs now autoscale to a shared axis range computed
+  across all input cells. With a single cell the range collapses to
+  that cell's data; with multiple cells every per-cell graph and the
+  comparison overlay share the same scale for direct comparison.
+  Rescaling is a no-op when the data yields no finite values, so
+  graphs fall back to the template's baked-in scale. ([#61])
+- The GUI folder-picker no longer loops. Clicking `Add...` opens one
+  `askdirectory` dialog and returns; cancel is a no-op. Users add
+  multiple directories either by clicking `Add...` repeatedly or via
+  the new drag-and-drop path above. ([#62])
+- `echemplot.origin._plots` documents a new originpro API assumption:
+  `layer.axis(axis).begin/end` attribute access for axis limits. A
+  LabTalk fallback via `op.lt_exec` is in place for environments where
+  the attribute path doesn't propagate to Origin, guarded by a
+  round-trip readback.
+
 ## [0.1.0] - 2026-04-22
 
 ### Changed
@@ -85,8 +124,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-alpha.** Public API is unstable and may change without deprecation in
   0.0.x releases.
 
-[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/tomooki/toyo-battery/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/tomooki/toyo-battery/compare/v0.0.3...v0.1.0
+[#60]: https://github.com/tomooki/toyo-battery/issues/60
+[#61]: https://github.com/tomooki/toyo-battery/issues/61
+[#62]: https://github.com/tomooki/toyo-battery/issues/62
+[#63]: https://github.com/tomooki/toyo-battery/issues/63
 [0.0.3]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/tomooki/toyo-battery/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/tomooki/toyo-battery/releases/tag/v0.0.1
