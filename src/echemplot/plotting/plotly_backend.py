@@ -1,7 +1,7 @@
 """Plotly plotting backend. Requires the ``[plotly]`` extra.
 
-Mirrors the :mod:`toyo_battery.plotting.matplotlib_backend` API — three
-user-facing functions that accept one or more :class:`toyo_battery.core.cell.Cell`
+Mirrors the :mod:`echemplot.plotting.matplotlib_backend` API — three
+user-facing functions that accept one or more :class:`echemplot.core.cell.Cell`
 instances and return a :class:`plotly.graph_objects.Figure` (the caller
 handles ``fig.write_image(...)`` / ``fig.write_html(...)``):
 
@@ -31,8 +31,8 @@ from collections.abc import Sequence
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from toyo_battery.core.cell import Cell
-from toyo_battery.io.schema import ColumnLang
+from echemplot.core.cell import Cell
+from echemplot.io.schema import ColumnLang
 
 _CYCLE_COLOR_FIRST = "red"
 _CYCLE_COLOR_OTHER = "black"
@@ -286,7 +286,7 @@ def plot_dqdv(
     """dQ/dV vs voltage, cycle 1 red / other cycles black.
 
     Discharge dQ/dV is negative by construction (see
-    :mod:`toyo_battery.core.dqdv`); the raw signed values are plotted so
+    :mod:`echemplot.core.dqdv`); the raw signed values are plotted so
     charge and discharge branches live in different half-planes.
 
     Parameters

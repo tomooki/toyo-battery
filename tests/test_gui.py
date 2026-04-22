@@ -1,4 +1,4 @@
-"""Tests for :mod:`toyo_battery.gui`.
+"""Tests for :mod:`echemplot.gui`.
 
 Only the controller is exercised — the Tk view is touched with
 import-only smoke to avoid spinning up a display in CI. Matplotlib is
@@ -29,7 +29,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 
-from toyo_battery.gui._controller import GuiRequest, run
+from echemplot.gui._controller import GuiRequest, run
 
 
 @pytest.fixture(autouse=True)
@@ -52,7 +52,7 @@ def _write_wide_renzoku(
 ) -> None:
     """Write a ``連続データ.csv`` with a wide-voltage linear ramp per cycle.
 
-    Mirrors the layout expected by :func:`toyo_battery.io.reader.read_cell_dir`
+    Mirrors the layout expected by :func:`echemplot.io.reader.read_cell_dir`
     for the renzoku path (mass row, JP header, channel row, separator,
     units, then data).
     """
@@ -173,10 +173,10 @@ def test_controller_passes_sg_window_to_plot_dqdv(
     Implementation note: the controller imports ``plot_dqdv`` lazily inside
     :func:`run`, so monkeypatching the controller-module attribute would be
     a no-op for the first call. We patch the symbol on the source module
-    (``toyo_battery.plotting.matplotlib_backend``) which is what the lazy
+    (``echemplot.plotting.matplotlib_backend``) which is what the lazy
     import resolves to.
     """
-    import toyo_battery.plotting.matplotlib_backend as backend
+    import echemplot.plotting.matplotlib_backend as backend
 
     calls: list[dict[str, object]] = []
 
@@ -314,17 +314,17 @@ def test_tk_app_module_importable_without_display() -> None:
     ``TclError`` from any deeper setup — but the import line itself must
     succeed.
     """
-    import toyo_battery.gui.tk_app as tk_app
+    import echemplot.gui.tk_app as tk_app
 
     assert callable(tk_app.launch_gui)
 
 
 def test_gui_package_reexports_launch_gui() -> None:
     """``launch_gui`` is the public entry point — callable from CLI
-    (``python -m toyo_battery.gui``) and from host Python processes such
-    as Origin's embedded console (``from toyo_battery.gui import
+    (``python -m echemplot.gui``) and from host Python processes such
+    as Origin's embedded console (``from echemplot.gui import
     launch_gui``). Guarding the re-export keeps that import path stable.
     """
-    import toyo_battery.gui as gui
+    import echemplot.gui as gui
 
     assert callable(gui.launch_gui)

@@ -10,10 +10,10 @@ figures (HTML / PNG via `write_image`).
 
 Requires the `[plot]` extra.
 
-::: toyo_battery.plotting.matplotlib_backend
+::: echemplot.plotting.matplotlib_backend
 
 ## Plotly backend
 
 Requires the `[plotly]` extra (`plotly` + `kaleido`).
 
-::: toyo_battery.plotting.plotly_backend
+::: echemplot.plotting.plotly_backend

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-04-22
+
+### Changed
+- **BREAKING**: Renamed the package from `toyo-battery` (PyPI distribution)
+  / `toyo_battery` (import) to `echemplot` for both. All user code must
+  replace `from toyo_battery ...` with `from echemplot ...`, `pip install
+  toyo-battery[...]` with `pip install echemplot[...]`, and the CLI
+  command `toyo-battery` with `echemplot`. No compatibility shim is
+  provided — the old `toyo_battery` import no longer resolves. The
+  `toyo-battery` project on PyPI remains available for installing past
+  0.0.x releases; new versions are published under `echemplot`.
+- **BREAKING**: Renamed the Origin template override env var
+  `TOYO_ORIGIN_TEMPLATE_DIR` → `ECHEMPLOT_ORIGIN_TEMPLATE_DIR`. Users who
+  set the override must update their environment; the old name is no
+  longer read.
+
 ## [0.0.3] - 2026-04-22
 
 ### Fixed
@@ -69,7 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-alpha.** Public API is unstable and may change without deprecation in
   0.0.x releases.
 
-[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/tomooki/toyo-battery/compare/v0.0.3...v0.1.0
 [0.0.3]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/tomooki/toyo-battery/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/tomooki/toyo-battery/releases/tag/v0.0.1

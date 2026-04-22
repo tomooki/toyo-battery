@@ -2,16 +2,16 @@
 
 ## chdis
 
-::: toyo_battery.core.chdis
+::: echemplot.core.chdis
 
 ## capacity
 
-::: toyo_battery.core.capacity
+::: echemplot.core.capacity
 
 ## dqdv
 
-::: toyo_battery.core.dqdv
+::: echemplot.core.dqdv
 
 ## stats
 
-::: toyo_battery.core.stats
+::: echemplot.core.stats

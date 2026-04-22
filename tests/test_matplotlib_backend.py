@@ -1,4 +1,4 @@
-"""Tests for :mod:`toyo_battery.plotting.matplotlib_backend`.
+"""Tests for :mod:`echemplot.plotting.matplotlib_backend`.
 
 The backend is exercised with small in-memory :class:`Cell` instances
 (mirroring :mod:`test_dqdv`) so the tests run without reading real TOYO
@@ -26,9 +26,9 @@ from matplotlib.colors import to_rgba
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 
-from toyo_battery.core.cell import Cell
-from toyo_battery.io.schema import ColumnLang
-from toyo_battery.plotting.matplotlib_backend import (
+from echemplot.core.cell import Cell
+from echemplot.io.schema import ColumnLang
+from echemplot.plotting.matplotlib_backend import (
     plot_chdis,
     plot_cycle,
     plot_dqdv,

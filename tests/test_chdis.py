@@ -1,4 +1,4 @@
-"""Tests for :mod:`toyo_battery.core.chdis`."""
+"""Tests for :mod:`echemplot.core.chdis`."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from typing import Callable
 import pandas as pd
 import pytest
 
-from toyo_battery.core.cell import Cell
-from toyo_battery.core.chdis import get_chdis_df
+from echemplot.core.cell import Cell
+from echemplot.core.chdis import get_chdis_df
 
 
 def _raw(

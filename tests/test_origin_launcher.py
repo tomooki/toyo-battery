@@ -1,14 +1,14 @@
-"""Tests for :func:`toyo_battery.origin.launch_gui`.
+"""Tests for :func:`echemplot.origin.launch_gui`.
 
 The launcher is the one-liner Origin users invoke from the embedded
 Python Console. It composes three pieces:
 
 1. ``_require_originpro`` — must run before Tk so a missing ``originpro``
    fails fast.
-2. ``toyo_battery.gui.launch_gui`` — the standalone Tk entry point;
+2. ``echemplot.gui.launch_gui`` — the standalone Tk entry point;
    patched here so no real window opens.
 3. The injected ``on_complete`` callback must invoke
-   :func:`toyo_battery.origin.push_to_origin` with the cells produced by
+   :func:`echemplot.origin.push_to_origin` with the cells produced by
    the GUI Run.
 
 We mock both ``originpro`` and the Tk launcher so the test stays
@@ -33,18 +33,18 @@ def _install_mock_originpro(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
 def test_launch_gui_requires_originpro_first(monkeypatch: pytest.MonkeyPatch) -> None:
     """If ``originpro`` is not importable the launcher must raise *before*
-    importing ``toyo_battery.gui`` (which would otherwise pull in
+    importing ``echemplot.gui`` (which would otherwise pull in
     matplotlib + tkinter)."""
     monkeypatch.setitem(sys.modules, "originpro", None)
     # If gui is imported it should not be reached — guard by a sentinel
     # exception that would mask the expected ``ImportError``.
-    import toyo_battery.gui as gui_pkg
+    import echemplot.gui as gui_pkg
 
     monkeypatch.setattr(
         gui_pkg, "launch_gui", lambda **_kw: pytest.fail("Tk launched despite missing originpro")
     )
 
-    from toyo_battery.origin import launch_gui
+    from echemplot.origin import launch_gui
 
     with pytest.raises(ImportError, match="OriginLab's embedded Python"):
         launch_gui()
@@ -57,7 +57,7 @@ def test_launch_gui_passes_callback_that_calls_push_to_origin(
     by the view's Run path, calls :func:`push_to_origin` with the cells
     the controller loaded.
 
-    We capture the callback at the ``toyo_battery.gui.launch_gui`` boundary
+    We capture the callback at the ``echemplot.gui.launch_gui`` boundary
     and invoke it manually with sentinel cells/figures, mirroring what
     the view's ``_on_run`` would do post-Run.
     """
@@ -68,7 +68,7 @@ def test_launch_gui_passes_callback_that_calls_push_to_origin(
     def fake_tk_launch(**kwargs: object) -> None:
         captured.update(kwargs)
 
-    import toyo_battery.gui as gui_pkg
+    import echemplot.gui as gui_pkg
 
     monkeypatch.setattr(gui_pkg, "launch_gui", fake_tk_launch)
 
@@ -77,7 +77,7 @@ def test_launch_gui_passes_callback_that_calls_push_to_origin(
     def fake_push(cells: object, **kw: object) -> None:
         push_calls.append({"cells": cells, **kw})
 
-    import toyo_battery.origin as origin_mod
+    import echemplot.origin as origin_mod
 
     monkeypatch.setattr(origin_mod, "push_to_origin", fake_push)
 
@@ -111,7 +111,7 @@ def test_launch_gui_defaults_match_push_to_origin_defaults(
     def fake_tk_launch(**kwargs: object) -> None:
         captured.update(kwargs)
 
-    import toyo_battery.gui as gui_pkg
+    import echemplot.gui as gui_pkg
 
     monkeypatch.setattr(gui_pkg, "launch_gui", fake_tk_launch)
 
@@ -120,7 +120,7 @@ def test_launch_gui_defaults_match_push_to_origin_defaults(
     def fake_push(cells: object, **kw: object) -> None:
         push_calls.append({"cells": cells, **kw})
 
-    import toyo_battery.origin as origin_mod
+    import echemplot.origin as origin_mod
 
     monkeypatch.setattr(origin_mod, "push_to_origin", fake_push)
 

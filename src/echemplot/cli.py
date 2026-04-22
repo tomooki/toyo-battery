@@ -2,17 +2,17 @@
 
 Three subcommands, all operating over one or more cell directories:
 
-- ``toyo-battery process <dirs>... [--out DIR]`` — load each cell via
-  :meth:`toyo_battery.core.cell.Cell.from_dir` and write the three derived
+- ``echemplot process <dirs>... [--out DIR]`` — load each cell via
+  :meth:`echemplot.core.cell.Cell.from_dir` and write the three derived
   CSVs (``chdis`` / ``cap`` / ``dqdv``) per cell.
-- ``toyo-battery plot <dirs>... --out DIR`` — render matplotlib PNGs
+- ``echemplot plot <dirs>... --out DIR`` — render matplotlib PNGs
   (``chdis`` / ``cycle`` / ``dqdv``) across all cells. Matplotlib is
   lazy-imported inside the command so ``process`` / ``stats`` stay fast.
-- ``toyo-battery stats <dirs>... --cycles N,M --out PATH`` — write the
-  :func:`toyo_battery.core.stats.stat_table` summary CSV.
+- ``echemplot stats <dirs>... --cycles N,M --out PATH`` — write the
+  :func:`echemplot.core.stats.stat_table` summary CSV.
 
 The ``app`` object is a Typer instance, which is directly callable — so the
-``[project.scripts]`` entry ``toyo-battery = toyo_battery.cli:app`` works
+``[project.scripts]`` entry ``echemplot = echemplot.cli:app`` works
 without wrapping.
 
 Note: this module intentionally omits ``from __future__ import annotations``.
@@ -37,9 +37,9 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
-from toyo_battery.core.cell import Cell
-from toyo_battery.core.stats import stat_table
-from toyo_battery.io.schema import ColumnLang
+from echemplot.core.cell import Cell
+from echemplot.core.stats import stat_table
+from echemplot.io.schema import ColumnLang
 
 app = typer.Typer(
     add_completion=False,
@@ -291,7 +291,7 @@ def plot(
     # Lazy-import the backend so ``process`` / ``stats`` don't pay the
     # matplotlib import cost (and don't fail when the ``[plot]`` extra is
     # absent but only ``process`` is being invoked).
-    from toyo_battery.plotting.matplotlib_backend import (
+    from echemplot.plotting.matplotlib_backend import (
         plot_chdis,
         plot_cycle,
         plot_dqdv,

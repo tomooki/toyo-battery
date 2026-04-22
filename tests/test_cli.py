@@ -1,4 +1,4 @@
-"""Tests for :mod:`toyo_battery.cli` (the Typer batch CLI).
+"""Tests for :mod:`echemplot.cli` (the Typer batch CLI).
 
 Invoked through :class:`typer.testing.CliRunner` so we exercise the full
 parse + dispatch path rather than reaching into helpers. Synthetic TOYO
@@ -18,7 +18,7 @@ pytest.importorskip("typer")
 
 from typer.testing import CliRunner
 
-from toyo_battery.cli import app
+from echemplot.cli import app
 
 runner = CliRunner()
 

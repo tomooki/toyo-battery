@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/toyo-battery
+      url: https://pypi.org/p/echemplot
     permissions:
       id-token: write
     steps:

@@ -1,6 +1,6 @@
 """Per-cycle charge/discharge capacity and Coulombic efficiency.
 
-Computes, from a :mod:`toyo_battery.core.chdis` output, one row per cycle
+Computes, from a :mod:`echemplot.core.chdis` output, one row per cycle
 with the maximum charge capacity (``q_ch``), maximum discharge capacity
 (``q_dis``), and Coulombic efficiency ``ce = 100 * q_dis / q_ch`` (in %).
 
@@ -30,7 +30,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from toyo_battery.io.schema import JA_TO_EN, ColumnLang
+from echemplot.io.schema import JA_TO_EN, ColumnLang
 
 # Single-entry today; retained in dict form to match the :mod:`chdis` pattern
 # and keep the door open for adding voltage or current when stats.py joins.
@@ -63,7 +63,7 @@ def get_cap_df(chdis_df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.
     Parameters
     ----------
     chdis_df
-        Output of :func:`toyo_battery.core.chdis.get_chdis_df`. Must have a
+        Output of :func:`echemplot.core.chdis.get_chdis_df`. Must have a
         3-level column MultiIndex ``(cycle, side, quantity)`` where
         ``side`` is in ``{"ch", "dis"}`` and ``quantity`` contains the
         capacity label (``電気量`` or ``capacity``).

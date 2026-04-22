@@ -1,6 +1,6 @@
 """Matplotlib plotting backend. Requires the ``[plot]`` extra.
 
-Three user-facing functions operate on one or more :class:`toyo_battery.core.cell.Cell`
+Three user-facing functions operate on one or more :class:`echemplot.core.cell.Cell`
 instances and return a :class:`matplotlib.figure.Figure` (the caller handles
 ``savefig``):
 
@@ -10,7 +10,7 @@ instances and return a :class:`matplotlib.figure.Figure` (the caller handles
   left Y axis, Coulombic efficiency on the right Y axis.
 - :func:`plot_dqdv` — dQ/dV-vs-V curves, same cycle-1-red / others-black
   coloring as :func:`plot_chdis`. Discharge dQ/dV is **negative** by
-  construction (see :mod:`toyo_battery.core.dqdv` for the sign
+  construction (see :mod:`echemplot.core.dqdv` for the sign
   convention); raw signed values are plotted so charge and discharge
   branches live in different half-planes.
 
@@ -39,9 +39,9 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 
-from toyo_battery.core.cell import Cell
-from toyo_battery.core.dqdv import get_dqdv_df
-from toyo_battery.io.schema import ColumnLang
+from echemplot.core.cell import Cell
+from echemplot.core.dqdv import get_dqdv_df
+from echemplot.io.schema import ColumnLang
 
 _CYCLE_COLOR_FIRST = "red"
 _CYCLE_COLOR_OTHER = "black"
@@ -275,7 +275,7 @@ def plot_dqdv(
     """dQ/dV vs voltage, cycle 1 red / other cycles black.
 
     Discharge dQ/dV is negative by construction (see
-    :mod:`toyo_battery.core.dqdv`); the raw signed values are plotted so
+    :mod:`echemplot.core.dqdv`); the raw signed values are plotted so
     charge and discharge branches live in different half-planes.
 
     Parameters
@@ -290,7 +290,7 @@ def plot_dqdv(
         skipped silently for that cell.
     sg_window_length
         Savitzky-Golay ``window_length`` forwarded to
-        :func:`toyo_battery.core.dqdv.get_dqdv_df`. When this and
+        :func:`echemplot.core.dqdv.get_dqdv_df`. When this and
         ``sg_polyorder`` are both at their defaults (``11`` / ``2``), the
         cached :attr:`Cell.dqdv_df` is reused; otherwise a fresh
         ``dqdv_df`` is computed per cell with the requested parameters.
@@ -298,7 +298,7 @@ def plot_dqdv(
         ``sg_polyorder``.
     sg_polyorder
         Savitzky-Golay polynomial order forwarded to
-        :func:`toyo_battery.core.dqdv.get_dqdv_df`. See ``sg_window_length``
+        :func:`echemplot.core.dqdv.get_dqdv_df`. See ``sg_window_length``
         for the cache-or-recompute behavior.
 
     Returns
@@ -310,7 +310,7 @@ def plot_dqdv(
     ------
     ValueError
         If ``cells`` is empty, or if Savitzky-Golay parameters violate
-        :func:`toyo_battery.core.dqdv.get_dqdv_df`'s preconditions.
+        :func:`echemplot.core.dqdv.get_dqdv_df`'s preconditions.
     """
     _check_nonempty(cells)
     fig, axes = _build_grid(len(cells))

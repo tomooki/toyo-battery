@@ -1,3 +1,3 @@
 # Cell
 
-::: toyo_battery.core.cell
+::: echemplot.core.cell

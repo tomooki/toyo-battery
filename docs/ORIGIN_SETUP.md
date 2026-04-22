@@ -1,6 +1,6 @@
-# Installing toyo-battery into Origin's embedded Python
+# Installing echemplot into Origin's embedded Python
 
-`toyo-battery` is a **pure-Python** package published on PyPI. It installs into
+`echemplot` is a **pure-Python** package published on PyPI. It installs into
 OriginLab's embedded Python the same way as numpy/pandas/scipy.
 
 ## Steps
@@ -15,24 +15,24 @@ OriginLab's embedded Python the same way as numpy/pandas/scipy.
    import sys
 
    subprocess.check_call(
-       [sys.executable, "-m", "pip", "install", "--upgrade", "toyo-battery[origin]"]
+       [sys.executable, "-m", "pip", "install", "--upgrade", "echemplot[origin]"]
    )
    ```
 
 4. Confirm:
 
    ```python
-   import toyo_battery
-   print(toyo_battery.__version__)
+   import echemplot
+   print(echemplot.__version__)
    ```
 
 5. Optional — check the Origin adapter is wired up:
 
    ```python
-   from toyo_battery.origin import push_to_origin
+   from echemplot.origin import push_to_origin
    ```
 
-   (Inside Origin this succeeds. Outside Origin, importing `toyo_battery.origin`
+   (Inside Origin this succeeds. Outside Origin, importing `echemplot.origin`
    still works — calling `push_to_origin` will raise `ImportError` with a clear
    message.)
 
@@ -42,7 +42,7 @@ After step 3 above, the recommended one-liner runs the Tk directory picker
 and pushes results straight into the active Origin project:
 
 ```python
-from toyo_battery.origin import launch_gui
+from echemplot.origin import launch_gui
 launch_gui()
 ```
 
@@ -60,7 +60,7 @@ launch_gui(project_path=r"C:\Users\me\Documents\toyo.opju", stat_cycles=(10, 50,
 ```
 
 If you want the standalone GUI behaviour (matplotlib figures in `Toplevel`
-windows, no Origin write-back) instead, call `toyo_battery.gui.launch_gui()`
+windows, no Origin write-back) instead, call `echemplot.gui.launch_gui()`
 directly.
 
 Notes:
@@ -71,7 +71,7 @@ Notes:
   do). If it doesn't, the call raises `ImportError` from `import tkinter`; use
   a separate system Python in that case.
 - The three `.otpu` graph templates ship inside the wheel — no extra setup
-  is needed. Set `TOYO_ORIGIN_TEMPLATE_DIR` only if you want to substitute
+  is needed. Set `ECHEMPLOT_ORIGIN_TEMPLATE_DIR` only if you want to substitute
   your own templates.
 
 ## Origin Python version check (please report back)
