@@ -36,7 +36,7 @@ plot = ["matplotlib>=3.7"]
 plotly = ["plotly>=5.18", "kaleido>=0.2.1"]
 gui = ["matplotlib>=3.7"]
 cli = ["typer>=0.12", "rich>=13"]
-origin = []
+origin = ["matplotlib>=3.7"]
 all = [
     "matplotlib>=3.7",
     "plotly>=5.18",

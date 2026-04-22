@@ -52,7 +52,15 @@ def _install_mock_originpro(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
 
 def _stub_templates(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    """Point ``TOYO_ORIGIN_TEMPLATE_DIR`` at a dir with zero-byte templates."""
+    """Point ``TOYO_ORIGIN_TEMPLATE_DIR`` at a dir with zero-byte templates.
+
+    Used by tests that exercise the env-var override path explicitly, and
+    by the bulk of the suite to keep the assertions focused on call
+    counts / shapes rather than on the bundled templates' real bytes.
+    Tests that need to verify the bundled-default lookup should NOT call
+    this and should instead unset the env var (see
+    :func:`test_default_templates_resolve_from_bundled_directory`).
+    """
     tpl_dir = tmp_path / "templates"
     tpl_dir.mkdir()
     for name in ("charge_discharge.otpu", "cycle_efficiency.otpu", "dqdv.otpu"):
@@ -190,6 +198,26 @@ def test_push_to_origin_missing_template_raises_with_remediation(
     msg = str(excinfo.value)
     assert "charge_discharge.otpu" in msg
     assert "TOYO_ORIGIN_TEMPLATE_DIR" in msg
+
+
+def test_default_templates_resolve_from_bundled_directory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without ``TOYO_ORIGIN_TEMPLATE_DIR`` set, the three required ``.otpu``
+    templates must resolve to non-empty files inside the package.
+
+    Guards the "default install only" UX: a fresh ``pip install
+    toyo-battery[origin]`` inside Origin must produce graphs without any
+    template-copy step. Regressing this means ``push_to_origin`` would
+    raise ``FileNotFoundError`` for every Origin user.
+    """
+    monkeypatch.delenv("TOYO_ORIGIN_TEMPLATE_DIR", raising=False)
+    from toyo_battery.origin._plots import _require_template
+
+    for name in ("charge_discharge.otpu", "cycle_efficiency.otpu", "dqdv.otpu"):
+        path = _require_template(name)
+        assert path.exists(), name
+        assert path.stat().st_size > 0, name
 
 
 # ----------------------------------------------------------------------

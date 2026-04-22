@@ -11,6 +11,10 @@ Design notes:
 - The view builds a :class:`GuiRequest` and hands it to :func:`run`. The
   dataclass is ``frozen`` to make it cheap to log, compare, and round-trip
   through tests.
+- :func:`run` returns a :class:`RunResult` carrying both the loaded cells
+  and the generated figures. The cells are exposed (not just the figures)
+  so the Origin launcher can hand them to
+  :func:`toyo_battery.origin.push_to_origin` without re-loading.
 - Axis ranges are optional; when present they are applied by iterating
   ``fig.axes`` after the matplotlib backend has drawn. For :func:`plot_cycle`
   the dual-Y twin is matched by y-label rather than position so the
@@ -44,6 +48,26 @@ _VALID_KINDS: frozenset[str] = frozenset({"chdis", "cycle", "dqdv"})
 _YLABEL_VOLTAGE = "Voltage [V]"
 _YLABEL_CAPACITY = "Discharge capacity [mAh/g]"
 _YLABEL_DQDV = "dQ/dV [mAh/g/V]"
+
+
+@dataclass(frozen=True)
+class RunResult:
+    """Outcome of :func:`run`.
+
+    Attributes
+    ----------
+    cells
+        The loaded :class:`Cell` instances, one per ``request.dirs`` entry,
+        in input order. Surfaced so callers (notably the Origin launcher)
+        can pass them on without re-loading from disk.
+    figures
+        One :class:`matplotlib.figure.Figure` per requested plot kind, in
+        the stable ``chdis`` → ``cycle`` → ``dqdv`` order described on
+        :func:`run`.
+    """
+
+    cells: Sequence[Cell]
+    figures: Sequence[Figure]
 
 
 @dataclass(frozen=True)
@@ -118,8 +142,8 @@ def _apply_ylim(fig: Figure, ylabel: str, ylim: tuple[float, float]) -> None:
             ax.set_ylim(*ylim)
 
 
-def run(request: GuiRequest) -> list[Figure]:
-    """Load cells, dispatch to the matplotlib backend, return figures.
+def run(request: GuiRequest) -> RunResult:
+    """Load cells, dispatch to the matplotlib backend, return cells + figures.
 
     Figures are returned in a stable order (``chdis``, ``cycle``,
     ``dqdv``) — independent of the iteration order of the input frozenset
@@ -133,9 +157,10 @@ def run(request: GuiRequest) -> list[Figure]:
 
     Returns
     -------
-    list of Figure
-        One figure per requested plot kind. The caller owns the figures;
-        they are not closed on return.
+    RunResult
+        Carries ``cells`` (loaded once, in input order) and ``figures``
+        (one per requested plot kind). The caller owns the figures; they
+        are not closed on return.
 
     Raises
     ------
@@ -175,4 +200,4 @@ def run(request: GuiRequest) -> list[Figure]:
         if request.dqdv_range is not None:
             _apply_ylim(fig, _YLABEL_DQDV, request.dqdv_range)
         figures.append(fig)
-    return figures
+    return RunResult(cells=cells, figures=figures)

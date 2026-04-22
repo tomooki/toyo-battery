@@ -104,17 +104,25 @@ Open Origin, then in the Origin Python console:
 import subprocess
 import sys
 
-subprocess.check_call([sys.executable, "-m", "pip", "install", "toyo-battery"])
+subprocess.check_call(
+    [sys.executable, "-m", "pip", "install", "toyo-battery[origin]"]
+)
 ```
 
-The `toyo_battery.origin` submodule exposes `push_to_origin(cells, ...)`,
-which populates the current Origin project with per-cell worksheets, plots,
-and a stat sheet. It imports `originpro` lazily, so the submodule is
-importable outside Origin (`push_to_origin` itself will raise there).
+The `[origin]` extra pulls in matplotlib so the Tk GUI works out of the box;
+the three `.otpu` graph templates ship inside the wheel. After install, one
+line opens the directory picker and pushes results into the active Origin
+project:
 
-With the `[gui]` extra installed, the Tk GUI can also be launched from
-Origin's Python Console with `from toyo_battery.gui import launch_gui;
-launch_gui()`.
+```python
+from toyo_battery.origin import launch_gui
+launch_gui()
+```
+
+For scripted use, `toyo_battery.origin.push_to_origin(cells, ...)` populates
+the current Origin project with per-cell worksheets, template graphs, and a
+stat sheet. It imports `originpro` lazily, so the submodule is importable
+outside Origin (`push_to_origin` itself raises there).
 
 See [docs/ORIGIN_SETUP.md](./docs/ORIGIN_SETUP.md) for the full workflow.
 

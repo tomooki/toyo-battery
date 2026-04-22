@@ -94,29 +94,30 @@ def wide_cell_dir(tmp_path: Path) -> Path:
 def test_run_chdis_returns_single_figure_with_axis_labels(
     wide_cell_dir: Path,
 ) -> None:
-    figures = run(
+    result = run(
         GuiRequest(
             dirs=[wide_cell_dir],
             kinds=frozenset({"chdis"}),
             cycles=[1, 2],
         )
     )
-    assert len(figures) == 1
-    ax = figures[0].axes[0]
+    assert len(result.figures) == 1
+    assert len(result.cells) == 1
+    ax = result.figures[0].axes[0]
     assert ax.get_xlabel() == "Capacity [mAh/g]"
     assert ax.get_ylabel() == "Voltage [V]"
 
 
 def test_run_all_kinds_returns_three_figures(wide_cell_dir: Path) -> None:
-    figures = run(
+    result = run(
         GuiRequest(
             dirs=[wide_cell_dir],
             kinds=frozenset({"chdis", "cycle", "dqdv"}),
             cycles=[1, 2],
         )
     )
-    assert len(figures) == 3
-    ylabels = {fig.axes[0].get_ylabel() for fig in figures}
+    assert len(result.figures) == 3
+    ylabels = {fig.axes[0].get_ylabel() for fig in result.figures}
     # One of the figures is the cycle dual-Y plot whose primary axis is
     # "Discharge capacity [mAh/g]"; the chdis and dQ/dV figures contribute
     # the other two labels.
@@ -145,7 +146,7 @@ def test_sg_window_override_changes_dqdv_values(wide_cell_dir: Path) -> None:
             cycles=[1],
             sg_window=11,
         )
-    )[0]
+    ).figures[0]
     fig_wide = run(
         GuiRequest(
             dirs=[wide_cell_dir],
@@ -153,7 +154,7 @@ def test_sg_window_override_changes_dqdv_values(wide_cell_dir: Path) -> None:
             cycles=[1],
             sg_window=21,
         )
-    )[0]
+    ).figures[0]
     y_default = np.asarray(fig_default.axes[0].lines[0].get_ydata(), dtype=float)
     y_wide = np.asarray(fig_wide.axes[0].lines[0].get_ydata(), dtype=float)
     # Same sample count (interpolation grid is independent of the SG window)
@@ -197,7 +198,7 @@ def test_controller_passes_sg_window_to_plot_dqdv(
 
     monkeypatch.setattr(backend, "plot_dqdv", fake_plot_dqdv)
 
-    figures = run(
+    result = run(
         GuiRequest(
             dirs=[wide_cell_dir],
             kinds=frozenset({"dqdv"}),
@@ -206,7 +207,7 @@ def test_controller_passes_sg_window_to_plot_dqdv(
         )
     )
 
-    assert len(figures) == 1
+    assert len(result.figures) == 1
     assert len(calls) == 1
     assert calls[0]["sg_window_length"] == 21
 
@@ -215,7 +216,7 @@ def test_controller_passes_sg_window_to_plot_dqdv(
 
 
 def test_voltage_range_applied_to_chdis(wide_cell_dir: Path) -> None:
-    figures = run(
+    result = run(
         GuiRequest(
             dirs=[wide_cell_dir],
             kinds=frozenset({"chdis"}),
@@ -223,7 +224,7 @@ def test_voltage_range_applied_to_chdis(wide_cell_dir: Path) -> None:
             voltage_range=(3.0, 4.2),
         )
     )
-    fig = figures[0]
+    fig = result.figures[0]
     # All visible axes in the chdis figure are "Voltage [V]" primaries.
     lo, hi = fig.axes[0].get_ylim()
     assert lo == pytest.approx(3.0)
@@ -238,14 +239,14 @@ def test_capacity_range_applied_only_to_primary_not_twin(
     ``fig.axes[0].set_ylim`` on all axes would clobber the efficiency
     scale too. This test guards that labeled-axis dispatch.
     """
-    figures = run(
+    result = run(
         GuiRequest(
             dirs=[wide_cell_dir],
             kinds=frozenset({"cycle"}),
             capacity_range=(0.0, 9999.0),
         )
     )
-    fig = figures[0]
+    fig = result.figures[0]
     primaries = [ax for ax in fig.axes if ax.get_ylabel() == "Discharge capacity [mAh/g]"]
     twins = [ax for ax in fig.axes if ax.get_ylabel() == "Coulombic efficiency [%]"]
     assert primaries and twins

@@ -7,14 +7,15 @@ OriginLab's embedded Python the same way as numpy/pandas/scipy.
 
 1. Open Origin.
 2. **Connectivity → Python Packages** (or Python Console → `pip`).
-3. Install:
+3. Install with the `[origin]` extra — it pulls in matplotlib for the Tk GUI
+   path so a single command is enough:
 
    ```python
    import subprocess
    import sys
 
    subprocess.check_call(
-       [sys.executable, "-m", "pip", "install", "--upgrade", "toyo-battery"]
+       [sys.executable, "-m", "pip", "install", "--upgrade", "toyo-battery[origin]"]
    )
    ```
 
@@ -37,13 +38,30 @@ OriginLab's embedded Python the same way as numpy/pandas/scipy.
 
 ## Launching the GUI from Origin
 
-With the `[gui]` extra installed (`pip install "toyo-battery[gui]"`), the Tk
-GUI can be launched directly from Origin's Python Console:
+After step 3 above, the recommended one-liner runs the Tk directory picker
+and pushes results straight into the active Origin project:
 
 ```python
-from toyo_battery.gui import launch_gui
+from toyo_battery.origin import launch_gui
 launch_gui()
 ```
+
+Pick one or more cell directories in the dialog, set the plot kinds /
+parameters you want, and click **Run**. For each cell the launcher creates
+`{name}_chdis`, `{name}_cycle`, `{name}_dqdv` worksheets, the matching
+template-backed graphs, and a `stat_table` worksheet — no PNG/CSV
+intermediates, no manual `push_to_origin(...)` call.
+
+To override the cycles used for the stat sheet, or to open a project file
+on disk, pass kwargs:
+
+```python
+launch_gui(project_path=r"C:\Users\me\Documents\toyo.opju", stat_cycles=(10, 50, 100))
+```
+
+If you want the standalone GUI behaviour (matplotlib figures in `Toplevel`
+windows, no Origin write-back) instead, call `toyo_battery.gui.launch_gui()`
+directly.
 
 Notes:
 
@@ -52,6 +70,9 @@ Notes:
 - Origin's embedded CPython must include `_tkinter` (OriginLab 2022 and later
   do). If it doesn't, the call raises `ImportError` from `import tkinter`; use
   a separate system Python in that case.
+- The three `.otpu` graph templates ship inside the wheel — no extra setup
+  is needed. Set `TOYO_ORIGIN_TEMPLATE_DIR` only if you want to substitute
+  your own templates.
 
 ## Origin Python version check (please report back)
 

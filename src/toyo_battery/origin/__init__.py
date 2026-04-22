@@ -11,9 +11,14 @@ tested against a mocked ``originpro`` module without importing the top-level
 
 * :mod:`._worksheets` — DataFrame → Origin worksheet helpers.
 * :mod:`._plots` — template-backed graph creation.
-* :mod:`.templates` — the ``.otpu`` asset directory (README only in this
-  PR; users provide the proprietary templates — see
-  ``templates/README.md``).
+* :mod:`.templates` — the bundled ``.otpu`` asset directory.
+
+For the end-user "default install only" path inside Origin, this module
+also exposes :func:`launch_gui`, a thin wrapper around
+:func:`toyo_battery.gui.launch_gui` that injects an ``on_complete``
+callback routing the loaded cells through :func:`push_to_origin`. That
+keeps the Tk view (in :mod:`toyo_battery.gui.tk_app`) free of any
+``originpro`` coupling.
 """
 
 from __future__ import annotations
@@ -105,7 +110,58 @@ def push_to_origin(
         op.save(project_path)  # type: ignore[attr-defined]
 
 
+def launch_gui(
+    *,
+    project_path: str | None = None,
+    stat_cycles: Sequence[int] = (10, 50),
+) -> None:
+    """Launch the Tk GUI from inside Origin and push results to the project.
+
+    This is the one-liner entry point for the "Origin default install only"
+    workflow: after ``pip install toyo-battery[origin]`` inside Origin's
+    embedded Python, ``from toyo_battery.origin import launch_gui;
+    launch_gui()`` brings up the existing Tk directory picker, and Run
+    forwards the loaded :class:`Cell` list to :func:`push_to_origin` —
+    populating the active Origin project with worksheets, template-backed
+    graphs, and a ``stat_table`` sheet without writing any PNG/CSV
+    intermediates.
+
+    The originpro check runs **before** Tk is constructed so a missing
+    embedded-Python build fails fast with the canonical
+    :func:`_require_originpro` message rather than after the user has
+    spent time selecting directories.
+
+    Parameters
+    ----------
+    project_path
+        Forwarded to :func:`push_to_origin` for each Run. ``None`` (the
+        default) operates on the in-memory project.
+    stat_cycles
+        Forwarded to :func:`push_to_origin` as ``stat_cycles``.
+
+    Raises
+    ------
+    ImportError
+        From :func:`_require_originpro` when ``originpro`` is not
+        importable (i.e. not running inside Origin), or from
+        ``import tkinter`` when the host Python lacks ``_tkinter`` (some
+        older OriginLab releases — see issue #16). Both errors propagate
+        unmodified so the failure mode is obvious from the traceback.
+    """
+    _require_originpro()
+    # Imported lazily so this module stays importable on hosts without
+    # Tk / matplotlib (the standalone ``push_to_origin`` path needs
+    # neither).
+    from toyo_battery.gui import launch_gui as _launch_tk_gui
+
+    def _push(cells: Sequence[Cell], _figures: Sequence[object]) -> None:
+        push_to_origin(cells, project_path=project_path, stat_cycles=stat_cycles)
+
+    _launch_tk_gui(on_complete=_push)
+
+
 __all__ = [
     "_require_originpro",
+    "launch_gui",
     "push_to_origin",
 ]
