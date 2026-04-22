@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-04-23
+
+### Fixed
+- Origin-mode graphs now autoscale after binding. Every template-backed
+  layer receives a `layer.rescale()` call at the tail of the bind
+  helpers (`_bind_xy_pairs`, `_bind_cycle`) so the three per-cell and
+  three comparison graphs fit their data instead of inheriting the
+  template's default axis window. The issue #61 shared-range path
+  (`_set_axis_limits` under explicit `ranges`) continues to override
+  the rescaled values. ([#73])
+
 ## [0.1.2] - 2026-04-22
 
 ### Changed
@@ -133,7 +144,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-alpha.** Public API is unstable and may change without deprecation in
   0.0.x releases.
 
-[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/tomooki/toyo-battery/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/tomooki/toyo-battery/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/tomooki/toyo-battery/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/tomooki/toyo-battery/compare/v0.0.3...v0.1.0
@@ -142,6 +154,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#62]: https://github.com/tomooki/toyo-battery/issues/62
 [#63]: https://github.com/tomooki/toyo-battery/issues/63
 [#69]: https://github.com/tomooki/toyo-battery/pull/69
+[#73]: https://github.com/tomooki/toyo-battery/pull/73
 [0.0.3]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/tomooki/toyo-battery/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/tomooki/toyo-battery/releases/tag/v0.0.1
