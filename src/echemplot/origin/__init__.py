@@ -50,7 +50,7 @@ def _require_originpro() -> object:
     return op
 
 
-_DEFAULT_SG_WINDOW = 11
+_DEFAULT_SG_WINDOW = 21
 _DEFAULT_SG_POLYORDER = 2
 
 
@@ -86,7 +86,7 @@ def push_to_origin(
         :func:`echemplot.core.stats.stat_table` as ``target_cycles``.
     sg_window, sg_polyorder
         Savitzky-Golay parameters for the dQ/dV worksheet. At the defaults
-        (``11`` / ``2``) the cached :attr:`Cell.dqdv_df` is reused verbatim;
+        (``21`` / ``2``) the cached :attr:`Cell.dqdv_df` is reused verbatim;
         any override triggers a one-off :func:`echemplot.core.dqdv.get_dqdv_df`
         recompute per cell so the worksheet values reflect the caller's
         choice. ``Cell`` instances are not mutated. ``sg_window`` must be a

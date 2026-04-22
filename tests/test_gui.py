@@ -135,9 +135,9 @@ def test_sg_window_override_changes_dqdv_values(wide_cell_dir: Path) -> None:
     """A non-default ``sg_window`` must actually flow into the dQ/dV
     computation, not silently fall back to the cached-property default.
 
-    Compares the y-data of the first dQ/dV line between a default-window
-    run (11) and an override (21); the smoother window produces numerically
-    distinct values across the curve.
+    Compares the y-data of the first dQ/dV line between two distinct
+    window_length values (11 vs 21); the smoother window produces
+    numerically distinct values across the curve.
     """
     fig_default = run(
         GuiRequest(
@@ -184,7 +184,7 @@ def test_controller_passes_sg_window_to_plot_dqdv(
         cells: object,
         cycles: object = None,
         *,
-        sg_window_length: int = 11,
+        sg_window_length: int = 21,
         sg_polyorder: int = 2,
     ) -> object:
         calls.append(

@@ -256,7 +256,7 @@ def test_plot_dqdv_sg_override_changes_curve() -> None:
     cell = _linear_cell(n_cycles=1)
 
     fig_default = plot_dqdv([cell])
-    fig_wide = plot_dqdv([cell], sg_window_length=21)
+    fig_wide = plot_dqdv([cell], sg_window_length=31)
 
     y_default = np.asarray(_first_visible(fig_default).lines[0].get_ydata(), dtype=float)
     y_wide = np.asarray(_first_visible(fig_wide).lines[0].get_ydata(), dtype=float)

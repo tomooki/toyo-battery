@@ -58,7 +58,7 @@ if TYPE_CHECKING:
 OnComplete = Callable[[Sequence["Cell"], Sequence["Figure"], int], None]
 
 _DEFAULT_CYCLES_TEXT = "1 10 50"
-_DEFAULT_SG_WINDOW_TEXT = "11"
+_DEFAULT_SG_WINDOW_TEXT = "21"
 _PADX = 6
 _PADY = 4
 
