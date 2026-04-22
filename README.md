@@ -23,6 +23,17 @@ pip install "toyo-battery[plot]"
 pip install "toyo-battery[all]"
 ```
 
+### CLI
+
+With the `[cli]` extra (`pip install "toyo-battery[cli]"`) the `toyo-battery`
+command offers batch operations over one or more cell directories:
+
+```bash
+toyo-battery process cell_A cell_B --out ./csvs        # chdis/cap/dqdv CSVs
+toyo-battery plot    cell_A cell_B --out ./pngs        # chdis/cycle/dqdv PNGs
+toyo-battery stats   cell_A cell_B --cycles 10,50 --out stats.csv
+```
+
 ### Installing into Origin's embedded Python
 
 Open Origin, go to **Connectivity → Python Packages**, then in the Origin
