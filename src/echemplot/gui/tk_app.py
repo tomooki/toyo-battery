@@ -15,6 +15,11 @@ Matplotlib and tkinter are imported at module scope so an
 ``ImportError`` raised when the ``[gui]`` extra is missing propagates
 immediately (the expected UX for an optional feature).
 
+``tkinterdnd2`` is an optional dependency (also shipped via the ``[gui]``
+extra): when present the directory Listbox accepts multi-folder
+drag-and-drop from the host file manager; when absent the GUI silently
+falls back to the Add-button-only workflow.
+
 The matplotlib / tkinter stubs are permissive and emit ``no-untyped-call``
 or ``arg-type`` errors for a handful of standard invocations
 (``FigureCanvasTkAgg``, ``NavigationToolbar2Tk``, ``Listbox.curselection``).
@@ -37,6 +42,13 @@ from matplotlib.backends.backend_tkagg import (  # type: ignore[attr-defined]
 )
 
 from echemplot.gui._controller import GuiRequest, run
+
+try:
+    from tkinterdnd2 import DND_FILES, TkinterDnD
+
+    _DND_AVAILABLE = True
+except ImportError:
+    _DND_AVAILABLE = False
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
@@ -143,6 +155,17 @@ class _App:
 
         self._dirs_list = tk.Listbox(dirs_frame, height=6, width=60)
         self._dirs_list.grid(row=0, column=0, rowspan=3, sticky="nsew", padx=_PADX, pady=_PADY)
+
+        # Enable multi-folder drag-and-drop when tkinterdnd2 is installed AND
+        # the current root was constructed with TkinterDnD.Tk (plain tk.Tk
+        # roots don't carry the dnd extension, so the listbox won't have
+        # drop_target_register bound even if the import above succeeded).
+        if _DND_AVAILABLE and hasattr(self.root, "tk") and callable(
+            getattr(self._dirs_list, "drop_target_register", None)
+        ):
+            self._dirs_list.drop_target_register(DND_FILES)  # type: ignore[attr-defined]
+            self._dirs_list.dnd_bind("<<Drop>>", self._on_drop)  # type: ignore[attr-defined]
+
         ttk.Button(dirs_frame, text="Add...", command=self._on_add).grid(
             row=0, column=1, sticky="ew", padx=_PADX, pady=_PADY
         )
@@ -217,21 +240,43 @@ class _App:
     # ----- directory list handlers ----------------------------------
 
     def _on_add(self) -> None:
-        """Open ``askdirectory`` in a loop so the user can add multiple dirs.
+        """Open ``askdirectory`` once and append the chosen directory.
 
-        An empty return from ``askdirectory`` (the user cancelled) breaks
-        the loop; otherwise each selection is appended to both the state
-        list and the display listbox.
+        Cancel (empty return from ``askdirectory``) is a no-op. Users who
+        want to add multiple directories can either click Add repeatedly
+        or drag-and-drop multiple folders onto the list when
+        ``tkinterdnd2`` is installed.
         """
-        while True:
-            selected = filedialog.askdirectory(
-                parent=self.root, title="Select a cell directory (cancel to stop)"
-            )
-            if not selected:
-                break
-            path = Path(selected)
-            self._dirs.append(path)
-            self._dirs_list.insert(tk.END, str(path))
+        selected = filedialog.askdirectory(parent=self.root, title="Select a cell directory")
+        if not selected:
+            return
+        self._add_dir(Path(selected))
+
+    def _on_drop(self, event: object) -> None:
+        """Handle a ``<<Drop>>`` event from tkinterdnd2.
+
+        ``event.data`` is a Tcl list string (brace-quoted for paths with
+        spaces); ``tk.splitlist`` unpacks it into a tuple of tokens.
+        Non-directory tokens are silently dropped so stray file drops
+        don't pollute the cell-directory list.
+        """
+        raw = getattr(event, "data", "")
+        for token in self.root.tk.splitlist(raw):
+            path = Path(token)
+            if path.is_dir():
+                self._add_dir(path)
+
+    def _add_dir(self, path: Path) -> None:
+        """Append ``path`` to the state list and Listbox if not already present.
+
+        Listbox allows duplicate rows but they make Remove-selected
+        ambiguous and produce redundant Cell loads at Run time, so we
+        de-dupe here.
+        """
+        if path in self._dirs:
+            return
+        self._dirs.append(path)
+        self._dirs_list.insert(tk.END, str(path))
 
     def _on_remove(self) -> None:
         # Walk selected indices in reverse so the remaining indices stay
@@ -359,9 +404,29 @@ def launch_gui(*, on_complete: OnComplete | None = None) -> None:
     import matplotlib
 
     matplotlib.use("TkAgg")
-    root = tk.Tk()
+    root = _make_root()
     _App(root, on_complete=on_complete)
     root.mainloop()
+
+
+def _make_root() -> tk.Tk:
+    """Return a Tk root, preferring ``TkinterDnD.Tk`` when the extra is installed.
+
+    ``TkinterDnD.Tk`` is a drop-in subclass that loads the tkdnd Tcl
+    extension into the interpreter so widgets can register as drop
+    targets. We fall back to plain ``tk.Tk`` silently when the package
+    isn't importable so the GUI still launches without the optional
+    drag-and-drop feature.
+    """
+    if _DND_AVAILABLE:
+        try:
+            return TkinterDnD.Tk()  # type: ignore[no-any-return]
+        except tk.TclError:
+            # The Python package imported but the underlying tkdnd Tcl
+            # extension failed to load (missing shared library on the
+            # host). Fall through to plain Tk rather than crash.
+            pass
+    return tk.Tk()
 
 
 if __name__ == "__main__":
