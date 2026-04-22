@@ -355,10 +355,19 @@ def test_coerce_for_originpro_rebuilds_string_column_index_as_object(
 
 
 def test_coerce_for_originpro_is_identity_for_numpy_dtypes() -> None:
-    """Numeric-only frames with an object-dtype column Index short-circuit."""
+    """Numeric-only frames with an object-dtype column Index short-circuit.
+
+    The column Index is pinned to ``dtype=object`` explicitly so the
+    assertion stays stable across pandas versions — recent releases
+    construct ``pd.DataFrame({...}).columns`` as ``StringDtype`` when
+    ``future.infer_string`` is on (py3.11/3.12 CI resolves a pandas
+    build where that is the case), which would legitimately send the
+    frame through the rebuild path and defeat the identity check.
+    """
     from echemplot.origin._worksheets import _coerce_for_originpro
 
     df = pd.DataFrame({"a": [1.0], "b": [2.0]})
+    df.columns = pd.Index(["a", "b"], dtype=object)
     assert _coerce_for_originpro(df) is df
 
 
