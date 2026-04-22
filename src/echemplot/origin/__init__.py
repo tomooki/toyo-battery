@@ -26,7 +26,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from echemplot.origin._plots import create_cell_plots, create_comparison_plots
+from echemplot.origin._plots import (
+    compute_global_ranges,
+    create_cell_plots,
+    create_comparison_plots,
+)
 from echemplot.origin._worksheets import write_cell_sheets, write_stat_table
 
 if TYPE_CHECKING:
@@ -96,14 +100,21 @@ def push_to_origin(
     if project_path is not None:
         op.open(project_path)  # type: ignore[attr-defined]
 
+    # Compute one shared axis range over the full cell sequence, applied
+    # uniformly to every per-cell graph AND the comparison overlays. With
+    # a single cell this collapses to "autoscale to that cell's data";
+    # with multiple cells every graph shares a directly-comparable scale
+    # (issue #61).
+    ranges = compute_global_ranges(cells)
+
     per_cell_sheets: list[dict[str, object]] = []
     for cell in cells:
         sheets = write_cell_sheets(op, cell)
-        create_cell_plots(op, cell, sheets)
+        create_cell_plots(op, cell, sheets, ranges=ranges)
         per_cell_sheets.append(sheets)
 
     if len(cells) > 1:
-        create_comparison_plots(op, cells, per_cell_sheets)
+        create_comparison_plots(op, cells, per_cell_sheets, ranges=ranges)
 
     stat_df = stat_table(cells, target_cycles=list(stat_cycles))
     write_stat_table(op, stat_df)

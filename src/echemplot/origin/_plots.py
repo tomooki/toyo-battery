@@ -19,6 +19,12 @@ confirm them — see issue #15):
   column designation and Origin renders an empty graph window — the
   column indices are mandatory for data to appear, even when the
   template already provides plot types and axis scaling.
+* Each layer exposes ``layer.axis(<"x"|"y">)`` returning an axis object
+  with mutable ``begin`` and ``end`` float attributes. Setting these
+  overrides the template's default scaling so per-cell and comparison
+  graphs can share a common axis range (see issue #61). When the
+  attribute-style access raises, :func:`_set_axis_limits` falls back to
+  LabTalk via ``layer.lt_exec("x.from=<lo>;x.to=<hi>;")``.
 
 The three templates expect distinct column layouts; the bind helpers in
 this module encode the layout per category:
@@ -40,8 +46,12 @@ from __future__ import annotations
 
 import os
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+import numpy as np
+import pandas as pd
 
 _TEMPLATE_CHDIS = "charge_discharge.otpu"
 _TEMPLATE_CYCLE = "cycle_efficiency.otpu"
@@ -74,6 +84,122 @@ _NOT_FOUND_MSG = (
     "missing one of charge_discharge.otpu, cycle_efficiency.otpu, or "
     "dqdv.otpu. Unset the env var to fall back to the bundled templates."
 )
+
+
+@dataclass(frozen=True)
+class _GraphRanges:
+    """Global (min, max) tuples across a Sequence of cells, one per axis.
+
+    Used by :func:`compute_global_ranges` to share a single axis scale
+    across every template-backed graph ``push_to_origin`` produces so
+    per-cell and comparison plots are directly comparable (issue #61).
+    ``None`` on a field means ``_safe_range`` found no finite values for
+    that axis — the :func:`_set_axis_limits` helper treats ``None`` as
+    "leave the template default in place".
+    """
+
+    chdis_x: tuple[float, float] | None
+    chdis_y: tuple[float, float] | None
+    cycle_x: tuple[float, float] | None
+    cycle_left_y: tuple[float, float] | None
+    cycle_right_y: tuple[float, float] | None
+    dqdv_x: tuple[float, float] | None
+    dqdv_y: tuple[float, float] | None
+
+
+def _safe_range(values: pd.DataFrame | pd.Series | np.ndarray) -> tuple[float, float] | None:
+    """Return ``(min, max)`` of ``values`` ignoring NaN; ``None`` if no finite entries.
+
+    Empty inputs and all-NaN / all-inf inputs both yield ``None`` so
+    callers can pass the result straight to :func:`_set_axis_limits`,
+    which treats ``None`` as a no-op and falls back to the template's
+    default axis range.
+    """
+    arr = np.asarray(values, dtype=float).ravel()
+    arr = arr[np.isfinite(arr)]
+    if arr.size == 0:
+        return None
+    return float(arr.min()), float(arr.max())
+
+
+def compute_global_ranges(cells: Sequence[Any]) -> _GraphRanges:
+    """Compute axis ranges across all cells' dataframes for template-backed graphs.
+
+    The function walks every cell once and collects per-axis values from
+    ``cell.chdis_df`` (even columns = capacity X, odd = voltage Y),
+    ``cell.cap_df`` (``[cycle, q_ch, q_dis, ce]`` with indices pinned by
+    ``_CYCLE_COL_*`` constants), and ``cell.dqdv_df`` (even columns =
+    voltage X, odd = dQ/dV Y). Concatenated arrays are reduced by
+    :func:`_safe_range` so empty / all-NaN inputs surface as ``None`` on
+    the returned :class:`_GraphRanges` rather than raising.
+
+    When the input is a single cell, "global" and "that cell's range"
+    coincide — the autoscale for a one-cell push is simply the cell's
+    own data range.
+    """
+    chdis_x_vals: list[np.ndarray] = []
+    chdis_y_vals: list[np.ndarray] = []
+    dqdv_x_vals: list[np.ndarray] = []
+    dqdv_y_vals: list[np.ndarray] = []
+    cycle_x_vals: list[np.ndarray] = []
+    cycle_left_vals: list[np.ndarray] = []
+    cycle_right_vals: list[np.ndarray] = []
+    for cell in cells:
+        chdis = cell.chdis_df
+        if chdis.shape[1] >= 2:
+            # even = capacity (x), odd = voltage (y)
+            chdis_x_vals.append(chdis.iloc[:, 0::2].to_numpy(dtype=float))
+            chdis_y_vals.append(chdis.iloc[:, 1::2].to_numpy(dtype=float))
+        dqdv = cell.dqdv_df
+        if dqdv.shape[1] >= 2:
+            dqdv_x_vals.append(dqdv.iloc[:, 0::2].to_numpy(dtype=float))
+            dqdv_y_vals.append(dqdv.iloc[:, 1::2].to_numpy(dtype=float))
+        # cap_df carries the cycle number in its index; surface it as a
+        # column to match the post-``reset_index`` layout used when
+        # writing the sheet. See :func:`._worksheets.write_cell_sheets`.
+        cap = cell.cap_df.reset_index()
+        if cap.shape[1] > _CYCLE_COL_CE:
+            cycle_x_vals.append(cap.iloc[:, _CYCLE_COL_CYCLE].to_numpy(dtype=float))
+            cycle_left_vals.append(cap.iloc[:, _CYCLE_COL_QDIS].to_numpy(dtype=float))
+            cycle_right_vals.append(cap.iloc[:, _CYCLE_COL_CE].to_numpy(dtype=float))
+    return _GraphRanges(
+        chdis_x=_safe_range(np.concatenate(chdis_x_vals)) if chdis_x_vals else None,
+        chdis_y=_safe_range(np.concatenate(chdis_y_vals)) if chdis_y_vals else None,
+        cycle_x=_safe_range(np.concatenate(cycle_x_vals)) if cycle_x_vals else None,
+        cycle_left_y=_safe_range(np.concatenate(cycle_left_vals)) if cycle_left_vals else None,
+        cycle_right_y=_safe_range(np.concatenate(cycle_right_vals)) if cycle_right_vals else None,
+        dqdv_x=_safe_range(np.concatenate(dqdv_x_vals)) if dqdv_x_vals else None,
+        dqdv_y=_safe_range(np.concatenate(dqdv_y_vals)) if dqdv_y_vals else None,
+    )
+
+
+def _set_axis_limits(layer: Any, axis: str, limits: tuple[float, float] | None) -> None:
+    """Apply ``(lo, hi)`` to ``layer``'s named axis. No-op when ``limits`` is ``None``.
+
+    Tries attribute-style originpro API first (``layer.axis(axis).begin``
+    and ``.end``) and falls back to LabTalk via ``layer.lt_exec`` when
+    that raises. The fallback path is exercised only in real Origin —
+    our mocks satisfy the attribute-style call so it never trips in
+    CI. Both paths need to be confirmed against real Origin; see issue
+    #15 for the tracking checklist.
+
+    Degenerate ``lo == hi`` ranges are left alone so the template's own
+    scaling picks a sensible unit-wide window rather than collapsing the
+    axis to a zero-width line.
+    """
+    if limits is None:
+        return
+    lo, hi = limits
+    if lo == hi:
+        return  # degenerate range; leave template scaling in place
+    try:
+        ax = layer.axis(axis)
+        ax.begin = lo
+        ax.end = hi
+    except Exception:  # pragma: no cover - exercised only in real Origin
+        # LabTalk fallback. ``layer.lt_exec`` selects ``layer`` implicitly.
+        cmd = "x" if axis == "x" else "y"
+        layer.lt_exec(f"{cmd}.from={lo};{cmd}.to={hi};")
 
 
 def _template_path(name: str) -> Path:
@@ -134,22 +260,45 @@ def _bind_cycle(graph: Any, sheet: Any) -> None:
     graph[1].add_plot(sheet, colx=_CYCLE_COL_CYCLE, coly=_CYCLE_COL_CE)
 
 
-def create_cell_plots(op: Any, cell: Any, sheets: dict[str, Any]) -> list[Any]:
+def create_cell_plots(
+    op: Any,
+    cell: Any,
+    sheets: dict[str, Any],
+    *,
+    ranges: _GraphRanges | None = None,
+) -> list[Any]:
     """Create the three per-cell graphs from templates.
 
     ``sheets`` is the mapping returned by
     :func:`echemplot.origin._worksheets.write_cell_sheets`. ``cell``
     is used to read the per-category column counts so the bind helpers
     know how many plot pairs to emit.
+
+    ``ranges`` — when given, the ``(lo, hi)`` tuples on this
+    :class:`_GraphRanges` are applied to the corresponding axes on each
+    graph via :func:`_set_axis_limits`. Pass ``None`` (the default) to
+    keep the template's built-in axis scaling, matching the legacy
+    pre-#61 behaviour.
     """
     chdis_graph = _new_graph_from_template(op, _TEMPLATE_CHDIS, f"{cell.name}_chdis_plot")
     _bind_xy_pairs(chdis_graph[0], sheets["chdis"], cell.chdis_df.shape[1])
+    if ranges is not None:
+        _set_axis_limits(chdis_graph[0], "x", ranges.chdis_x)
+        _set_axis_limits(chdis_graph[0], "y", ranges.chdis_y)
 
     cycle_graph = _new_graph_from_template(op, _TEMPLATE_CYCLE, f"{cell.name}_cycle_plot")
     _bind_cycle(cycle_graph, sheets["cycle"])
+    if ranges is not None:
+        _set_axis_limits(cycle_graph[0], "x", ranges.cycle_x)
+        _set_axis_limits(cycle_graph[0], "y", ranges.cycle_left_y)
+        _set_axis_limits(cycle_graph[1], "x", ranges.cycle_x)
+        _set_axis_limits(cycle_graph[1], "y", ranges.cycle_right_y)
 
     dqdv_graph = _new_graph_from_template(op, _TEMPLATE_DQDV, f"{cell.name}_dqdv_plot")
     _bind_xy_pairs(dqdv_graph[0], sheets["dqdv"], cell.dqdv_df.shape[1])
+    if ranges is not None:
+        _set_axis_limits(dqdv_graph[0], "x", ranges.dqdv_x)
+        _set_axis_limits(dqdv_graph[0], "y", ranges.dqdv_y)
 
     return [chdis_graph, cycle_graph, dqdv_graph]
 
@@ -158,6 +307,8 @@ def create_comparison_plots(
     op: Any,
     cells: Sequence[Any],
     per_cell_sheets: list[dict[str, Any]],
+    *,
+    ranges: _GraphRanges | None = None,
 ) -> list[Any]:
     """Create three overlay graphs that combine every cell's sheets.
 
@@ -171,17 +322,32 @@ def create_comparison_plots(
     column pair on ``graph[0]``; ``cycle`` emits two calls per cell, one
     per dual-Y layer (``graph[0]`` = discharge capacity,
     ``graph[1]`` = Coulombic efficiency).
+
+    ``ranges`` applies the same per-axis ``(lo, hi)`` overrides as in
+    :func:`create_cell_plots`, so per-cell and comparison graphs share a
+    single axis scale — the core of the issue #61 fix.
     """
     chdis_graph = _new_graph_from_template(op, _TEMPLATE_CHDIS, "comparison_chdis_plot")
     for cell, sheets in zip(cells, per_cell_sheets):
         _bind_xy_pairs(chdis_graph[0], sheets["chdis"], cell.chdis_df.shape[1])
+    if ranges is not None:
+        _set_axis_limits(chdis_graph[0], "x", ranges.chdis_x)
+        _set_axis_limits(chdis_graph[0], "y", ranges.chdis_y)
 
     cycle_graph = _new_graph_from_template(op, _TEMPLATE_CYCLE, "comparison_cycle_plot")
     for _cell, sheets in zip(cells, per_cell_sheets):
         _bind_cycle(cycle_graph, sheets["cycle"])
+    if ranges is not None:
+        _set_axis_limits(cycle_graph[0], "x", ranges.cycle_x)
+        _set_axis_limits(cycle_graph[0], "y", ranges.cycle_left_y)
+        _set_axis_limits(cycle_graph[1], "x", ranges.cycle_x)
+        _set_axis_limits(cycle_graph[1], "y", ranges.cycle_right_y)
 
     dqdv_graph = _new_graph_from_template(op, _TEMPLATE_DQDV, "comparison_dqdv_plot")
     for cell, sheets in zip(cells, per_cell_sheets):
         _bind_xy_pairs(dqdv_graph[0], sheets["dqdv"], cell.dqdv_df.shape[1])
+    if ranges is not None:
+        _set_axis_limits(dqdv_graph[0], "x", ranges.dqdv_x)
+        _set_axis_limits(dqdv_graph[0], "y", ranges.dqdv_y)
 
     return [chdis_graph, cycle_graph, dqdv_graph]
