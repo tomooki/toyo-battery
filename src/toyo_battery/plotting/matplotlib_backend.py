@@ -40,6 +40,7 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 
 from toyo_battery.core.cell import Cell
+from toyo_battery.core.dqdv import get_dqdv_df
 from toyo_battery.io.schema import ColumnLang
 
 _CYCLE_COLOR_FIRST = "red"
@@ -267,6 +268,9 @@ def plot_cycle(cells: Sequence[Cell]) -> Figure:
 def plot_dqdv(
     cells: Sequence[Cell],
     cycles: Sequence[int] | None = None,
+    *,
+    sg_window_length: int = 11,
+    sg_polyorder: int = 2,
 ) -> Figure:
     """dQ/dV vs voltage, cycle 1 red / other cycles black.
 
@@ -284,6 +288,18 @@ def plot_dqdv(
         cycles whose ``dqdv_df`` columns collapsed to all-NaN (e.g.
         ``ipnum < window_length`` for a narrow-voltage segment) are
         skipped silently for that cell.
+    sg_window_length
+        Savitzky-Golay ``window_length`` forwarded to
+        :func:`toyo_battery.core.dqdv.get_dqdv_df`. When this and
+        ``sg_polyorder`` are both at their defaults (``11`` / ``2``), the
+        cached :attr:`Cell.dqdv_df` is reused; otherwise a fresh
+        ``dqdv_df`` is computed per cell with the requested parameters.
+        Must be a positive odd integer strictly greater than
+        ``sg_polyorder``.
+    sg_polyorder
+        Savitzky-Golay polynomial order forwarded to
+        :func:`toyo_battery.core.dqdv.get_dqdv_df`. See ``sg_window_length``
+        for the cache-or-recompute behavior.
 
     Returns
     -------
@@ -293,15 +309,29 @@ def plot_dqdv(
     Raises
     ------
     ValueError
-        If ``cells`` is empty.
+        If ``cells`` is empty, or if Savitzky-Golay parameters violate
+        :func:`toyo_battery.core.dqdv.get_dqdv_df`'s preconditions.
     """
     _check_nonempty(cells)
     fig, axes = _build_grid(len(cells))
 
+    # Reuse the cached property only at the defaults; any override forces a
+    # recompute via ``get_dqdv_df`` so the requested SG parameters actually
+    # land in the output.
+    use_default = sg_window_length == 11 and sg_polyorder == 2
+
     for ax, cell in zip(axes, cells):
         v_name = _quantity(cell.column_lang, "voltage")
         dqdv_name = _quantity(cell.column_lang, "dqdv")
-        dqdv = cell.dqdv_df
+        if use_default:
+            df = cell.dqdv_df
+        else:
+            df = get_dqdv_df(
+                cell.chdis_df,
+                window_length=sg_window_length,
+                polyorder=sg_polyorder,
+                column_lang=cell.column_lang,
+            )
 
         plotted: list[int] = []
         for cycle in _resolve_cycles(cell, cycles):
@@ -310,10 +340,10 @@ def plot_dqdv(
             for side in ("ch", "dis"):
                 v_key = (cycle, side, v_name)
                 y_key = (cycle, side, dqdv_name)
-                if v_key not in dqdv.columns or y_key not in dqdv.columns:
+                if v_key not in df.columns or y_key not in df.columns:
                     continue
                 # Joint dropna — see plot_chdis for the rationale.
-                pair = dqdv[[v_key, y_key]].dropna()
+                pair = df[[v_key, y_key]].dropna()
                 if pair.empty:
                     continue
                 ax.plot(pair[v_key], pair[y_key], color=color, linewidth=0.9)

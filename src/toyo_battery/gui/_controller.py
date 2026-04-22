@@ -17,12 +17,12 @@ Design notes:
   capacity range never accidentally lands on the efficiency axis.
 - The Savitzky-Golay ``window_length`` is not reachable through the cached
   :attr:`toyo_battery.core.cell.Cell.dqdv_df` property, which hard-codes
-  the defaults. When the caller requests a non-default window, we compute
-  a fresh ``dqdv_df`` via :func:`toyo_battery.core.dqdv.get_dqdv_df` and
-  set it on the cell's ``__dict__`` to shadow the ``cached_property``
-  lookup before handing the cell to the plotting backend. The override
-  is local to freshly constructed cells and does not mutate any shared
-  state outside this call.
+  the defaults. The controller forwards ``request.sg_window`` straight to
+  :func:`toyo_battery.plotting.matplotlib_backend.plot_dqdv` as the
+  ``sg_window_length`` kwarg; the backend reuses the cached
+  :attr:`Cell.dqdv_df` at defaults and recomputes via
+  :func:`toyo_battery.core.dqdv.get_dqdv_df` on overrides. ``Cell``
+  instances are never mutated.
 """
 
 from __future__ import annotations
@@ -33,7 +33,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from toyo_battery.core.cell import Cell
-from toyo_battery.core.dqdv import get_dqdv_df
 
 if TYPE_CHECKING:
     from matplotlib.figure import Figure
@@ -97,26 +96,14 @@ def _validate(request: GuiRequest) -> None:
         raise ValueError(f"sg_window must be odd, got {request.sg_window}")
 
 
-def _load_cells(dirs: Sequence[Path], sg_window: int) -> list[Cell]:
+def _load_cells(dirs: Sequence[Path]) -> list[Cell]:
     """Load one :class:`Cell` per directory.
 
-    When ``sg_window`` differs from :func:`get_dqdv_df`'s default (11),
-    we precompute ``dqdv_df`` with the requested window and install it on
-    the cell's instance ``__dict__`` so the ``cached_property`` lookup on
-    :attr:`Cell.dqdv_df` returns the overridden frame. This shadows the
-    default without mutating the ``Cell`` class or any shared cache.
+    ``Cell`` instances are returned untouched; per-call Savitzky-Golay
+    overrides are forwarded directly to the plotting backend rather than
+    threaded through the cell's cached properties.
     """
-    cells: list[Cell] = []
-    for d in dirs:
-        cell = Cell.from_dir(d)
-        if sg_window != 11:
-            cell.__dict__["dqdv_df"] = get_dqdv_df(
-                cell.chdis_df,
-                window_length=sg_window,
-                column_lang=cell.column_lang,
-            )
-        cells.append(cell)
-    return cells
+    return [Cell.from_dir(d) for d in dirs]
 
 
 def _apply_ylim(fig: Figure, ylabel: str, ylim: tuple[float, float]) -> None:
@@ -168,7 +155,7 @@ def run(request: GuiRequest) -> list[Figure]:
 
     _validate(request)
 
-    cells = _load_cells(request.dirs, request.sg_window)
+    cells = _load_cells(request.dirs)
     # ``None`` / empty cycles → let the backend default to all available.
     cycles_arg: Sequence[int] | None = list(request.cycles) if request.cycles else None
 
@@ -184,7 +171,7 @@ def run(request: GuiRequest) -> list[Figure]:
             _apply_ylim(fig, _YLABEL_CAPACITY, request.capacity_range)
         figures.append(fig)
     if "dqdv" in request.kinds:
-        fig = plot_dqdv(cells, cycles=cycles_arg)
+        fig = plot_dqdv(cells, cycles=cycles_arg, sg_window_length=request.sg_window)
         if request.dqdv_range is not None:
             _apply_ylim(fig, _YLABEL_DQDV, request.dqdv_range)
         figures.append(fig)

@@ -163,6 +163,54 @@ def test_sg_window_override_changes_dqdv_values(wide_cell_dir: Path) -> None:
     assert not np.allclose(y_default, y_wide)
 
 
+def test_controller_passes_sg_window_to_plot_dqdv(
+    monkeypatch: pytest.MonkeyPatch, wide_cell_dir: Path
+) -> None:
+    """The controller must forward ``request.sg_window`` as ``plot_dqdv``'s
+    ``sg_window_length`` kwarg.
+
+    Implementation note: the controller imports ``plot_dqdv`` lazily inside
+    :func:`run`, so monkeypatching the controller-module attribute would be
+    a no-op for the first call. We patch the symbol on the source module
+    (``toyo_battery.plotting.matplotlib_backend``) which is what the lazy
+    import resolves to.
+    """
+    import toyo_battery.plotting.matplotlib_backend as backend
+
+    calls: list[dict[str, object]] = []
+
+    def fake_plot_dqdv(
+        cells: object,
+        cycles: object = None,
+        *,
+        sg_window_length: int = 11,
+        sg_polyorder: int = 2,
+    ) -> object:
+        calls.append(
+            {
+                "sg_window_length": sg_window_length,
+                "sg_polyorder": sg_polyorder,
+                "cycles": cycles,
+            }
+        )
+        return plt.figure()
+
+    monkeypatch.setattr(backend, "plot_dqdv", fake_plot_dqdv)
+
+    figures = run(
+        GuiRequest(
+            dirs=[wide_cell_dir],
+            kinds=frozenset({"dqdv"}),
+            cycles=[1],
+            sg_window=21,
+        )
+    )
+
+    assert len(figures) == 1
+    assert len(calls) == 1
+    assert calls[0]["sg_window_length"] == 21
+
+
 # ---- axis ranges -----------------------------------------------------------
 
 
