@@ -602,3 +602,387 @@ def test_push_to_origin_rejects_even_sg_window(
 
     with pytest.raises(ValueError, match="sg_window"):
         push_to_origin([cell], stat_cycles=(1,), sg_window=10)
+
+
+# ----------------------------------------------------------------------
+# Shared-scale autoscaling (issue #61)
+# ----------------------------------------------------------------------
+
+
+def _fake_cell(
+    *,
+    chdis: pd.DataFrame | None = None,
+    cap: pd.DataFrame | None = None,
+    dqdv: pd.DataFrame | None = None,
+    name: str = "fake",
+) -> MagicMock:
+    """Build a duck-typed Cell exposing only the three dataframes + name.
+
+    ``compute_global_ranges`` touches nothing else, so the full
+    :class:`Cell` construction (raw_df parsing, mass, etc.) is
+    unnecessary for range-computation tests.
+    """
+    cell = MagicMock(spec=["name", "chdis_df", "cap_df", "dqdv_df"])
+    cell.name = name
+    cell.chdis_df = chdis if chdis is not None else pd.DataFrame()
+    # ``compute_global_ranges`` calls ``cap_df.reset_index()``; a
+    # DataFrame provides that out of the box so no extra plumbing is
+    # needed on the mock.
+    cell.cap_df = cap if cap is not None else pd.DataFrame()
+    cell.dqdv_df = dqdv if dqdv is not None else pd.DataFrame()
+    return cell
+
+
+def test_safe_range_ignores_nan_and_returns_none_for_empty() -> None:
+    from echemplot.origin._plots import _safe_range
+
+    assert _safe_range(np.array([1.0, 2.0, np.nan, 3.0])) == (1.0, 3.0)
+    assert _safe_range(np.array([np.nan, np.nan])) is None
+    assert _safe_range(np.array([])) is None
+
+
+def test_compute_global_ranges_extracts_per_axis_min_max() -> None:
+    """Hand-crafted cells → exact min/max tuples across the sequence."""
+    from echemplot.origin._plots import compute_global_ranges
+
+    # chdis: even cols = capacity (x), odd = voltage (y).
+    chdis_a = pd.DataFrame({"q_ch": [0.0, 500.0], "v_ch": [3.0, 4.0]})
+    chdis_b = pd.DataFrame({"q_ch": [0.0, 800.0], "v_ch": [3.1, 4.2]})
+
+    # cap after reset_index → [cycle, q_ch, q_dis, ce].
+    cap_a = pd.DataFrame(
+        {"cycle": [1, 2], "q_ch": [1000.0, 990.0], "q_dis": [990.0, 980.0], "ce": [99.0, 98.9]}
+    ).set_index("cycle")
+    cap_b = pd.DataFrame(
+        {
+            "cycle": [1, 2, 3],
+            "q_ch": [800.0, 790.0, 780.0],
+            "q_dis": [760.0, 755.0, 750.0],
+            "ce": [95.0, 95.5, 96.1],
+        }
+    ).set_index("cycle")
+
+    # dqdv: even cols = voltage (x), odd = dQ/dV (y).
+    dqdv_a = pd.DataFrame({"v": [3.0, 3.5, 4.0], "dqdv": [10.0, 20.0, -5.0]})
+    dqdv_b = pd.DataFrame({"v": [3.1, 3.6, 4.1], "dqdv": [12.0, 22.0, -8.0]})
+
+    a = _fake_cell(chdis=chdis_a, cap=cap_a, dqdv=dqdv_a, name="A")
+    b = _fake_cell(chdis=chdis_b, cap=cap_b, dqdv=dqdv_b, name="B")
+
+    ranges = compute_global_ranges([a, b])
+
+    assert ranges.chdis_x == (0.0, 800.0)
+    assert ranges.chdis_y == (3.0, 4.2)
+    assert ranges.cycle_x == (1.0, 3.0)
+    assert ranges.cycle_left_y == (750.0, 990.0)
+    assert ranges.cycle_right_y == (95.0, 99.0)
+    assert ranges.dqdv_x == (3.0, 4.1)
+    assert ranges.dqdv_y == (-8.0, 22.0)
+
+
+def test_compute_global_ranges_single_cell_equals_cell_range() -> None:
+    """With a single cell, global == that cell's own data range."""
+    from echemplot.origin._plots import compute_global_ranges
+
+    chdis = pd.DataFrame({"q_ch": [0.0, 1000.0], "v_ch": [3.0, 4.2]})
+    cap = pd.DataFrame(
+        {"cycle": [1, 2], "q_ch": [1000.0, 990.0], "q_dis": [990.0, 980.0], "ce": [99.0, 98.9]}
+    ).set_index("cycle")
+    dqdv = pd.DataFrame({"v": [3.0, 4.0], "dqdv": [5.0, 15.0]})
+
+    cell = _fake_cell(chdis=chdis, cap=cap, dqdv=dqdv)
+    ranges = compute_global_ranges([cell])
+
+    assert ranges.chdis_x == (0.0, 1000.0)
+    assert ranges.chdis_y == (3.0, 4.2)
+    assert ranges.cycle_x == (1.0, 2.0)
+    assert ranges.cycle_left_y == (980.0, 990.0)
+    assert ranges.cycle_right_y == (98.9, 99.0)
+    assert ranges.dqdv_x == (3.0, 4.0)
+    assert ranges.dqdv_y == (5.0, 15.0)
+
+
+def test_compute_global_ranges_nan_only_yields_none() -> None:
+    """All-NaN columns produce ``None`` per-axis instead of NaN tuples."""
+    from echemplot.origin._plots import compute_global_ranges
+
+    nan_df = pd.DataFrame({"a": [np.nan, np.nan], "b": [np.nan, np.nan]})
+    cap_nan = pd.DataFrame(
+        {
+            "cycle": [1, 2],
+            "q_ch": [np.nan, np.nan],
+            "q_dis": [np.nan, np.nan],
+            "ce": [np.nan, np.nan],
+        }
+    ).set_index("cycle")
+
+    cell = _fake_cell(chdis=nan_df, cap=cap_nan, dqdv=nan_df)
+    ranges = compute_global_ranges([cell])
+
+    assert ranges.chdis_x is None
+    assert ranges.chdis_y is None
+    assert ranges.cycle_x == (1.0, 2.0)  # cycle index is finite
+    assert ranges.cycle_left_y is None
+    assert ranges.cycle_right_y is None
+    assert ranges.dqdv_x is None
+    assert ranges.dqdv_y is None
+
+
+def test_compute_global_ranges_empty_dataframes_are_safe() -> None:
+    """Empty cell dataframes → ``_GraphRanges`` with all ``None`` fields, no raises."""
+    from echemplot.origin._plots import compute_global_ranges
+
+    cell = _fake_cell()
+    ranges = compute_global_ranges([cell])
+
+    for field_name in (
+        "chdis_x",
+        "chdis_y",
+        "cycle_x",
+        "cycle_left_y",
+        "cycle_right_y",
+        "dqdv_x",
+        "dqdv_y",
+    ):
+        assert getattr(ranges, field_name) is None, field_name
+
+
+def test_set_axis_limits_is_noop_when_limits_none() -> None:
+    from echemplot.origin._plots import _set_axis_limits
+
+    layer = MagicMock()
+    _set_axis_limits(layer, "x", None)
+    layer.axis.assert_not_called()
+    layer.lt_exec.assert_not_called()
+
+
+def test_set_axis_limits_skips_degenerate_range() -> None:
+    """``lo == hi`` → leave template scaling alone (no axis API call)."""
+    from echemplot.origin._plots import _set_axis_limits
+
+    layer = MagicMock()
+    _set_axis_limits(layer, "x", (3.0, 3.0))
+    layer.axis.assert_not_called()
+    layer.lt_exec.assert_not_called()
+
+
+def test_set_axis_limits_sets_begin_and_end_via_attribute_api() -> None:
+    from echemplot.origin._plots import _set_axis_limits
+
+    layer = MagicMock()
+    _set_axis_limits(layer, "x", (0.0, 10.0))
+    layer.axis.assert_called_once_with("x")
+    axis_obj = layer.axis.return_value
+    assert axis_obj.begin == 0.0
+    assert axis_obj.end == 10.0
+
+
+def test_set_axis_limits_falls_back_to_lt_exec_when_attr_api_raises() -> None:
+    """When ``layer.axis()`` itself raises, the fallback runs on ``op.lt_exec``.
+
+    The fallback uses the module-level :func:`op.lt_exec` rather than
+    ``layer.lt_exec`` because originpro's Python bindings reliably expose
+    ``lt_exec`` at the module level but not consistently on per-layer
+    proxies. :func:`op.lt_exec` targets the currently-active graph, which
+    is the one :func:`_new_graph_from_template` just created.
+    """
+    from echemplot.origin._plots import _set_axis_limits
+
+    layer = MagicMock()
+    layer.axis.side_effect = RuntimeError("no axis() on this layer build")
+    op = MagicMock()
+    _set_axis_limits(layer, "y", (1.0, 5.0), op=op)
+    op.lt_exec.assert_called_once()
+    cmd = op.lt_exec.call_args.args[0]
+    assert cmd.startswith("y.from=1.0")
+    assert "y.to=5.0" in cmd
+    # ``layer.lt_exec`` must NOT be called — that was the old contract.
+    layer.lt_exec.assert_not_called()
+
+
+def test_set_axis_limits_falls_back_when_readback_disagrees() -> None:
+    """Silent no-op detection: if ``ax.begin`` readback != ``lo`` then fall back.
+
+    Covers the case where ``layer.axis()`` returns an object that
+    accepts attribute writes (plain Python objects always do) but
+    doesn't actually propagate them to Origin — the graph would render
+    with template defaults and no exception would surface. A round-trip
+    read guards against that.
+    """
+    from echemplot.origin._plots import _set_axis_limits
+
+    # Custom axis proxy: accepts writes but returns stale readbacks.
+    class _StaleAxis:
+        def __init__(self) -> None:
+            self.begin = 999.0
+            self.end = 999.0
+
+        def __setattr__(self, name: str, value: object) -> None:
+            # Accept the write but don't actually update (simulates a
+            # proxy whose setter doesn't wire through to Origin).
+            if not hasattr(self, name):
+                # Allow the initial __init__ writes.
+                object.__setattr__(self, name, value)
+
+    stale_axis = _StaleAxis()
+    layer = MagicMock()
+    layer.axis.return_value = stale_axis
+    op = MagicMock()
+    _set_axis_limits(layer, "x", (0.0, 10.0), op=op)
+    # Round-trip failed (begin/end still 999.0) → fallback fires.
+    op.lt_exec.assert_called_once()
+    cmd = op.lt_exec.call_args.args[0]
+    assert cmd.startswith("x.from=0.0")
+    assert "x.to=10.0" in cmd
+
+
+def test_set_axis_limits_no_fallback_when_op_is_none() -> None:
+    """Without an ``op`` handle the fallback is suppressed, not crashed.
+
+    Preserves the pre-#67 call-site ergonomics: unit tests that call
+    :func:`_set_axis_limits` directly without plumbing ``op`` through
+    must not raise when the attribute path is unreliable.
+    """
+    from echemplot.origin._plots import _set_axis_limits
+
+    layer = MagicMock()
+    layer.axis.side_effect = RuntimeError("no axis() on this layer build")
+    # Must not raise despite no fallback being available.
+    _set_axis_limits(layer, "y", (1.0, 5.0))
+    layer.lt_exec.assert_not_called()
+
+
+def test_create_cell_plots_applies_ranges_to_every_layer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When ``ranges`` is passed, each layer receives begin/end writes per axis.
+
+    Calls ``create_cell_plots`` directly with a non-degenerate
+    ``_GraphRanges`` so every axis triggers an ``axis()`` setter — the
+    single-cycle ``_linear_cell`` would otherwise collapse cycle ranges
+    to ``lo == hi`` and short-circuit :func:`_set_axis_limits`.
+    """
+    import echemplot.origin._plots as plots_mod
+    from echemplot.origin._plots import _GraphRanges, create_cell_plots
+
+    # Make graph[0] and graph[1] share the same inner layer mock so
+    # axis() call history is observable in one place.
+    created_graphs: list[MagicMock] = []
+
+    def _fake_new_graph(*_args: Any, **_kwargs: Any) -> MagicMock:
+        g = MagicMock()
+        created_graphs.append(g)
+        return g
+
+    monkeypatch.setattr(plots_mod, "_new_graph_from_template", _fake_new_graph)
+
+    cell = _linear_cell("A")
+    sheets = {"chdis": MagicMock(), "cycle": MagicMock(), "dqdv": MagicMock()}
+    ranges = _GraphRanges(
+        chdis_x=(0.0, 1000.0),
+        chdis_y=(3.0, 4.2),
+        cycle_x=(1.0, 5.0),
+        cycle_left_y=(900.0, 1000.0),
+        cycle_right_y=(95.0, 99.0),
+        dqdv_x=(3.0, 4.2),
+        dqdv_y=(-10.0, 10.0),
+    )
+    create_cell_plots(MagicMock(), cell, sheets, ranges=ranges)
+
+    chdis_graph, cycle_graph, dqdv_graph = created_graphs
+
+    # chdis: one layer, two axis() calls (x + y).
+    chdis_axes = [c.args[0] for c in chdis_graph.__getitem__.return_value.axis.call_args_list]
+    assert chdis_axes == ["x", "y"], chdis_axes
+
+    # cycle: two layers but MagicMock collapses graph[0] / graph[1]
+    # into the same return value, so we see 4 axis() calls in order.
+    cycle_axes = [c.args[0] for c in cycle_graph.__getitem__.return_value.axis.call_args_list]
+    assert cycle_axes == ["x", "y", "x", "y"], cycle_axes
+
+    # dqdv: one layer, two axis() calls.
+    dqdv_axes = [c.args[0] for c in dqdv_graph.__getitem__.return_value.axis.call_args_list]
+    assert dqdv_axes == ["x", "y"], dqdv_axes
+
+
+def test_comparison_plots_share_the_per_cell_ranges(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Comparison graphs must receive the same ``(lo, hi)`` as per-cell graphs."""
+    _stub_templates(monkeypatch, tmp_path)
+    _, _, graph_objs = _install_tracking_originpro(monkeypatch)
+    cell_a = _linear_cell("A")
+    cell_b = _linear_cell("B", q_ch=800.0, q_dis=760.0)
+
+    from echemplot.origin import push_to_origin
+    from echemplot.origin._plots import compute_global_ranges
+
+    push_to_origin([cell_a, cell_b], stat_cycles=(1,))
+
+    # Order: per-cell A (3), per-cell B (3), comparison (3) = 9 graphs.
+    assert len(graph_objs) == 9
+
+    expected = compute_global_ranges([cell_a, cell_b])
+
+    # Per-cell A chdis graph (index 0) and comparison chdis graph
+    # (index 6) should both have begin/end set to the shared range.
+    per_cell_chdis_axis = graph_objs[0].__getitem__.return_value.axis
+    comparison_chdis_axis = graph_objs[6].__getitem__.return_value.axis
+
+    # Both must have been called with "x" and "y" at least once.
+    per_cell_axes = {c.args[0] for c in per_cell_chdis_axis.call_args_list}
+    comparison_axes = {c.args[0] for c in comparison_chdis_axis.call_args_list}
+    assert per_cell_axes == {"x", "y"}
+    assert comparison_axes == {"x", "y"}
+
+    # Same axis object is returned by MagicMock for every axis() call,
+    # so the last begin/end written wins. Assert on that final value
+    # which is the comparison graph's y-range write — matching the
+    # global chdis_y range.
+    assert expected.chdis_y is not None
+    final_begin = comparison_chdis_axis.return_value.begin
+    final_end = comparison_chdis_axis.return_value.end
+    assert final_begin == expected.chdis_y[0]
+    assert final_end == expected.chdis_y[1]
+
+
+def test_ranges_not_applied_when_dataframes_yield_no_finite_values(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """All-None ranges → no axis() or lt_exec() calls on any layer."""
+    _stub_templates(monkeypatch, tmp_path)
+    _install_mock_originpro(monkeypatch)
+
+    from echemplot.origin._plots import _GraphRanges, create_cell_plots
+
+    layer = MagicMock()
+    # Make graph[0] and graph[1] both return the same layer mock.
+    graph = MagicMock()
+    graph.__getitem__.return_value = layer
+
+    # Patch _new_graph_from_template to return our tracked graph every
+    # call, avoiding any template-file resolution concerns here.
+    import echemplot.origin._plots as plots_mod
+
+    monkeypatch.setattr(plots_mod, "_new_graph_from_template", lambda *a, **kw: graph)
+
+    empty_ranges = _GraphRanges(
+        chdis_x=None,
+        chdis_y=None,
+        cycle_x=None,
+        cycle_left_y=None,
+        cycle_right_y=None,
+        dqdv_x=None,
+        dqdv_y=None,
+    )
+
+    cell = _linear_cell("A")
+    sheets = {
+        "chdis": MagicMock(),
+        "cycle": MagicMock(),
+        "dqdv": MagicMock(),
+    }
+    create_cell_plots(MagicMock(), cell, sheets, ranges=empty_ranges)
+
+    layer.axis.assert_not_called()
+    layer.lt_exec.assert_not_called()

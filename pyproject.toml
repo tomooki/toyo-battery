@@ -34,7 +34,7 @@ dependencies = [
 [project.optional-dependencies]
 plot = ["matplotlib>=3.7"]
 plotly = ["plotly>=5.18", "kaleido>=0.2.1"]
-gui = ["matplotlib>=3.7"]
+gui = ["matplotlib>=3.7", "tkinterdnd2>=0.3"]
 cli = ["typer>=0.12", "rich>=13"]
 origin = ["matplotlib>=3.7"]
 all = [
@@ -43,6 +43,7 @@ all = [
     "kaleido>=0.2.1",
     "typer>=0.12",
     "rich>=13",
+    "tkinterdnd2>=0.3",
 ]
 
 [project.scripts]
@@ -102,7 +103,7 @@ files = ["src/echemplot"]
 plugins = []
 
 [[tool.mypy.overrides]]
-module = ["originpro.*", "scipy.*", "matplotlib.*", "plotly.*", "kaleido.*", "typer.*", "rich.*"]
+module = ["originpro.*", "scipy.*", "matplotlib.*", "plotly.*", "kaleido.*", "typer.*", "rich.*", "tkinterdnd2"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

@@ -365,6 +365,9 @@ def test_app_origin_mode_disables_ineffective_widgets() -> None:
         root.destroy()
 
 
+# ---- folder selection -----------------------------------------------------
+
+
 def test_app_default_mode_keeps_widgets_enabled() -> None:
     """Regression guard: the standalone (default) GUI must not acquire
     disabled widgets from the origin_mode plumbing.
@@ -394,3 +397,35 @@ def test_app_default_mode_keeps_widgets_enabled() -> None:
             assert str(widget["state"]) != "disabled"
     finally:
         root.destroy()
+def test_add_dir_deduplicates_paths(tmp_path: Path) -> None:
+    """``_add_dir`` is the single path through which both Add-button and
+    drag-and-drop reach the state list; adding the same directory twice
+    must leave exactly one entry so Remove-selected / Run stays
+    unambiguous.
+
+    Exercised without a live Tk — we stub the Listbox ``insert`` call
+    since we only care about the ``self._dirs`` invariant and asserting
+    ``insert`` is not called on the duplicate attempt.
+    """
+    import echemplot.gui.tk_app as tk_app
+
+    class _FakeListbox:
+        def __init__(self) -> None:
+            self.inserts: list[str] = []
+
+        def insert(self, _where: object, value: str) -> None:
+            self.inserts.append(value)
+
+    app = tk_app._App.__new__(tk_app._App)
+    app._dirs = []  # type: ignore[attr-defined]
+    app._dirs_list = _FakeListbox()  # type: ignore[attr-defined]
+
+    d = tmp_path / "cell_a"
+    d.mkdir()
+
+    app._add_dir(d)
+    app._add_dir(d)  # duplicate — should be ignored
+    app._add_dir(tmp_path / "cell_b")  # different path — counted even though missing
+
+    assert app._dirs == [d, tmp_path / "cell_b"]
+    assert app._dirs_list.inserts == [str(d), str(tmp_path / "cell_b")]  # type: ignore[attr-defined]
