@@ -30,6 +30,8 @@ from toyo_battery.origin._plots import create_cell_plots, create_comparison_plot
 from toyo_battery.origin._worksheets import write_cell_sheets, write_stat_table
 
 if TYPE_CHECKING:
+    from matplotlib.figure import Figure
+
     from toyo_battery.core.cell import Cell
 
 
@@ -151,11 +153,21 @@ def launch_gui(
     _require_originpro()
     # Imported lazily so this module stays importable on hosts without
     # Tk / matplotlib (the standalone ``push_to_origin`` path needs
-    # neither).
+    # neither). ``Figure`` is annotation-only; the runtime ``plt.close``
+    # call below resolves it via ``matplotlib.pyplot``.
     from toyo_battery.gui import launch_gui as _launch_tk_gui
 
-    def _push(cells: Sequence[Cell], _figures: Sequence[object]) -> None:
+    def _push(cells: Sequence[Cell], figures: Sequence[Figure]) -> None:
         push_to_origin(cells, project_path=project_path, stat_cycles=stat_cycles)
+        # Close the figures the controller built. The Origin path
+        # bypasses ``_show_figure`` (which would otherwise own the close
+        # via ``WM_DELETE_WINDOW``), so without an explicit close a long
+        # session of repeated Run clicks accumulates figures in pyplot's
+        # global registry and eventually trips ``max_open_warning``.
+        import matplotlib.pyplot as plt
+
+        for fig in figures:
+            plt.close(fig)
 
     _launch_tk_gui(on_complete=_push)
 

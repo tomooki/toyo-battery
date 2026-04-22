@@ -124,6 +124,10 @@ the current Origin project with per-cell worksheets, template graphs, and a
 stat sheet. It imports `originpro` lazily, so the submodule is importable
 outside Origin (`push_to_origin` itself raises there).
 
+To run the same Tk GUI **outside** Origin (matplotlib `Toplevel` previews,
+no Origin write-back), install the `[gui]` extra and call
+`from toyo_battery.gui import launch_gui; launch_gui()` instead.
+
 See [docs/ORIGIN_SETUP.md](./docs/ORIGIN_SETUP.md) for the full workflow.
 
 ## License

@@ -18,18 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cycle_efficiency`, `dqdv`) inside the wheel so `push_to_origin` works
   out of the box from a fresh `pip install`. `TOYO_ORIGIN_TEMPLATE_DIR`
   remains as an override path.
-- `toyo_battery.gui._controller.RunResult` dataclass exposing both the
-  loaded `Cell` instances and the generated figures from `run()`, so the
-  Origin launcher can hand cells straight to `push_to_origin` without
-  re-loading from disk.
+- Internal `toyo_battery.gui._controller.RunResult` dataclass exposing
+  both the loaded `Cell` instances and the generated figures from
+  `run()`, so the Origin launcher can hand cells straight to
+  `push_to_origin` without re-loading from disk. Private to the package
+  — there is no supported public import path.
 
 ### Changed
 - Renamed internal `toyo_battery.gui.main` → `launch_gui`. The CLI entry
   `python -m toyo_battery.gui` is unaffected.
 - `toyo_battery.gui._controller.run` now returns `RunResult(cells, figures)`
   instead of a bare list of figures. The Tk view (`tk_app.py`) is the only
-  in-tree caller and has been updated; downstream code should switch to
-  `result.figures`.
+  in-tree caller and has been updated; the module is private (leading
+  underscore) so no external code is expected to depend on it.
 - `[origin]` extra now declares `matplotlib>=3.7` so a single
   `pip install toyo-battery[origin]` is enough to run `launch_gui` from
   inside Origin (previously required adding `[gui]` separately).
