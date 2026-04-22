@@ -49,6 +49,10 @@ subprocess.check_call([sys.executable, "-m", "pip", "install", "toyo-battery"])
 The `toyo_battery.origin` submodule uses `originpro` (shipped with Origin)
 and is only importable inside Origin's Python environment.
 
+With the `[gui]` extra installed, the Tk GUI can also be launched from
+Origin's Python Console via `from toyo_battery.gui import launch_gui;
+launch_gui()` — see [docs/ORIGIN_SETUP.md](./docs/ORIGIN_SETUP.md) for caveats.
+
 ## Quick start
 
 ```python

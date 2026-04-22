@@ -315,10 +315,15 @@ def test_tk_app_module_importable_without_display() -> None:
     """
     import toyo_battery.gui.tk_app as tk_app
 
-    assert callable(tk_app.main)
+    assert callable(tk_app.launch_gui)
 
 
-def test_gui_package_reexports_main() -> None:
+def test_gui_package_reexports_launch_gui() -> None:
+    """``launch_gui`` is the public entry point — callable from CLI
+    (``python -m toyo_battery.gui``) and from host Python processes such
+    as Origin's embedded console (``from toyo_battery.gui import
+    launch_gui``). Guarding the re-export keeps that import path stable.
+    """
     import toyo_battery.gui as gui
 
-    assert callable(gui.main)
+    assert callable(gui.launch_gui)
