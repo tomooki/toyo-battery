@@ -30,13 +30,6 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import TYPE_CHECKING
 
-import matplotlib
-
-# Force a Tk-compatible backend before pyplot is imported anywhere else.
-# Without this, on some headless setups matplotlib picks a non-Tk backend
-# and ``FigureCanvasTkAgg`` fails at draw time.
-matplotlib.use("TkAgg")
-
 from matplotlib.backends.backend_tkagg import (  # type: ignore[attr-defined]
     FigureCanvasTkAgg,
     NavigationToolbar2Tk,
@@ -301,7 +294,17 @@ class _App:
 
 
 def main() -> None:
-    """Entry point for ``python -m toyo_battery.gui.tk_app``."""
+    """Entry point for ``python -m toyo_battery.gui.tk_app``.
+
+    Switches matplotlib to the TkAgg backend at call time (not import
+    time): a module-level ``matplotlib.use("TkAgg")`` would crash
+    headless test collection on Linux CI runners that have no Tk
+    toolkit, even though the test merely imports a sibling controller
+    module that doesn't need matplotlib at all.
+    """
+    import matplotlib
+
+    matplotlib.use("TkAgg")
     root = tk.Tk()
     _App(root)
     root.mainloop()
