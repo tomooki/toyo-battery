@@ -39,6 +39,7 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 # Origin's worksheet-name length limit. Hard-coded here rather than
@@ -84,10 +85,51 @@ def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
         "_".join(str(lvl) for lvl in tup if str(lvl) != "") for tup in df.columns.to_flat_index()
     ]
     out = df.copy()
-    out.columns = pd.Index(flat_names)
+    # ``dtype=object`` pins the Index to numpy-compatible object dtype
+    # instead of pandas' ``StringDtype``. See :func:`_coerce_for_originpro`
+    # for why ``StringDtype`` breaks ``originpro.from_df``.
+    out.columns = pd.Index(flat_names, dtype=object)
     # Explicit DataFrame wrap pins the return type against pandas-stubs
     # occasionally inferring ``.copy`` as ``Any``. Matches the idiom used
     # in :mod:`echemplot.core.stats`.
+    return pd.DataFrame(out)
+
+
+def _coerce_for_originpro(df: pd.DataFrame) -> pd.DataFrame:
+    """Coerce pandas extension dtypes to numpy-compatible dtypes for ``from_df``.
+
+    ``originpro.worksheet.from_df`` dispatches per-column storage via
+    ``series.dtype.char`` (and also touches ``df.columns.dtype``). Pandas
+    extension dtypes — most commonly ``StringDtype`` when a user has
+    ``pd.options.future.infer_string = True`` set, or when Origin's
+    embedded Python ships a pandas build that defaults it on — do not
+    expose ``.char`` and raise ``AttributeError: 'StringDtype' object has
+    no attribute 'char'`` (issue #75).
+
+    The helper:
+
+    * Rebuilds the column ``Index`` with ``dtype=object`` if it isn't
+      already a numpy dtype.
+    * Converts any column whose dtype is not a numpy dtype to ``object``
+      (string-like extension arrays) — preserving values while giving
+      originpro a ``.char`` to read.
+
+    No-op when every dtype is already numpy-native, so the helper is
+    cheap on the numeric-only cell sheets that dominate the push path.
+    """
+    new_columns = None
+    if not isinstance(df.columns.dtype, np.dtype):
+        new_columns = pd.Index(list(df.columns), dtype=object)
+
+    conversions: dict[Any, str] = {
+        name: "object" for name, dt in zip(df.columns, df.dtypes) if not isinstance(dt, np.dtype)
+    }
+    if not conversions and new_columns is None:
+        return df
+
+    out = df.astype(conversions) if conversions else df.copy()
+    if new_columns is not None:
+        out.columns = new_columns
     return pd.DataFrame(out)
 
 
@@ -114,7 +156,7 @@ def _write_sheet(
     which is never plotted).
     """
     safe_name = _sanitize_sheet_name(sheet_name)
-    flat = _flatten_columns(df)
+    flat = _coerce_for_originpro(_flatten_columns(df))
     wks = op.new_sheet(type="w", lname=safe_name)
     wks.from_df(flat)
     # ``None`` = caller opted out (e.g. ``stat_table``). Empty string =
