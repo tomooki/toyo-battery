@@ -119,8 +119,9 @@ def get_chdis_df(df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.Data
     pieces: dict[tuple[int, str], pd.DataFrame] = {}
     for (cycle_val, state_val), g in working.groupby([cycle_col, state_col], sort=True):
         side = _STATE_TO_SIDE[str(state_val)]
-        # abs() so the filter works whether capacity is monotone-positive
-        # (real 連続データ) or signed (reader's raw-6-digit formula output).
+        # abs() is defensive: real TOYO data (both 連続データ and raw-6-digit
+        # paths) is already monotone non-decreasing per segment; abs() keeps
+        # the filter correct under any hand-crafted signed input.
         segment = g[[cap_col, v_col]].loc[~(g[cap_col].abs().diff() < 0)].reset_index(drop=True)
         pieces[(int(cycle_val), side)] = segment
 
