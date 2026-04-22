@@ -46,11 +46,17 @@ def _require_originpro() -> object:
     return op
 
 
+_DEFAULT_SG_WINDOW = 11
+_DEFAULT_SG_POLYORDER = 2
+
+
 def push_to_origin(
     cells: Sequence[Cell],
     *,
     project_path: str | None = None,
     stat_cycles: Sequence[int] = (10, 50),
+    sg_window: int = _DEFAULT_SG_WINDOW,
+    sg_polyorder: int = _DEFAULT_SG_POLYORDER,
 ) -> None:
     """Populate the current Origin project with per-cell sheets + plots + stats.
 
@@ -74,18 +80,30 @@ def push_to_origin(
     stat_cycles
         Cycle numbers forwarded to
         :func:`echemplot.core.stats.stat_table` as ``target_cycles``.
+    sg_window, sg_polyorder
+        Savitzky-Golay parameters for the dQ/dV worksheet. At the defaults
+        (``11`` / ``2``) the cached :attr:`Cell.dqdv_df` is reused verbatim;
+        any override triggers a one-off :func:`echemplot.core.dqdv.get_dqdv_df`
+        recompute per cell so the worksheet values reflect the caller's
+        choice. ``Cell`` instances are not mutated. ``sg_window`` must be a
+        positive odd integer.
 
     Raises
     ------
     ImportError
         From :func:`_require_originpro` when ``originpro`` is not available
         (i.e. when the caller is not running inside Origin).
+    ValueError
+        If ``sg_window`` is not a positive odd integer.
     FileNotFoundError
         When a required ``.otpu`` template cannot be located under the
         package ``templates/`` directory or
         ``$ECHEMPLOT_ORIGIN_TEMPLATE_DIR``. The message names both remediation
         paths.
     """
+    if sg_window < 1 or sg_window % 2 == 0:
+        raise ValueError(f"sg_window must be a positive odd integer, got {sg_window}")
+
     op = _require_originpro()
 
     # Import inside the function so users who only ever call the helpers
@@ -93,12 +111,28 @@ def push_to_origin(
     # scipy.integrate at import time.
     from echemplot.core.stats import stat_table
 
+    # Only recompute when the caller actually wants non-default SG
+    # parameters; at the defaults the cached ``Cell.dqdv_df`` suffices and
+    # we avoid paying the scipy interp/savgol cost a second time.
+    sg_is_default = sg_window == _DEFAULT_SG_WINDOW and sg_polyorder == _DEFAULT_SG_POLYORDER
+    if not sg_is_default:
+        from echemplot.core.dqdv import get_dqdv_df
+
     if project_path is not None:
         op.open(project_path)  # type: ignore[attr-defined]
 
     per_cell_sheets: list[dict[str, object]] = []
     for cell in cells:
-        sheets = write_cell_sheets(op, cell)
+        if sg_is_default:
+            sheets = write_cell_sheets(op, cell)
+        else:
+            dqdv_df = get_dqdv_df(
+                cell.chdis_df,
+                window_length=sg_window,
+                polyorder=sg_polyorder,
+                column_lang=cell.column_lang,
+            )
+            sheets = write_cell_sheets(op, cell, dqdv_df=dqdv_df)
         create_cell_plots(op, cell, sheets)
         per_cell_sheets.append(sheets)
 
@@ -164,8 +198,18 @@ def launch_gui(
     # call below resolves it via ``matplotlib.pyplot``.
     from echemplot.gui import launch_gui as _launch_tk_gui
 
-    def _push(cells: Sequence[Cell], figures: Sequence[Figure]) -> None:
-        push_to_origin(cells, project_path=project_path, stat_cycles=stat_cycles)
+    def _push(cells: Sequence[Cell], figures: Sequence[Figure], sg_window: int) -> None:
+        # ``sg_window`` is forwarded so the dQ/dV worksheet reflects the
+        # value the user typed in the GUI. ``Cell.dqdv_df`` is cached at
+        # defaults and can't surface per-run overrides on its own (see
+        # issue #60), so ``push_to_origin`` recomputes the frame when the
+        # caller supplies a non-default window.
+        push_to_origin(
+            cells,
+            project_path=project_path,
+            stat_cycles=stat_cycles,
+            sg_window=sg_window,
+        )
         # Close the figures the controller built. The Origin path
         # bypasses ``_show_figure`` (which would otherwise own the close
         # via ``WM_DELETE_WINDOW``), so without an explicit close a long

@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 
     from echemplot.core.cell import Cell
 
-OnComplete = Callable[[Sequence["Cell"], Sequence["Figure"]], None]
+OnComplete = Callable[[Sequence["Cell"], Sequence["Figure"], int], None]
 
 _DEFAULT_CYCLES_TEXT = "1 10 50"
 _DEFAULT_SG_WINDOW_TEXT = "11"
@@ -144,7 +144,11 @@ class _App:
         # #60): ``push_to_origin`` always writes all three worksheets and
         # the full per-cell DataFrames, and the matplotlib figures the
         # controller returns are closed before their axis-range overrides
-        # can affect any visible plot.
+        # can affect any visible plot. ``SG window_length`` stays
+        # editable because the ``on_complete`` callback forwards it to
+        # :func:`echemplot.origin.push_to_origin`, which recomputes the
+        # dQ/dV DataFrame on non-default values so the user's choice
+        # actually lands in the worksheet.
         self._origin_mode = origin_mode
 
         self._build_widgets()
@@ -177,17 +181,11 @@ class _App:
         # Kept as instance attributes so ``_build_widgets`` can toggle
         # their ``state`` in origin-mode below (and so tests can assert
         # the disabled-state without reaching into grid slaves).
-        self._chk_chdis = ttk.Checkbutton(
-            kinds_frame, text="chdis", variable=self._var_chdis
-        )
+        self._chk_chdis = ttk.Checkbutton(kinds_frame, text="chdis", variable=self._var_chdis)
         self._chk_chdis.grid(row=0, column=0, sticky="w", padx=_PADX, pady=_PADY)
-        self._chk_cycle = ttk.Checkbutton(
-            kinds_frame, text="cycle", variable=self._var_cycle
-        )
+        self._chk_cycle = ttk.Checkbutton(kinds_frame, text="cycle", variable=self._var_cycle)
         self._chk_cycle.grid(row=1, column=0, sticky="w", padx=_PADX, pady=_PADY)
-        self._chk_dqdv = ttk.Checkbutton(
-            kinds_frame, text="dQ/dV", variable=self._var_dqdv
-        )
+        self._chk_dqdv = ttk.Checkbutton(kinds_frame, text="dQ/dV", variable=self._var_dqdv)
         self._chk_dqdv.grid(row=2, column=0, sticky="w", padx=_PADX, pady=_PADY)
 
         # Parameters
@@ -233,10 +231,7 @@ class _App:
         if self._origin_mode:
             note = ttk.Label(
                 self.root,
-                text=(
-                    "Origin mode: only SG window_length is applied. "
-                    "Other options are disabled."
-                ),
+                text=("Origin mode: only SG window_length is applied. Other options are disabled."),
                 foreground="#666",
                 wraplength=520,
             )
@@ -355,7 +350,13 @@ class _App:
 
         if self._on_complete is not None:
             try:
-                self._on_complete(result.cells, result.figures)
+                # ``sg_window`` is surfaced so the Origin launcher can
+                # propagate a non-default Savitzky-Golay window into the
+                # worksheet data — ``Cell.dqdv_df`` is cached at defaults
+                # and ignores per-run overrides, so without this argument
+                # the Origin-mode ``SG window_length`` field would have no
+                # effect on the pushed output. See issue #60.
+                self._on_complete(result.cells, result.figures, request.sg_window)
             except Exception as exc:
                 self._fail(f"Error in completion hook: {exc}")
                 return
