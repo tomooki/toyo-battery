@@ -301,29 +301,37 @@ def test_push_to_origin_skips_open_save_when_project_path_none(
 def test_each_per_cell_graph_binds_its_own_sheet(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Each template-backed graph must call ``add_plot`` with its sheet."""
+    """Each per-cell graph's add_plot must bind exactly its corresponding sheet."""
     mock_op = _install_mock_originpro(monkeypatch)
     _stub_templates(monkeypatch, tmp_path)
 
-    # Give ``new_sheet`` and ``new_graph`` distinct return values so the
-    # assertion can correlate sheets with graphs.
-    sheet_objs: list[Any] = []
+    sheet_objs: list[MagicMock] = []
 
     def _fake_new_sheet(**_kwargs: Any) -> MagicMock:
         s = MagicMock(name=f"sheet_{len(sheet_objs)}")
         sheet_objs.append(s)
         return s
 
+    graph_objs: list[MagicMock] = []
+
+    def _fake_new_graph(**_kwargs: Any) -> MagicMock:
+        g = MagicMock(name=f"graph_{len(graph_objs)}")
+        graph_objs.append(g)
+        return g
+
     mock_op.new_sheet.side_effect = _fake_new_sheet
+    mock_op.new_graph.side_effect = _fake_new_graph
+
     cell = _linear_cell("A")
 
     from toyo_battery.origin import push_to_origin
 
     push_to_origin([cell], stat_cycles=(1,))
-    # First three sheets are the per-cell ones; each must appear in the
-    # corresponding graph's add_plot call.
-    for graph_call in mock_op.new_graph.call_args_list:
-        graph = mock_op.new_graph.return_value
-        # ``graph[0].add_plot`` was called at least once.
-        assert graph.__getitem__.return_value.add_plot.called
-        del graph_call
+
+    # write_cell_sheets adds sheets in order chdis → cycle → dqdv (the
+    # stat_table sheet comes last, see push_to_origin orchestration).
+    # create_cell_plots emits graphs in the same chdis → cycle → dqdv order.
+    # So the i-th graph's first layer must add_plot the i-th sheet.
+    assert len(graph_objs) >= 3, "expected at least 3 per-cell graphs"
+    for graph, expected_sheet in zip(graph_objs, sheet_objs[:3]):
+        graph.__getitem__.return_value.add_plot.assert_called_once_with(expected_sheet)
