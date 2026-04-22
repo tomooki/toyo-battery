@@ -175,8 +175,9 @@ def test_cell_chdis_df_from_all_layouts(make_cell_dir: Callable[..., Path], layo
 
     Each fixture writes exactly 2 charge rows + 1 rest + 2 discharge rows (plus 1
     extra leading/trailing row in some variants). The reversal filter runs on
-    ``|電気量|`` so the signed-capacity output of the raw-6-digit and
-    renzoku-without-precomputed-capacity paths is preserved, not silently dropped.
+    ``|電気量|`` as a defensive measure: real TOYO data (all three paths) is
+    already monotone non-decreasing per segment, so no rows are spuriously
+    dropped, and any hand-crafted signed input would still segment correctly.
     """
     cell = Cell.from_dir(make_cell_dir(layout))
     out = cell.chdis_df
