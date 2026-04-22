@@ -326,12 +326,17 @@ def test_push_to_origin_skips_open_save_when_project_path_none(
 # ----------------------------------------------------------------------
 
 
-def test_each_per_cell_graph_binds_its_own_sheet(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """Each per-cell graph's add_plot must bind exactly its corresponding sheet."""
+def _install_tracking_originpro(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[MagicMock, list[MagicMock], list[MagicMock]]:
+    """Install a mock originpro that returns a fresh MagicMock per sheet/graph.
+
+    Returning distinct mocks (instead of the default single shared
+    ``return_value``) lets tests correlate individual sheet objects with
+    the ``add_plot`` calls bound to them. Worksheet mocks also get a
+    ``cols_axis`` spec so assertions on column designation stay honest.
+    """
     mock_op = _install_mock_originpro(monkeypatch)
-    _stub_templates(monkeypatch, tmp_path)
 
     sheet_objs: list[MagicMock] = []
 
@@ -349,17 +354,153 @@ def test_each_per_cell_graph_binds_its_own_sheet(
 
     mock_op.new_sheet.side_effect = _fake_new_sheet
     mock_op.new_graph.side_effect = _fake_new_graph
+    return mock_op, sheet_objs, graph_objs
 
+
+def test_each_per_cell_graph_binds_its_own_sheet(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Each per-cell graph's add_plot calls must reference only its own sheet."""
+    _stub_templates(monkeypatch, tmp_path)
+    _, sheet_objs, graph_objs = _install_tracking_originpro(monkeypatch)
     cell = _linear_cell("A")
 
     from toyo_battery.origin import push_to_origin
 
     push_to_origin([cell], stat_cycles=(1,))
 
-    # write_cell_sheets adds sheets in order chdis → cycle → dqdv (the
+    # write_cell_sheets creates sheets in order chdis → cycle → dqdv (the
     # stat_table sheet comes last, see push_to_origin orchestration).
     # create_cell_plots emits graphs in the same chdis → cycle → dqdv order.
-    # So the i-th graph's first layer must add_plot the i-th sheet.
     assert len(graph_objs) >= 3, "expected at least 3 per-cell graphs"
-    for graph, expected_sheet in zip(graph_objs, sheet_objs[:3]):
-        graph.__getitem__.return_value.add_plot.assert_called_once_with(expected_sheet)
+    for graph, expected_sheet in zip(graph_objs[:3], sheet_objs[:3]):
+        # MagicMock's __getitem__ returns the same inner mock regardless
+        # of index, so both graph[0] and graph[1] share call_args_list.
+        # chdis / dqdv emit multiple add_plot calls (one per cycle×side
+        # pair); cycle emits two (one per layer). Every call must point
+        # at the same sheet.
+        calls = graph.__getitem__.return_value.add_plot.call_args_list
+        assert calls, f"no add_plot calls on {graph!r}"
+        for call in calls:
+            assert call.args[0] is expected_sheet, (
+                f"add_plot bound wrong sheet on {graph!r}: {call}"
+            )
+
+
+def test_add_plot_passes_column_indices(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Every ``add_plot`` call must carry ``colx`` and ``coly`` kwargs.
+
+    Without these, Origin renders the template's axes/legend but binds
+    no data — the v0.0.2 regression that this test guards against.
+    """
+    _stub_templates(monkeypatch, tmp_path)
+    _, _, graph_objs = _install_tracking_originpro(monkeypatch)
+    cell = _linear_cell("A")
+
+    from toyo_battery.origin import push_to_origin
+
+    push_to_origin([cell], stat_cycles=(1,))
+
+    for graph in graph_objs[:3]:
+        calls = graph.__getitem__.return_value.add_plot.call_args_list
+        assert calls, f"no add_plot calls on {graph!r}"
+        for call in calls:
+            assert "colx" in call.kwargs, f"missing colx on {graph!r}: {call}"
+            assert "coly" in call.kwargs, f"missing coly on {graph!r}: {call}"
+
+
+def test_cycle_plot_binds_both_layers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """cycle_efficiency's dual-Y template has two layers — bind both.
+
+    ``graph[0]`` takes discharge capacity (col 2), ``graph[1]`` takes
+    Coulombic efficiency (col 3). Both share ``cycle`` (col 0) as X.
+    """
+    _stub_templates(monkeypatch, tmp_path)
+    _, _, graph_objs = _install_tracking_originpro(monkeypatch)
+    cell = _linear_cell("A")
+
+    from toyo_battery.origin import push_to_origin
+
+    push_to_origin([cell], stat_cycles=(1,))
+
+    # Per-cell graphs emit in order chdis → cycle → dqdv.
+    cycle_graph = graph_objs[1]
+    # MagicMock indexing history: __getitem__.call_args_list records each
+    # access. We expect both 0 and 1 to have been accessed.
+    indexed = {call.args[0] for call in cycle_graph.__getitem__.call_args_list}
+    assert 0 in indexed and 1 in indexed, f"cycle graph accessed only {indexed}"
+
+    # Two add_plot calls total on the shared inner mock: one per layer.
+    call_list = cycle_graph.__getitem__.return_value.add_plot.call_args_list
+    colys = sorted(call.kwargs["coly"] for call in call_list)
+    assert colys == [2, 3], f"expected q_dis + ce bound, got coly={colys}"
+    assert all(call.kwargs["colx"] == 0 for call in call_list), call_list
+
+
+def test_cols_axis_is_set_per_category(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Worksheets for plot-targeted categories must declare X/Y designations.
+
+    ``from_df`` leaves every column as ``"Y"``; without a ``cols_axis``
+    call the template-backed plot has no X to bind against and renders
+    empty. ``stat_table`` is never plotted so it skips the call.
+    """
+    _stub_templates(monkeypatch, tmp_path)
+    mock_op, sheet_objs, _ = _install_tracking_originpro(monkeypatch)
+    cell = _linear_cell("A")
+
+    from toyo_battery.origin import push_to_origin
+
+    push_to_origin([cell], stat_cycles=(1,))
+
+    # Sheet creation order: chdis → cycle → dqdv → stat_table.
+    chdis_sheet, cycle_sheet, dqdv_sheet, stat_sheet = sheet_objs[:4]
+
+    # chdis / dqdv: "XY" repeated — one pair per (cycle, side) column pair.
+    for sheet in (chdis_sheet, dqdv_sheet):
+        args = sheet.cols_axis.call_args
+        assert args is not None, f"cols_axis not called on {sheet!r}"
+        types = args.args[0]
+        assert set(types) <= {"X", "Y"}, types
+        assert types.startswith("XY"), types
+        assert len(types) % 2 == 0, types
+
+    # cycle: [cycle, q_ch, q_dis, ce] → "XYYY".
+    cycle_sheet.cols_axis.assert_called_once_with("XYYY")
+
+    # stat_table must NOT have a cols_axis call (never plotted).
+    assert not stat_sheet.cols_axis.called
+
+
+def test_cap_df_written_with_cycle_as_column(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """cap_df's ``cycle`` index must be surfaced as a column before from_df.
+
+    Without ``reset_index``, Origin receives only ``[q_ch, q_dis, ce]``
+    and the cycle_efficiency plot has no X source — graph window opens
+    but nothing is plotted.
+    """
+    _stub_templates(monkeypatch, tmp_path)
+    mock_op, sheet_objs, _ = _install_tracking_originpro(monkeypatch)
+    cell = _linear_cell("A")
+
+    from toyo_battery.origin import push_to_origin
+
+    push_to_origin([cell], stat_cycles=(1,))
+
+    # Second sheet created is the cycle sheet (chdis=0, cycle=1, dqdv=2).
+    cycle_sheet = sheet_objs[1]
+    from_df_call = cycle_sheet.from_df.call_args
+    assert from_df_call is not None, "from_df not called on cycle sheet"
+    written = from_df_call.args[0]
+    assert "cycle" in written.columns, (
+        f"cycle column missing from cap_df write: {list(written.columns)}"
+    )
+    # Order must match the _CYCLE_COL_* constants in _plots.py.
+    assert list(written.columns)[0] == "cycle", list(written.columns)
