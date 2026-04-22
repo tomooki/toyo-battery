@@ -2888,15 +2888,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pyasn1"
-version = "0.6.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/5c/5f/6583902b6f79b399c9c40674ac384fd9cd77805f9e6205075f828ef11fb2/pyasn1-0.6.3.tar.gz", hash = "sha256:697a8ecd6d98891189184ca1fa05d1bb00e2f84b5977c481452050549c8a72cf", size = 148685, upload-time = "2026-03-17T01:06:53.382Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/5d/a0/7d793dce3fa811fe047d6ae2431c672364b462850c6235ae306c0efd025f/pyasn1-0.6.3-py3-none-any.whl", hash = "sha256:a80184d120f0864a52a073acc6fc642847d0be408e7c7252f31390c0f4eadcde", size = 83997, upload-time = "2026-03-17T01:06:52.036Z" },
-]
-
-[[package]]
 name = "pygments"
 version = "2.20.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2926,19 +2917,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f3/91/9c6ee907786a473bf81c5f53cf703ba0957b23ab84c264080fb5a450416f/pyparsing-3.3.2.tar.gz", hash = "sha256:c777f4d763f140633dcb6d8a3eda953bf7a214dc4eff598413c070bcdc117cbc", size = 6851574, upload-time = "2026-01-21T03:57:59.36Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/10/bd/c038d7cc38edc1aa5bf91ab8068b63d4308c66c4c8bb3cbba7dfbc049f9c/pyparsing-3.3.2-py3-none-any.whl", hash = "sha256:850ba148bd908d7e2411587e247a1e4f0327839c40e2e5e6d05a007ecc69911d", size = 122781, upload-time = "2026-01-21T03:57:55.912Z" },
-]
-
-[[package]]
-name = "pysmb"
-version = "1.2.13"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pyasn1" },
-    { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/de/79/f9a2f2f3aea92ae5647079fcbf28e3969de9af7953bef10e31898fe435e2/pysmb-1.2.13.tar.gz", hash = "sha256:89d37fc4f061acecf40e6864e555898f2ecc49994ec06949edbb94b94239a808", size = 1180577, upload-time = "2025-09-20T02:51:43.603Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9c/e3/6b5aefde2965fe3b728283daf5e7a56140166d63d0af94dc82a905b80b56/pysmb-1.2.13-py3-none-any.whl", hash = "sha256:3b1a4fc4b8a02293bbb5032f8397a737e760048c7ae7869681317e5c41195fc2", size = 85170, upload-time = "2025-09-20T02:51:40.816Z" },
 ]
 
 [[package]]
@@ -3548,7 +3526,6 @@ all = [
     { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "matplotlib", version = "3.10.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "plotly" },
-    { name = "pysmb" },
     { name = "rich" },
     { name = "typer", version = "0.23.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "typer", version = "0.24.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
@@ -3569,9 +3546,6 @@ plot = [
 plotly = [
     { name = "kaleido" },
     { name = "plotly" },
-]
-smb = [
-    { name = "pysmb" },
 ]
 
 [package.dev-dependencies]
@@ -3608,15 +3582,13 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.0" },
     { name = "plotly", marker = "extra == 'all'", specifier = ">=5.18" },
     { name = "plotly", marker = "extra == 'plotly'", specifier = ">=5.18" },
-    { name = "pysmb", marker = "extra == 'all'", specifier = ">=1.2.9" },
-    { name = "pysmb", marker = "extra == 'smb'", specifier = ">=1.2.9" },
     { name = "rich", marker = "extra == 'all'", specifier = ">=13" },
     { name = "rich", marker = "extra == 'cli'", specifier = ">=13" },
     { name = "scipy", specifier = ">=1.10" },
     { name = "typer", marker = "extra == 'all'", specifier = ">=0.12" },
     { name = "typer", marker = "extra == 'cli'", specifier = ">=0.12" },
 ]
-provides-extras = ["plot", "plotly", "gui", "smb", "cli", "origin", "all"]
+provides-extras = ["plot", "plotly", "gui", "cli", "origin", "all"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -3632,18 +3604,6 @@ docs = [
     { name = "mkdocs", specifier = ">=1.6" },
     { name = "mkdocs-material", specifier = ">=9.5" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=0.26" },
-]
-
-[[package]]
-name = "tqdm"
-version = "4.67.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/09/a9/6ba95a270c6f1fbcd8dac228323f2777d886cb206987444e4bce66338dd4/tqdm-4.67.3.tar.gz", hash = "sha256:7d825f03f89244ef73f1d4ce193cb1774a8179fd96f31d7e1dcde62092b960bb", size = 169598, upload-time = "2026-02-03T17:35:53.048Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/e1/3079a9ff9b8e11b846c6ac5c8b5bfb7ff225eee721825310c91b3b50304f/tqdm-4.67.3-py3-none-any.whl", hash = "sha256:ee1e4c0e59148062281c49d80b25b67771a127c85fc9676d3be5f243206826bf", size = 78374, upload-time = "2026-02-03T17:35:50.982Z" },
 ]
 
 [[package]]
