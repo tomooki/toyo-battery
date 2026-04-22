@@ -7,13 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-04-23
+
+### Fixed
+- `push_to_origin` (and the Origin-mode GUI completion hook) no longer
+  raises `AttributeError: 'StringDtype' object has no attribute 'char'`
+  when the host pandas has `future.infer_string` enabled (or defaults
+  it on in a future pandas release). `originpro.worksheet.from_df`
+  dispatches per-column storage via `.dtype.char`, which pandas
+  extension dtypes don't expose; `echemplot.origin._worksheets` now
+  pins the flattened column `Index` to `dtype=object` and applies a
+  `_coerce_for_originpro` preprocessing step that rebuilds any
+  extension-dtype column Index as numpy-object and converts string-like
+  extension columns to object — closing both the `_flatten_columns`
+  Index path and the `stat_table.reset_index()` `cell` column path.
+  ([#75], [#80])
+
 ### Changed
 - `echemplot.origin.launch_gui` now closes the Tk window automatically
   after a successful Run. The launcher's `mainloop()` runs inside the
   Origin Python Console, so previously the user had to click the window
   close button to release the Console; the one-shot batch UX now simply
   ends when the push completes. Error dialogs still keep the window open
-  so the inputs can be corrected and re-Run.
+  so the inputs can be corrected and re-Run. ([#79])
 
 ## [0.1.3] - 2026-04-23
 
@@ -152,7 +168,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-alpha.** Public API is unstable and may change without deprecation in
   0.0.x releases.
 
-[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/tomooki/toyo-battery/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/tomooki/toyo-battery/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/tomooki/toyo-battery/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/tomooki/toyo-battery/compare/v0.1.0...v0.1.1
@@ -163,6 +180,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#63]: https://github.com/tomooki/toyo-battery/issues/63
 [#69]: https://github.com/tomooki/toyo-battery/pull/69
 [#73]: https://github.com/tomooki/toyo-battery/pull/73
+[#75]: https://github.com/tomooki/toyo-battery/issues/75
+[#79]: https://github.com/tomooki/toyo-battery/pull/79
+[#80]: https://github.com/tomooki/toyo-battery/pull/80
 [0.0.3]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/tomooki/toyo-battery/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/tomooki/toyo-battery/releases/tag/v0.0.1
