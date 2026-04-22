@@ -7,37 +7,98 @@ cycle capacity, Coulombic efficiency, dQ/dV curves, and summary statistics.
 Pure Python, installable from PyPI — including into OriginLab's embedded
 Python.
 
-> Status: **0.0.1 — pre-alpha scaffold.** Core logic is being ported from the
-> private `TOYO_origin` scripts. Public API is unstable.
+- PyPI: <https://pypi.org/project/toyo-battery/>
+- Docs: <https://tomooki.github.io/toyo-battery/>
+- Changelog: [CHANGELOG.md](./CHANGELOG.md)
+
+> Status: **pre-alpha (0.0.x)**. Public API is unstable and may change
+> without deprecation until 0.1.0.
 
 ## Installation
 
 ```bash
-# Core only
+# Core library only (numpy, pandas, scipy)
 pip install toyo-battery
 
-# With Matplotlib plotting
-pip install "toyo-battery[plot]"
+# Pick one or more extras:
+pip install "toyo-battery[plot]"    # Matplotlib plotting
+pip install "toyo-battery[plotly]"  # Plotly + Kaleido (static image export)
+pip install "toyo-battery[cli]"     # toyo-battery CLI (typer + rich)
+pip install "toyo-battery[gui]"     # Tk desktop app (matplotlib)
 
-# Everything except Origin
+# Everything non-Origin in one shot
 pip install "toyo-battery[all]"
 ```
 
-### CLI
+The `[origin]` extra has no runtime deps — the `toyo_battery.origin` submodule
+imports `originpro` lazily, so it only works inside Origin's embedded Python
+(see below).
 
-With the `[cli]` extra (`pip install "toyo-battery[cli]"`) the `toyo-battery`
-command offers batch operations over one or more cell directories:
+## Quick start
 
-```bash
-toyo-battery process cell_A cell_B --out ./csvs        # chdis/cap/dqdv CSVs
-toyo-battery plot    cell_A cell_B --out ./pngs        # chdis/cycle/dqdv PNGs
-toyo-battery stats   cell_A cell_B --cycles 10,50 --out stats.csv
+```python
+from toyo_battery import Cell
+
+cell = Cell.from_dir("path/to/cell_dir")
+
+cell.chdis_df.to_csv("chdis.csv")   # charge/discharge V-Q curves per cycle
+cell.cap_df.to_csv("cycle.csv")     # per-cycle capacity + Coulombic efficiency
+cell.dqdv_df.to_csv("dqdv.csv")     # dQ/dV per cycle
 ```
 
-### Installing into Origin's embedded Python
+`Cell.from_dir()` auto-detects three TOYO layouts: `連続データ.csv` (native
+export), `連続データ_py.csv` (pre-normalized), or 6-digit raw files with a
+`*.PTN` pattern file. Mass is read from the PTN file unless you pass
+`mass=...` (grams).
 
-Open Origin, go to **Connectivity → Python Packages**, then in the Origin
-Python console:
+## CLI
+
+Install with `pip install "toyo-battery[cli]"`. All subcommands accept one or
+more cell directories plus the shared options `--mass`, `--encoding`,
+`--column-lang`.
+
+```bash
+# {name}_chdis.csv / {name}_cap.csv / {name}_dqdv.csv per cell
+toyo-battery process cell_A cell_B --out ./csvs
+
+# chdis / cycle / dqdv PNGs (one figure per kind, one Axes per cell)
+toyo-battery plot cell_A cell_B --out ./pngs \
+    --kinds chdis,cycle,dqdv --cycles 1,10,50
+
+# Single stat_table CSV spanning all cells at the given target cycles
+toyo-battery stats cell_A cell_B --cycles 10,50 --out stats.csv
+```
+
+## GUI
+
+Install with `pip install "toyo-battery[gui]"` and launch:
+
+```bash
+python -m toyo_battery.gui
+```
+
+Tk app for interactive directory selection, plot-kind toggles, per-axis
+ranges, and Savitzky–Golay window tuning for dQ/dV.
+
+## Plotting from Python
+
+Matplotlib and Plotly backends expose the same three functions — pick by
+import path:
+
+```python
+from toyo_battery import Cell
+from toyo_battery.plotting.matplotlib_backend import plot_chdis, plot_cycle, plot_dqdv
+# or: from toyo_battery.plotting.plotly_backend import plot_chdis, plot_cycle, plot_dqdv
+
+cells = [Cell.from_dir(p) for p in ("cell_A", "cell_B")]
+fig = plot_cycle(cells)
+fig.savefig("cycle.png", dpi=150, bbox_inches="tight")  # matplotlib
+# fig.write_image("cycle.png")                          # plotly
+```
+
+## Installing into Origin's embedded Python
+
+Open Origin, then in the Origin Python console:
 
 ```python
 import subprocess
@@ -46,17 +107,12 @@ import sys
 subprocess.check_call([sys.executable, "-m", "pip", "install", "toyo-battery"])
 ```
 
-The `toyo_battery.origin` submodule uses `originpro` (shipped with Origin)
-and is only importable inside Origin's Python environment.
+The `toyo_battery.origin` submodule exposes `push_to_origin(cells, ...)`,
+which populates the current Origin project with per-cell worksheets, plots,
+and a stat sheet. It imports `originpro` lazily, so the submodule is
+importable outside Origin (`push_to_origin` itself will raise there).
 
-## Quick start
-
-```python
-from toyo_battery import Cell
-
-cell = Cell.from_dir("path/to/cell_dir")
-cell.cap_df.to_csv("cycle.csv")
-```
+See [docs/ORIGIN_SETUP.md](./docs/ORIGIN_SETUP.md) for the full workflow.
 
 ## License
 
