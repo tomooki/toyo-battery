@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "echemplot"
-version = "0.1.3"
+version = "0.1.4"
 description = "OSS Python toolkit for TOYO battery cycler data (charge/discharge, dQ/dV, cycle stats). Installable from PyPI into Origin's embedded Python."
 readme = "README.md"
 license = { text = "MIT" }
