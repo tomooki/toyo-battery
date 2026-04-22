@@ -550,7 +550,12 @@ def test_compute_global_ranges_extracts_per_axis_min_max() -> None:
         {"cycle": [1, 2], "q_ch": [1000.0, 990.0], "q_dis": [990.0, 980.0], "ce": [99.0, 98.9]}
     ).set_index("cycle")
     cap_b = pd.DataFrame(
-        {"cycle": [1, 2, 3], "q_ch": [800.0, 790.0, 780.0], "q_dis": [760.0, 755.0, 750.0], "ce": [95.0, 95.5, 96.1]}
+        {
+            "cycle": [1, 2, 3],
+            "q_ch": [800.0, 790.0, 780.0],
+            "q_dis": [760.0, 755.0, 750.0],
+            "ce": [95.0, 95.5, 96.1],
+        }
     ).set_index("cycle")
 
     # dqdv: even cols = voltage (x), odd = dQ/dV (y).
@@ -599,7 +604,12 @@ def test_compute_global_ranges_nan_only_yields_none() -> None:
 
     nan_df = pd.DataFrame({"a": [np.nan, np.nan], "b": [np.nan, np.nan]})
     cap_nan = pd.DataFrame(
-        {"cycle": [1, 2], "q_ch": [np.nan, np.nan], "q_dis": [np.nan, np.nan], "ce": [np.nan, np.nan]}
+        {
+            "cycle": [1, 2],
+            "q_ch": [np.nan, np.nan],
+            "q_dis": [np.nan, np.nan],
+            "ce": [np.nan, np.nan],
+        }
     ).set_index("cycle")
 
     cell = _fake_cell(chdis=nan_df, cap=cap_nan, dqdv=nan_df)
@@ -664,15 +674,78 @@ def test_set_axis_limits_sets_begin_and_end_via_attribute_api() -> None:
 
 
 def test_set_axis_limits_falls_back_to_lt_exec_when_attr_api_raises() -> None:
+    """When ``layer.axis()`` itself raises, the fallback runs on ``op.lt_exec``.
+
+    The fallback uses the module-level :func:`op.lt_exec` rather than
+    ``layer.lt_exec`` because originpro's Python bindings reliably expose
+    ``lt_exec`` at the module level but not consistently on per-layer
+    proxies. :func:`op.lt_exec` targets the currently-active graph, which
+    is the one :func:`_new_graph_from_template` just created.
+    """
     from echemplot.origin._plots import _set_axis_limits
 
     layer = MagicMock()
     layer.axis.side_effect = RuntimeError("no axis() on this layer build")
-    _set_axis_limits(layer, "y", (1.0, 5.0))
-    layer.lt_exec.assert_called_once()
-    cmd = layer.lt_exec.call_args.args[0]
+    op = MagicMock()
+    _set_axis_limits(layer, "y", (1.0, 5.0), op=op)
+    op.lt_exec.assert_called_once()
+    cmd = op.lt_exec.call_args.args[0]
     assert cmd.startswith("y.from=1.0")
     assert "y.to=5.0" in cmd
+    # ``layer.lt_exec`` must NOT be called — that was the old contract.
+    layer.lt_exec.assert_not_called()
+
+
+def test_set_axis_limits_falls_back_when_readback_disagrees() -> None:
+    """Silent no-op detection: if ``ax.begin`` readback != ``lo`` then fall back.
+
+    Covers the case where ``layer.axis()`` returns an object that
+    accepts attribute writes (plain Python objects always do) but
+    doesn't actually propagate them to Origin — the graph would render
+    with template defaults and no exception would surface. A round-trip
+    read guards against that.
+    """
+    from echemplot.origin._plots import _set_axis_limits
+
+    # Custom axis proxy: accepts writes but returns stale readbacks.
+    class _StaleAxis:
+        def __init__(self) -> None:
+            self.begin = 999.0
+            self.end = 999.0
+
+        def __setattr__(self, name: str, value: object) -> None:
+            # Accept the write but don't actually update (simulates a
+            # proxy whose setter doesn't wire through to Origin).
+            if not hasattr(self, name):
+                # Allow the initial __init__ writes.
+                object.__setattr__(self, name, value)
+
+    stale_axis = _StaleAxis()
+    layer = MagicMock()
+    layer.axis.return_value = stale_axis
+    op = MagicMock()
+    _set_axis_limits(layer, "x", (0.0, 10.0), op=op)
+    # Round-trip failed (begin/end still 999.0) → fallback fires.
+    op.lt_exec.assert_called_once()
+    cmd = op.lt_exec.call_args.args[0]
+    assert cmd.startswith("x.from=0.0")
+    assert "x.to=10.0" in cmd
+
+
+def test_set_axis_limits_no_fallback_when_op_is_none() -> None:
+    """Without an ``op`` handle the fallback is suppressed, not crashed.
+
+    Preserves the pre-#67 call-site ergonomics: unit tests that call
+    :func:`_set_axis_limits` directly without plumbing ``op`` through
+    must not raise when the attribute path is unreliable.
+    """
+    from echemplot.origin._plots import _set_axis_limits
+
+    layer = MagicMock()
+    layer.axis.side_effect = RuntimeError("no axis() on this layer build")
+    # Must not raise despite no fallback being available.
+    _set_axis_limits(layer, "y", (1.0, 5.0))
+    layer.lt_exec.assert_not_called()
 
 
 def test_create_cell_plots_applies_ranges_to_every_layer(

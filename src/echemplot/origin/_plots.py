@@ -22,9 +22,15 @@ confirm them — see issue #15):
 * Each layer exposes ``layer.axis(<"x"|"y">)`` returning an axis object
   with mutable ``begin`` and ``end`` float attributes. Setting these
   overrides the template's default scaling so per-cell and comparison
-  graphs can share a common axis range (see issue #61). When the
-  attribute-style access raises, :func:`_set_axis_limits` falls back to
-  LabTalk via ``layer.lt_exec("x.from=<lo>;x.to=<hi>;")``.
+  graphs can share a common axis range (see issue #61). The attribute
+  path is treated as "tentative": :func:`_set_axis_limits` writes the
+  values, then reads them back and — if the round-trip disagrees or
+  the attribute access raised — falls back to LabTalk via
+  ``op.lt_exec("x.from=<lo>;x.to=<hi>;")``. The module-level
+  :func:`op.lt_exec` targets the currently-active graph, which is the
+  graph we just created via :func:`op.new_graph`; it is the documented
+  scripting entry point and does not assume any per-layer attribute
+  contract.
 
 The three templates expect distinct column layouts; the bind helpers in
 this module encode the layout per category:
@@ -44,6 +50,7 @@ remediation message rather than spreading that concern across callers.
 
 from __future__ import annotations
 
+import math
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -173,33 +180,73 @@ def compute_global_ranges(cells: Sequence[Any]) -> _GraphRanges:
     )
 
 
-def _set_axis_limits(layer: Any, axis: str, limits: tuple[float, float] | None) -> None:
+def _set_axis_limits(
+    layer: Any,
+    axis: str,
+    limits: tuple[float, float] | None,
+    *,
+    op: Any | None = None,
+) -> None:
     """Apply ``(lo, hi)`` to ``layer``'s named axis. No-op when ``limits`` is ``None``.
 
-    Tries attribute-style originpro API first (``layer.axis(axis).begin``
-    and ``.end``) and falls back to LabTalk via ``layer.lt_exec`` when
-    that raises. The fallback path is exercised only in real Origin —
-    our mocks satisfy the attribute-style call so it never trips in
-    CI. Both paths need to be confirmed against real Origin; see issue
-    #15 for the tracking checklist.
+    Strategy: try the attribute-style originpro API
+    (``layer.axis(axis).begin`` / ``.end``), then **verify** by reading
+    the values back — a plain Python object silently accepts unknown
+    attribute writes, which would let a missing real-Origin contract
+    slip through as a degraded "template default scaling" graph instead
+    of a raised error. If either the set or the readback disagrees with
+    ``(lo, hi)``, fall back to LabTalk via ``op.lt_exec`` (documented
+    module-level function) against the currently-active graph, which
+    is the one the caller just created.
+
+    ``op`` is optional for backward compatibility with call sites that
+    don't thread the module through; when omitted the fallback is
+    suppressed. Callers that care about the degraded case
+    (:func:`create_cell_plots`, :func:`create_comparison_plots`) always
+    pass ``op`` explicitly.
 
     Degenerate ``lo == hi`` ranges are left alone so the template's own
     scaling picks a sensible unit-wide window rather than collapsing the
-    axis to a zero-width line.
+    axis to a zero-width line. NaN / inf are filtered upstream by
+    :func:`_safe_range`, so they never reach this helper.
+
+    Both the attribute and LabTalk paths ultimately need real-Origin
+    verification (see issue #15). The round-trip check is the best-effort
+    safety net we can run from the Python side.
     """
     if limits is None:
         return
     lo, hi = limits
     if lo == hi:
         return  # degenerate range; leave template scaling in place
+
+    attr_ok = False
     try:
         ax = layer.axis(axis)
         ax.begin = lo
         ax.end = hi
+        # Round-trip verification: if ``ax`` is a plain Python object it
+        # accepted the writes silently but the real Origin axis is
+        # untouched — the graph would render with template defaults and
+        # no error would surface. ``math.isclose`` guards against
+        # float-roundtrip noise from the originpro C bridge; the abs_tol
+        # covers near-zero ranges (e.g. dQ/dV around the baseline).
+        attr_ok = math.isclose(float(ax.begin), lo, rel_tol=1e-9, abs_tol=1e-12) and math.isclose(
+            float(ax.end), hi, rel_tol=1e-9, abs_tol=1e-12
+        )
     except Exception:  # pragma: no cover - exercised only in real Origin
-        # LabTalk fallback. ``layer.lt_exec`` selects ``layer`` implicitly.
-        cmd = "x" if axis == "x" else "y"
-        layer.lt_exec(f"{cmd}.from={lo};{cmd}.to={hi};")
+        attr_ok = False
+
+    if attr_ok:
+        return
+
+    # Fallback: LabTalk against the active graph. ``op.lt_exec`` is the
+    # documented module-level entry point; individual layer objects do
+    # not reliably expose ``lt_exec``.
+    if op is None:  # pragma: no cover - defensive; call sites always pass op
+        return
+    cmd = "x" if axis == "x" else "y"
+    op.lt_exec(f"{cmd}.from={lo};{cmd}.to={hi};")
 
 
 def _template_path(name: str) -> Path:
@@ -283,22 +330,22 @@ def create_cell_plots(
     chdis_graph = _new_graph_from_template(op, _TEMPLATE_CHDIS, f"{cell.name}_chdis_plot")
     _bind_xy_pairs(chdis_graph[0], sheets["chdis"], cell.chdis_df.shape[1])
     if ranges is not None:
-        _set_axis_limits(chdis_graph[0], "x", ranges.chdis_x)
-        _set_axis_limits(chdis_graph[0], "y", ranges.chdis_y)
+        _set_axis_limits(chdis_graph[0], "x", ranges.chdis_x, op=op)
+        _set_axis_limits(chdis_graph[0], "y", ranges.chdis_y, op=op)
 
     cycle_graph = _new_graph_from_template(op, _TEMPLATE_CYCLE, f"{cell.name}_cycle_plot")
     _bind_cycle(cycle_graph, sheets["cycle"])
     if ranges is not None:
-        _set_axis_limits(cycle_graph[0], "x", ranges.cycle_x)
-        _set_axis_limits(cycle_graph[0], "y", ranges.cycle_left_y)
-        _set_axis_limits(cycle_graph[1], "x", ranges.cycle_x)
-        _set_axis_limits(cycle_graph[1], "y", ranges.cycle_right_y)
+        _set_axis_limits(cycle_graph[0], "x", ranges.cycle_x, op=op)
+        _set_axis_limits(cycle_graph[0], "y", ranges.cycle_left_y, op=op)
+        _set_axis_limits(cycle_graph[1], "x", ranges.cycle_x, op=op)
+        _set_axis_limits(cycle_graph[1], "y", ranges.cycle_right_y, op=op)
 
     dqdv_graph = _new_graph_from_template(op, _TEMPLATE_DQDV, f"{cell.name}_dqdv_plot")
     _bind_xy_pairs(dqdv_graph[0], sheets["dqdv"], cell.dqdv_df.shape[1])
     if ranges is not None:
-        _set_axis_limits(dqdv_graph[0], "x", ranges.dqdv_x)
-        _set_axis_limits(dqdv_graph[0], "y", ranges.dqdv_y)
+        _set_axis_limits(dqdv_graph[0], "x", ranges.dqdv_x, op=op)
+        _set_axis_limits(dqdv_graph[0], "y", ranges.dqdv_y, op=op)
 
     return [chdis_graph, cycle_graph, dqdv_graph]
 
@@ -331,23 +378,23 @@ def create_comparison_plots(
     for cell, sheets in zip(cells, per_cell_sheets):
         _bind_xy_pairs(chdis_graph[0], sheets["chdis"], cell.chdis_df.shape[1])
     if ranges is not None:
-        _set_axis_limits(chdis_graph[0], "x", ranges.chdis_x)
-        _set_axis_limits(chdis_graph[0], "y", ranges.chdis_y)
+        _set_axis_limits(chdis_graph[0], "x", ranges.chdis_x, op=op)
+        _set_axis_limits(chdis_graph[0], "y", ranges.chdis_y, op=op)
 
     cycle_graph = _new_graph_from_template(op, _TEMPLATE_CYCLE, "comparison_cycle_plot")
     for _cell, sheets in zip(cells, per_cell_sheets):
         _bind_cycle(cycle_graph, sheets["cycle"])
     if ranges is not None:
-        _set_axis_limits(cycle_graph[0], "x", ranges.cycle_x)
-        _set_axis_limits(cycle_graph[0], "y", ranges.cycle_left_y)
-        _set_axis_limits(cycle_graph[1], "x", ranges.cycle_x)
-        _set_axis_limits(cycle_graph[1], "y", ranges.cycle_right_y)
+        _set_axis_limits(cycle_graph[0], "x", ranges.cycle_x, op=op)
+        _set_axis_limits(cycle_graph[0], "y", ranges.cycle_left_y, op=op)
+        _set_axis_limits(cycle_graph[1], "x", ranges.cycle_x, op=op)
+        _set_axis_limits(cycle_graph[1], "y", ranges.cycle_right_y, op=op)
 
     dqdv_graph = _new_graph_from_template(op, _TEMPLATE_DQDV, "comparison_dqdv_plot")
     for cell, sheets in zip(cells, per_cell_sheets):
         _bind_xy_pairs(dqdv_graph[0], sheets["dqdv"], cell.dqdv_df.shape[1])
     if ranges is not None:
-        _set_axis_limits(dqdv_graph[0], "x", ranges.dqdv_x)
-        _set_axis_limits(dqdv_graph[0], "y", ranges.dqdv_y)
+        _set_axis_limits(dqdv_graph[0], "x", ranges.dqdv_x, op=op)
+        _set_axis_limits(dqdv_graph[0], "y", ranges.dqdv_y, op=op)
 
     return [chdis_graph, cycle_graph, dqdv_graph]
