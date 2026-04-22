@@ -39,6 +39,7 @@ remediation message rather than spreading that concern across callers.
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -155,7 +156,7 @@ def create_cell_plots(op: Any, cell: Any, sheets: dict[str, Any]) -> list[Any]:
 
 def create_comparison_plots(
     op: Any,
-    cells: list[Any],
+    cells: Sequence[Any],
     per_cell_sheets: list[dict[str, Any]],
 ) -> list[Any]:
     """Create three overlay graphs that combine every cell's sheets.
@@ -164,6 +165,12 @@ def create_comparison_plots(
     sheet contributes its own set of ``add_plot`` calls. Graph names are
     fixed (``comparison_chdis_plot`` etc.) since there is no per-cell
     disambiguation to perform.
+
+    Per-category bind shape mirrors :func:`create_cell_plots`:
+    ``chdis`` / ``dqdv`` emit one ``add_plot`` per ``(cycle, side)``
+    column pair on ``graph[0]``; ``cycle`` emits two calls per cell, one
+    per dual-Y layer (``graph[0]`` = discharge capacity,
+    ``graph[1]`` = Coulombic efficiency).
     """
     chdis_graph = _new_graph_from_template(op, _TEMPLATE_CHDIS, "comparison_chdis_plot")
     for cell, sheets in zip(cells, per_cell_sheets):

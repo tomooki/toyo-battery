@@ -117,7 +117,10 @@ def _write_sheet(
     flat = _flatten_columns(df)
     wks = op.new_sheet(type="w", lname=safe_name)
     wks.from_df(flat)
-    if axis_types:
+    # ``None`` = caller opted out (e.g. ``stat_table``). Empty string =
+    # zero-column sheet (``_xy_pairs_axis(0)`` or ``_single_x_axis(0)``);
+    # both skip the call since there is nothing to designate.
+    if axis_types is not None and axis_types:
         wks.cols_axis(axis_types)
     return wks
 
@@ -132,6 +135,19 @@ def _xy_pairs_axis(ncols: int) -> str:
     """
     pairs, tail = divmod(ncols, 2)
     return "XY" * pairs + ("Y" if tail else "")
+
+
+def _single_x_axis(ncols: int) -> str:
+    """Return ``"X"`` followed by ``"Y"`` repeated ``ncols - 1`` times.
+
+    Used for the ``cycle`` sheet whose flattened layout is
+    ``[cycle, q_ch, q_dis, ce]`` — one leading X column and the rest Y.
+    Empty input yields ``""`` so the ``_write_sheet`` no-op guard
+    handles the zero-cycle degenerate case without a ``cols_axis`` call.
+    """
+    if ncols <= 0:
+        return ""
+    return "X" + "Y" * (ncols - 1)
 
 
 def write_cell_sheets(op: Any, cell: Any) -> dict[str, Any]:
@@ -172,12 +188,11 @@ def write_cell_sheets(op: Any, cell: Any) -> dict[str, Any]:
     # cap_df after reset_index: [cycle, q_ch, q_dis, ce] → "XYYY".
     # q_ch is kept as Y rather than dropped so the user can easily
     # re-plot it without re-running the pipeline.
-    cycle_axis = ("X" + "Y" * (cap.shape[1] - 1)) if cap.shape[1] else None
     sheets["cycle"] = _write_sheet(
         op,
         f"{cell.name}_cycle",
         cap,
-        axis_types=cycle_axis,
+        axis_types=_single_x_axis(cap.shape[1]),
     )
     sheets["dqdv"] = _write_sheet(
         op,
