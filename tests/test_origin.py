@@ -437,6 +437,31 @@ def test_cycle_plot_binds_both_layers(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert all(call.kwargs["colx"] == 0 for call in call_list), call_list
 
 
+def test_every_per_cell_graph_layer_is_rescaled(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Every template-backed layer must be rescaled after ``add_plot``.
+
+    Without an explicit ``layer.rescale()`` call, Origin keeps the
+    template's default axis range and data outside that window renders
+    clipped — the autoscale-not-working regression this test guards.
+    ``MagicMock.__getitem__`` returns the same inner mock for every
+    index, so the cycle graph's two layers share a single ``rescale``
+    counter; we assert ``>= 1`` rather than an exact count.
+    """
+    _stub_templates(monkeypatch, tmp_path)
+    _, _, graph_objs = _install_tracking_originpro(monkeypatch)
+    cell = _linear_cell("A")
+
+    from echemplot.origin import push_to_origin
+
+    push_to_origin([cell], stat_cycles=(1,))
+
+    for graph in graph_objs[:3]:
+        layer = graph.__getitem__.return_value
+        assert layer.rescale.called, f"rescale not called on layer of {graph!r}"
+
+
 def test_cols_axis_is_set_per_category(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Worksheets for plot-targeted categories must declare X/Y designations.
 

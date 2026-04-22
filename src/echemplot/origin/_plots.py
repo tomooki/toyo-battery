@@ -31,6 +31,14 @@ confirm them — see issue #15):
   graph we just created via :func:`op.new_graph`; it is the documented
   scripting entry point and does not assume any per-layer attribute
   contract.
+* Each layer exposes ``layer.rescale()``, which fits the axes to the
+  currently-bound data. The template defaults do not know the data
+  range, so without this call the graph renders with the template's
+  original scale and data outside that window is clipped. The bind
+  helpers below call ``rescale`` after their ``add_plot`` loop;
+  :func:`_set_axis_limits` (called later from the orchestrators when
+  explicit ``ranges`` are provided) subsequently overrides those
+  autoscaled values, so the issue #61 shared-axis path is unaffected.
 
 The three templates expect distinct column layouts; the bind helpers in
 this module encode the layout per category:
@@ -291,9 +299,17 @@ def _bind_xy_pairs(layer: Any, sheet: Any, ncols: int) -> None:
     ``(電圧, dqdv)`` for dqdv. Trailing odd columns — which should never
     occur given the upstream pair-producing pipeline — are skipped
     rather than bound as an orphan plot.
+
+    ``layer.rescale()`` fits the axes to the just-bound data so the
+    template's default scaling does not clip the plot. When called
+    repeatedly on the same layer from a comparison loop the call is
+    idempotent — each invocation expands the axes to cover everything
+    currently bound — so the final state is correct regardless of the
+    number of cells.
     """
     for i in range(0, ncols - 1, 2):
         layer.add_plot(sheet, colx=i, coly=i + 1)
+    layer.rescale()
 
 
 def _bind_cycle(graph: Any, sheet: Any) -> None:
@@ -301,10 +317,13 @@ def _bind_cycle(graph: Any, sheet: Any) -> None:
 
     The template has two layers: ``graph[0]`` is the left Y (discharge
     capacity), ``graph[1]`` is the right Y (Coulombic efficiency). Both
-    share ``cycle`` as X.
+    share ``cycle`` as X. Each layer is rescaled after binding so the
+    autoscale survives the template's default axis range.
     """
     graph[0].add_plot(sheet, colx=_CYCLE_COL_CYCLE, coly=_CYCLE_COL_QDIS)
     graph[1].add_plot(sheet, colx=_CYCLE_COL_CYCLE, coly=_CYCLE_COL_CE)
+    graph[0].rescale()
+    graph[1].rescale()
 
 
 def create_cell_plots(
