@@ -13,6 +13,9 @@ from typing import Callable
 
 import pandas as pd
 import pytest
+
+pytest.importorskip("typer")
+
 from typer.testing import CliRunner
 
 from toyo_battery.cli import app

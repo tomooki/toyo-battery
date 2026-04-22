@@ -102,8 +102,12 @@ files = ["src/toyo_battery"]
 plugins = []
 
 [[tool.mypy.overrides]]
-module = ["originpro.*", "scipy.*", "matplotlib.*", "plotly.*", "kaleido.*"]
+module = ["originpro.*", "scipy.*", "matplotlib.*", "plotly.*", "kaleido.*", "typer.*", "rich.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "toyo_battery.cli"
+disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
 minversion = "8.0"
