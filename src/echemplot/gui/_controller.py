@@ -98,7 +98,7 @@ class GuiRequest:
     dirs: Sequence[Path]
     kinds: frozenset[str]
     cycles: Sequence[int] = field(default_factory=tuple)
-    sg_window: int = 11
+    sg_window: int = 21
     voltage_range: tuple[float, float] | None = None
     capacity_range: tuple[float, float] | None = None
     dqdv_range: tuple[float, float] | None = None

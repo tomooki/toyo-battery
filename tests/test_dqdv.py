@@ -215,7 +215,7 @@ def test_in_memory_cell_dqdv_exercises_interpolation_path() -> None:
 
     cell = Cell(name="synthetic", mass_g=0.001, raw_df=raw)
     dqdv = cell.dqdv_df
-    # Wide V range (1.2 V) → ipnum = 120, well above window_length = 11.
+    # Wide V range (1.2 V) → ipnum = 120, well above window_length = 21.
     # Real populated rows on both sides.
     assert dqdv[(1, "ch", "dQ/dV")].notna().any()
     assert dqdv[(1, "dis", "dQ/dV")].notna().any()
@@ -273,7 +273,7 @@ def test_cell_dqdv_df_is_cached(make_cell_dir: Callable[..., Path]) -> None:
     second = cell.dqdv_df
     assert first is second
     # The synthetic renzoku fixture has a very small voltage span (0.1 V for
-    # ch, 0.2 V for dis) so ipnum=int(100*0.1)=10 < window_length=11 → both
+    # ch, 0.2 V for dis) so ipnum=int(100*0.1)=10 < window_length=21 → both
     # segments produce NaN columns by design. The shape + column layout must
     # still be correct.
     assert list(first.columns.names) == ["cycle", "side", "quantity"]

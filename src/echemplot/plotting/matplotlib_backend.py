@@ -269,7 +269,7 @@ def plot_dqdv(
     cells: Sequence[Cell],
     cycles: Sequence[int] | None = None,
     *,
-    sg_window_length: int = 11,
+    sg_window_length: int = 21,
     sg_polyorder: int = 2,
 ) -> Figure:
     """dQ/dV vs voltage, cycle 1 red / other cycles black.
@@ -291,7 +291,7 @@ def plot_dqdv(
     sg_window_length
         Savitzky-Golay ``window_length`` forwarded to
         :func:`echemplot.core.dqdv.get_dqdv_df`. When this and
-        ``sg_polyorder`` are both at their defaults (``11`` / ``2``), the
+        ``sg_polyorder`` are both at their defaults (``21`` / ``2``), the
         cached :attr:`Cell.dqdv_df` is reused; otherwise a fresh
         ``dqdv_df`` is computed per cell with the requested parameters.
         Must be a positive odd integer strictly greater than
@@ -318,7 +318,7 @@ def plot_dqdv(
     # Reuse the cached property only at the defaults; any override forces a
     # recompute via ``get_dqdv_df`` so the requested SG parameters actually
     # land in the output.
-    use_default = sg_window_length == 11 and sg_polyorder == 2
+    use_default = sg_window_length == 21 and sg_polyorder == 2
 
     for ax, cell in zip(axes, cells):
         v_name = _quantity(cell.column_lang, "voltage")

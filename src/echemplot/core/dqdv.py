@@ -111,7 +111,7 @@ def get_dqdv_df(
     chdis_df: pd.DataFrame,
     *,
     inter_num: int = 100,
-    window_length: int = 11,
+    window_length: int = 21,
     polyorder: int = 2,
     column_lang: ColumnLang = "ja",
 ) -> pd.DataFrame:
