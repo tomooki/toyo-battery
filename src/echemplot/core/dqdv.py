@@ -51,23 +51,25 @@ Rewrite notes (vs. legacy TOYO_Origin_2.01 ``plot_dQdV_curve`` L378-453):
 
 from __future__ import annotations
 
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import pandas as pd
-from numpy.typing import NDArray
 from scipy.signal import savgol_filter
 
 from echemplot.io.schema import JA_TO_EN, ColumnLang
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
+    # Per-segment result: (V-grid, dQ/dV samples), both same length.
+    _SegPair = tuple[NDArray[np.float64], NDArray[np.float64]]
 
 _JA_COLS: dict[str, str] = {
     "voltage": "電圧",
     "capacity": "電気量",
     "dqdv": "dQ/dV",
 }
-
-# Per-segment result: (V-grid, dQ/dV samples), both same length.
-_SegPair = tuple[NDArray[np.float64], NDArray[np.float64]]
 
 
 def _resolve_cols(column_lang: ColumnLang) -> dict[str, str]:

@@ -63,12 +63,13 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import pandas as pd
-from numpy.typing import NDArray
 from scipy.integrate import simpson, trapezoid
 
 from echemplot.io.schema import JA_TO_EN, ColumnLang
 
 if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
     from echemplot.core.cell import Cell
 
 _JA_COLS: dict[str, str] = {
