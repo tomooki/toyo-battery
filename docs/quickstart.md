@@ -19,7 +19,7 @@ point — it discovers the TOYO files in the directory, picks the right
 reader, resolves the active-material mass, and returns a `Cell` instance.
 
 ```python
-from toyo_battery import Cell
+from toyo_battery.core.cell import Cell
 
 cell = Cell.from_dir("path/to/cell_dir")
 print(cell.name, cell.mass_g)
