@@ -330,6 +330,75 @@ def test_gui_package_reexports_launch_gui() -> None:
     assert callable(gui.launch_gui)
 
 
+# ---- origin_mode -----------------------------------------------------------
+
+
+def test_app_origin_mode_disables_ineffective_widgets() -> None:
+    """Issue #60: in origin_mode every option that ``push_to_origin``
+    ignores must be disabled; ``SG window_length`` (which flows into the
+    dQ/dV worksheet via ``get_dqdv_df``) must remain editable.
+    """
+    import tkinter as tk
+
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        pytest.skip(f"no display available for Tk: {exc}")
+
+    try:
+        from echemplot.gui.tk_app import _App
+
+        app = _App(root, origin_mode=True)
+
+        # Disabled: the widgets whose values are discarded by push_to_origin.
+        assert str(app._chk_chdis["state"]) == "disabled"
+        assert str(app._chk_cycle["state"]) == "disabled"
+        assert str(app._chk_dqdv["state"]) == "disabled"
+        assert str(app._entry_cycles["state"]) == "disabled"
+        assert str(app._entry_vrange["state"]) == "disabled"
+        assert str(app._entry_qrange["state"]) == "disabled"
+        assert str(app._entry_drange["state"]) == "disabled"
+
+        # SG window_length stays editable — it regenerates the dQ/dV data.
+        assert str(app._entry_sg["state"]) != "disabled"
+    finally:
+        root.destroy()
+
+
+# ---- folder selection -----------------------------------------------------
+
+
+def test_app_default_mode_keeps_widgets_enabled() -> None:
+    """Regression guard: the standalone (default) GUI must not acquire
+    disabled widgets from the origin_mode plumbing.
+    """
+    import tkinter as tk
+
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        pytest.skip(f"no display available for Tk: {exc}")
+
+    try:
+        from echemplot.gui.tk_app import _App
+
+        app = _App(root)
+
+        for widget in (
+            app._chk_chdis,
+            app._chk_cycle,
+            app._chk_dqdv,
+            app._entry_cycles,
+            app._entry_sg,
+            app._entry_vrange,
+            app._entry_qrange,
+            app._entry_drange,
+        ):
+            assert str(widget["state"]) != "disabled"
+    finally:
+        root.destroy()
+
+
 def test_add_dir_deduplicates_paths(tmp_path: Path) -> None:
     """``_add_dir`` is the single path through which both Add-button and
     drag-and-drop reach the state list; adding the same directory twice

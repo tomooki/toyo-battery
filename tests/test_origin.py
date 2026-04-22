@@ -501,6 +501,110 @@ def test_cap_df_written_with_cycle_as_column(
 
 
 # ----------------------------------------------------------------------
+# Savitzky-Golay override propagation (issue #60 follow-up)
+# ----------------------------------------------------------------------
+
+
+def test_push_to_origin_non_default_sg_window_reaches_dqdv_sheet(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A non-default ``sg_window`` must change the dQ/dV worksheet content.
+
+    ``Cell.dqdv_df`` is cached at the SG defaults (window=11, polyorder=2),
+    so if :func:`push_to_origin` blindly reused that cached frame the user's
+    GUI ``SG window_length`` edit (issue #60) would silently be ignored —
+    exactly the failure mode this test guards against. Here we compare the
+    dQ/dV DataFrame handed to ``from_df`` against the cached default and
+    assert it differs when ``sg_window`` is overridden.
+    """
+    _stub_templates(monkeypatch, tmp_path)
+    _, sheet_objs, _ = _install_tracking_originpro(monkeypatch)
+    cell = _linear_cell("A")
+
+    # Cache the default-SG frame before push; push_to_origin must override
+    # with a freshly-computed frame using sg_window=5 rather than reuse this.
+    default_dqdv = cell.dqdv_df.copy()
+
+    from echemplot.origin import push_to_origin
+
+    push_to_origin([cell], stat_cycles=(1,), sg_window=5)
+
+    # sheet_objs: chdis=0, cycle=1, dqdv=2 (stat_table created last).
+    dqdv_sheet = sheet_objs[2]
+    from_df_call = dqdv_sheet.from_df.call_args
+    assert from_df_call is not None, "from_df not called on dqdv sheet"
+    written = from_df_call.args[0]
+
+    # Column structure must be preserved — only the values should differ.
+    assert written.shape == default_dqdv.shape, (
+        f"shape drift: default={default_dqdv.shape} overridden={written.shape}"
+    )
+    # Values must differ for at least one column (the SG smoothing window
+    # changed, so the derivative estimates cannot coincide everywhere).
+    import numpy as np
+
+    assert not np.allclose(
+        written.to_numpy(dtype=float),
+        default_dqdv.to_numpy(dtype=float),
+        equal_nan=True,
+    ), "dqdv sheet content identical to default-SG cached frame; override not applied"
+
+
+def test_push_to_origin_default_sg_window_writes_cached_dqdv_values(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """At the defaults, the dQ/dV sheet content matches the cached frame.
+
+    ``_write_sheet`` flattens MultiIndex columns before handing the frame to
+    ``from_df``, so object identity does not survive; we compare values
+    instead. If a future refactor accidentally starts recomputing at the
+    defaults, this test still guards against value drift.
+    """
+    _stub_templates(monkeypatch, tmp_path)
+    _, sheet_objs, _ = _install_tracking_originpro(monkeypatch)
+    cell = _linear_cell("A")
+
+    default_dqdv = cell.dqdv_df.copy()
+
+    from echemplot.origin import push_to_origin
+
+    push_to_origin([cell], stat_cycles=(1,))
+
+    dqdv_sheet = sheet_objs[2]
+    from_df_call = dqdv_sheet.from_df.call_args
+    assert from_df_call is not None
+    written = from_df_call.args[0]
+
+    import numpy as np
+
+    assert written.shape == default_dqdv.shape
+    assert np.allclose(
+        written.to_numpy(dtype=float),
+        default_dqdv.to_numpy(dtype=float),
+        equal_nan=True,
+    )
+
+
+def test_push_to_origin_rejects_even_sg_window(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Even ``sg_window`` values are invalid Savitzky-Golay inputs.
+
+    Validation lives in ``push_to_origin`` itself so an even value fails
+    before any Origin sheets are created, mirroring the controller-side
+    ``GuiRequest`` validation.
+    """
+    _install_mock_originpro(monkeypatch)
+    _stub_templates(monkeypatch, tmp_path)
+    cell = _linear_cell("A")
+
+    from echemplot.origin import push_to_origin
+
+    with pytest.raises(ValueError, match="sg_window"):
+        push_to_origin([cell], stat_cycles=(1,), sg_window=10)
+
+
+# ----------------------------------------------------------------------
 # Shared-scale autoscaling (issue #61)
 # ----------------------------------------------------------------------
 

@@ -55,7 +55,7 @@ if TYPE_CHECKING:
 
     from echemplot.core.cell import Cell
 
-OnComplete = Callable[[Sequence["Cell"], Sequence["Figure"]], None]
+OnComplete = Callable[[Sequence["Cell"], Sequence["Figure"], int], None]
 
 _DEFAULT_CYCLES_TEXT = "1 10 50"
 _DEFAULT_SG_WINDOW_TEXT = "11"
@@ -129,7 +129,13 @@ class _App:
     all inter-widget state lives on ``self``.
     """
 
-    def __init__(self, root: tk.Tk, *, on_complete: OnComplete | None = None) -> None:
+    def __init__(
+        self,
+        root: tk.Tk,
+        *,
+        on_complete: OnComplete | None = None,
+        origin_mode: bool = False,
+    ) -> None:
         self.root = root
         root.title("echemplot GUI")
 
@@ -143,6 +149,19 @@ class _App:
         # launcher injects a callback that pushes results into the active
         # Origin project instead.
         self._on_complete: OnComplete | None = on_complete
+
+        # When ``True``, widgets whose values never reach Origin's push
+        # path are disabled and annotated with a note. See
+        # :func:`echemplot.origin.launch_gui` for the motivation (issue
+        # #60): ``push_to_origin`` always writes all three worksheets and
+        # the full per-cell DataFrames, and the matplotlib figures the
+        # controller returns are closed before their axis-range overrides
+        # can affect any visible plot. ``SG window_length`` stays
+        # editable because the ``on_complete`` callback forwards it to
+        # :func:`echemplot.origin.push_to_origin`, which recomputes the
+        # dQ/dV DataFrame on non-default values so the user's choice
+        # actually lands in the worksheet.
+        self._origin_mode = origin_mode
 
         self._build_widgets()
 
@@ -189,15 +208,15 @@ class _App:
         self._var_chdis = tk.BooleanVar(value=True)
         self._var_cycle = tk.BooleanVar(value=True)
         self._var_dqdv = tk.BooleanVar(value=False)
-        ttk.Checkbutton(kinds_frame, text="chdis", variable=self._var_chdis).grid(
-            row=0, column=0, sticky="w", padx=_PADX, pady=_PADY
-        )
-        ttk.Checkbutton(kinds_frame, text="cycle", variable=self._var_cycle).grid(
-            row=1, column=0, sticky="w", padx=_PADX, pady=_PADY
-        )
-        ttk.Checkbutton(kinds_frame, text="dQ/dV", variable=self._var_dqdv).grid(
-            row=2, column=0, sticky="w", padx=_PADX, pady=_PADY
-        )
+        # Kept as instance attributes so ``_build_widgets`` can toggle
+        # their ``state`` in origin-mode below (and so tests can assert
+        # the disabled-state without reaching into grid slaves).
+        self._chk_chdis = ttk.Checkbutton(kinds_frame, text="chdis", variable=self._var_chdis)
+        self._chk_chdis.grid(row=0, column=0, sticky="w", padx=_PADX, pady=_PADY)
+        self._chk_cycle = ttk.Checkbutton(kinds_frame, text="cycle", variable=self._var_cycle)
+        self._chk_cycle.grid(row=1, column=0, sticky="w", padx=_PADX, pady=_PADY)
+        self._chk_dqdv = ttk.Checkbutton(kinds_frame, text="dQ/dV", variable=self._var_dqdv)
+        self._chk_dqdv.grid(row=2, column=0, sticky="w", padx=_PADX, pady=_PADY)
 
         # Parameters
         params_frame = ttk.LabelFrame(self.root, text="Parameters")
@@ -235,13 +254,42 @@ class _App:
         self._entry_drange = ttk.Entry(params_frame, width=24)
         self._entry_drange.grid(row=4, column=1, sticky="ew", padx=_PADX, pady=_PADY)
 
+        # Origin-mode note + grey-out. The note shifts Run/status down one
+        # row; we thread ``run_row`` / ``status_row`` through the two
+        # ``.grid()`` calls below so the non-origin layout stays pixel
+        # identical to what it was before this switch existed.
+        if self._origin_mode:
+            note = ttk.Label(
+                self.root,
+                text=("Origin mode: only SG window_length is applied. Other options are disabled."),
+                foreground="#666",
+                wraplength=520,
+            )
+            note.grid(row=2, column=0, columnspan=2, sticky="ew", padx=_PADX, pady=_PADY)
+            run_row = 3
+            status_row = 4
+
+            for widget in (
+                self._chk_chdis,
+                self._chk_cycle,
+                self._chk_dqdv,
+                self._entry_cycles,
+                self._entry_vrange,
+                self._entry_qrange,
+                self._entry_drange,
+            ):
+                widget.configure(state="disabled")
+        else:
+            run_row = 2
+            status_row = 3
+
         # Run + status
         ttk.Button(self.root, text="Run", command=self._on_run).grid(
-            row=2, column=0, columnspan=2, sticky="ew", padx=_PADX, pady=_PADY
+            row=run_row, column=0, columnspan=2, sticky="ew", padx=_PADX, pady=_PADY
         )
         self._status = tk.StringVar(value="Ready.")
         ttk.Label(self.root, textvariable=self._status, relief=tk.SUNKEN, anchor="w").grid(
-            row=3, column=0, columnspan=2, sticky="ew", padx=_PADX, pady=_PADY
+            row=status_row, column=0, columnspan=2, sticky="ew", padx=_PADX, pady=_PADY
         )
 
     # ----- directory list handlers ----------------------------------
@@ -311,15 +359,33 @@ class _App:
 
     def _on_run(self) -> None:
         try:
-            request = GuiRequest(
-                dirs=tuple(self._dirs),
-                kinds=self._collect_kinds(),
-                cycles=tuple(_parse_cycles(self._entry_cycles.get())),
-                sg_window=_parse_sg_window(self._entry_sg.get()),
-                voltage_range=_parse_range(self._entry_vrange.get(), "Voltage range"),
-                capacity_range=_parse_range(self._entry_qrange.get(), "Capacity range"),
-                dqdv_range=_parse_range(self._entry_drange.get(), "dQ/dV range"),
-            )
+            if self._origin_mode:
+                # Skip the disabled widgets entirely so a stale value
+                # left behind from a toggle can't feed into the request
+                # (and so an accidentally non-odd SG placeholder in a
+                # disabled entry can't fail validation). ``push_to_origin``
+                # always writes all three worksheets and the full
+                # DataFrames, so the kinds / cycles / range fields have no
+                # effect on the Origin output regardless.
+                request = GuiRequest(
+                    dirs=tuple(self._dirs),
+                    kinds=frozenset({"chdis", "cycle", "dqdv"}),
+                    cycles=(),
+                    sg_window=_parse_sg_window(self._entry_sg.get()),
+                    voltage_range=None,
+                    capacity_range=None,
+                    dqdv_range=None,
+                )
+            else:
+                request = GuiRequest(
+                    dirs=tuple(self._dirs),
+                    kinds=self._collect_kinds(),
+                    cycles=tuple(_parse_cycles(self._entry_cycles.get())),
+                    sg_window=_parse_sg_window(self._entry_sg.get()),
+                    voltage_range=_parse_range(self._entry_vrange.get(), "Voltage range"),
+                    capacity_range=_parse_range(self._entry_qrange.get(), "Capacity range"),
+                    dqdv_range=_parse_range(self._entry_drange.get(), "dQ/dV range"),
+                )
         except ValueError as exc:
             self._fail(f"Invalid input: {exc}")
             return
@@ -336,7 +402,13 @@ class _App:
 
         if self._on_complete is not None:
             try:
-                self._on_complete(result.cells, result.figures)
+                # ``sg_window`` is surfaced so the Origin launcher can
+                # propagate a non-default Savitzky-Golay window into the
+                # worksheet data — ``Cell.dqdv_df`` is cached at defaults
+                # and ignores per-run overrides, so without this argument
+                # the Origin-mode ``SG window_length`` field would have no
+                # effect on the pushed output. See issue #60.
+                self._on_complete(result.cells, result.figures, request.sg_window)
             except Exception as exc:
                 self._fail(f"Error in completion hook: {exc}")
                 return
@@ -380,7 +452,11 @@ class _App:
         self._status.set(message)
 
 
-def launch_gui(*, on_complete: OnComplete | None = None) -> None:
+def launch_gui(
+    *,
+    on_complete: OnComplete | None = None,
+    origin_mode: bool = False,
+) -> None:
     """Start the Tk GUI and run its event loop.
 
     Callable two ways:
@@ -401,6 +477,14 @@ def launch_gui(*, on_complete: OnComplete | None = None) -> None:
         forwards to :func:`echemplot.origin.push_to_origin` instead,
         so figures are not shown and the results land directly in the
         active Origin project.
+    origin_mode
+        When ``True``, the GUI greys out the options that have no effect
+        on the Origin push path (the plot-kind checkboxes, the cycles
+        entry, and the voltage/capacity/dQ-dV range entries) and shows
+        an inline note explaining why. Only ``SG window_length`` stays
+        editable because it flows into the dQ/dV worksheet the Origin
+        push writes. :func:`echemplot.origin.launch_gui` sets this;
+        standalone callers should leave it at the ``False`` default.
 
     Switches matplotlib to the TkAgg backend at call time (not import
     time): a module-level ``matplotlib.use("TkAgg")`` would crash
@@ -412,7 +496,7 @@ def launch_gui(*, on_complete: OnComplete | None = None) -> None:
 
     matplotlib.use("TkAgg")
     root = _make_root()
-    _App(root, on_complete=on_complete)
+    _App(root, on_complete=on_complete, origin_mode=origin_mode)
     root.mainloop()
 
 

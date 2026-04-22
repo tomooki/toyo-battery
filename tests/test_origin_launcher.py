@@ -83,18 +83,26 @@ def test_launch_gui_passes_callback_that_calls_push_to_origin(
 
     origin_mod.launch_gui(project_path=str(tmp_path / "p.opju"), stat_cycles=(7, 13))
 
+    # Issue #60: the Origin launcher must put the Tk GUI into its
+    # constrained ``origin_mode`` so ineffective options are greyed out.
+    assert captured.get("origin_mode") is True
+
     on_complete = captured.get("on_complete")
     assert callable(on_complete), "launcher must inject an on_complete callback"
 
     sentinel_cells = ["cell-A", "cell-B"]  # opaque to push_to_origin in this fake
     sentinel_figs = ["fig0", "fig1", "fig2"]
-    on_complete(sentinel_cells, sentinel_figs)  # type: ignore[operator]
+    # Third positional arg is ``sg_window`` — the Tk view surfaces it so
+    # the Origin launcher can propagate a non-default value through to
+    # the dQ/dV worksheet (issue #60 follow-up).
+    on_complete(sentinel_cells, sentinel_figs, 11)  # type: ignore[operator]
 
     assert len(push_calls) == 1
     call = push_calls[0]
     assert call["cells"] is sentinel_cells
     assert call["project_path"] == str(tmp_path / "p.opju")
     assert call["stat_cycles"] == (7, 13)
+    assert call["sg_window"] == 11
 
 
 def test_launch_gui_defaults_match_push_to_origin_defaults(
@@ -128,8 +136,9 @@ def test_launch_gui_defaults_match_push_to_origin_defaults(
 
     on_complete = captured.get("on_complete")
     assert callable(on_complete)
-    on_complete(["c"], ["f"])  # type: ignore[operator]
+    on_complete(["c"], ["f"], 11)  # type: ignore[operator]
 
     call = push_calls[0]
     assert call["project_path"] is None
     assert call["stat_cycles"] == (10, 50)
+    assert call["sg_window"] == 11

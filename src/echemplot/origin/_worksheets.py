@@ -150,7 +150,12 @@ def _single_x_axis(ncols: int) -> str:
     return "X" + "Y" * (ncols - 1)
 
 
-def write_cell_sheets(op: Any, cell: Any) -> dict[str, Any]:
+def write_cell_sheets(
+    op: Any,
+    cell: Any,
+    *,
+    dqdv_df: pd.DataFrame | None = None,
+) -> dict[str, Any]:
     """Materialize the three per-cell worksheets.
 
     Parameters
@@ -161,6 +166,15 @@ def write_cell_sheets(op: Any, cell: Any) -> dict[str, Any]:
     cell
         A :class:`echemplot.core.cell.Cell` (typed as ``Any`` here to
         keep the mocked-originpro test path import-light).
+    dqdv_df
+        Optional pre-computed dQ/dV DataFrame. When ``None`` (the
+        default) the cached :attr:`Cell.dqdv_df` property is used, which
+        hard-codes the Savitzky-Golay defaults. Callers that need the
+        dQ/dV worksheet to reflect a non-default SG ``window_length`` /
+        ``polyorder`` must compute the frame via
+        :func:`echemplot.core.dqdv.get_dqdv_df` and pass it here —
+        :func:`push_to_origin` does so on behalf of GUI callers when
+        the user edits the SG window.
 
     Returns
     -------
@@ -176,7 +190,7 @@ def write_cell_sheets(op: Any, cell: Any) -> dict[str, Any]:
     # regular column so Origin has an X source for the cycle_efficiency
     # plot. Matches the pattern :func:`write_stat_table` already uses.
     cap = cell.cap_df.reset_index()
-    dqdv = cell.dqdv_df
+    dqdv = cell.dqdv_df if dqdv_df is None else dqdv_df
 
     sheets: dict[str, Any] = {}
     sheets["chdis"] = _write_sheet(
