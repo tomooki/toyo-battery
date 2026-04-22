@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- `echemplot.origin.launch_gui` now closes the Tk window automatically
+  after a successful Run. The launcher's `mainloop()` runs inside the
+  Origin Python Console, so previously the user had to click the window
+  close button to release the Console; the one-shot batch UX now simply
+  ends when the push completes. Error dialogs still keep the window open
+  so the inputs can be corrected and re-Run.
+
 ## [0.1.3] - 2026-04-23
 
 ### Fixed

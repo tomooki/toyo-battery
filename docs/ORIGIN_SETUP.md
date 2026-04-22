@@ -65,8 +65,11 @@ directly.
 
 Notes:
 
-- `launch_gui()` runs Tk's `mainloop()` **in the Origin process**. The Origin
-  Python Console is blocked until you close the GUI window.
+- `launch_gui()` runs Tk's `mainloop()` **in the Origin process**, so the
+  Origin Python Console is blocked while the window is open. After a
+  successful Run the window closes automatically and the Console prompt
+  returns; if the Run surfaces an error dialog, close the window manually
+  (or fix the inputs and Run again) to release the Console.
 - Origin's embedded CPython must include `_tkinter` (OriginLab 2022 and later
   do). If it doesn't, the call raises `ImportError` from `import tkinter`; use
   a separate system Python in that case.

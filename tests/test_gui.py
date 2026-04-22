@@ -399,6 +399,144 @@ def test_app_default_mode_keeps_widgets_enabled() -> None:
         root.destroy()
 
 
+# ---- origin_mode auto-close ------------------------------------------------
+
+
+def test_app_origin_mode_destroys_root_after_successful_run(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """In origin_mode the Tk root must be destroyed after a successful
+    Run so the Origin Python Console (blocked on ``mainloop()``) is
+    released without forcing the user to click the window close button.
+    """
+    import tkinter as tk
+
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        pytest.skip(f"no display available for Tk: {exc}")
+
+    import echemplot.gui.tk_app as tk_app
+    from echemplot.gui._controller import RunResult
+
+    real_destroy = root.destroy
+    destroy_calls: list[None] = []
+
+    def spy_destroy() -> None:
+        destroy_calls.append(None)
+
+    try:
+        # Stub the controller so _on_run reaches the on_complete branch
+        # without touching the filesystem.
+        monkeypatch.setattr(tk_app, "run", lambda _req: RunResult(cells=[], figures=[]))
+
+        hook_calls: list[int] = []
+
+        def noop_hook(_cells: object, _figs: object, sg: int) -> None:
+            hook_calls.append(sg)
+
+        app = tk_app._App(root, origin_mode=True, on_complete=noop_hook)
+        # Non-empty dirs so the GuiRequest construction succeeds; the
+        # stubbed ``run`` ignores the value, so a placeholder Path is fine.
+        app._dirs = [tmp_path]
+        root.destroy = spy_destroy  # type: ignore[assignment,method-assign]
+
+        app._on_run()
+
+        assert hook_calls, "on_complete should have fired for a successful Run"
+        assert destroy_calls, "root.destroy must be called after successful origin-mode Run"
+    finally:
+        real_destroy()
+
+
+def test_app_origin_mode_keeps_root_when_on_complete_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """If the on_complete hook raises, ``_fail`` surfaces the error and
+    the root stays alive — the user needs the window to see the dialog
+    and retry.
+    """
+    import tkinter as tk
+    from tkinter import messagebox
+
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        pytest.skip(f"no display available for Tk: {exc}")
+
+    import echemplot.gui.tk_app as tk_app
+    from echemplot.gui._controller import RunResult
+
+    real_destroy = root.destroy
+    destroy_calls: list[None] = []
+
+    def spy_destroy() -> None:
+        destroy_calls.append(None)
+
+    try:
+        monkeypatch.setattr(tk_app, "run", lambda _req: RunResult(cells=[], figures=[]))
+        # ``_fail`` pops a modal that would hang the headless test.
+        monkeypatch.setattr(messagebox, "showerror", lambda *_a, **_kw: None)
+
+        def raising_hook(_cells: object, _figs: object, _sg: int) -> None:
+            raise RuntimeError("simulated push failure")
+
+        app = tk_app._App(root, origin_mode=True, on_complete=raising_hook)
+        app._dirs = [tmp_path]
+        root.destroy = spy_destroy  # type: ignore[assignment,method-assign]
+
+        app._on_run()
+
+        assert not destroy_calls, "root must stay alive when on_complete raises"
+    finally:
+        real_destroy()
+
+
+def test_app_standalone_mode_does_not_destroy_root_after_run(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Regression guard: the standalone GUI (``origin_mode=False``) must
+    keep the window open after Run so repeated iteration and the
+    matplotlib Toplevels remain usable.
+    """
+    import tkinter as tk
+
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        pytest.skip(f"no display available for Tk: {exc}")
+
+    import echemplot.gui.tk_app as tk_app
+    from echemplot.gui._controller import RunResult
+
+    real_destroy = root.destroy
+    destroy_calls: list[None] = []
+
+    def spy_destroy() -> None:
+        destroy_calls.append(None)
+
+    try:
+        monkeypatch.setattr(tk_app, "run", lambda _req: RunResult(cells=[], figures=[]))
+
+        hook_calls: list[int] = []
+
+        def noop_hook(_cells: object, _figs: object, sg: int) -> None:
+            hook_calls.append(sg)
+
+        # Same on_complete branch as origin-mode, but with the default
+        # ``origin_mode=False`` — proves the destroy is gated on the flag.
+        app = tk_app._App(root, on_complete=noop_hook)
+        app._dirs = [tmp_path]
+        root.destroy = spy_destroy  # type: ignore[assignment,method-assign]
+
+        app._on_run()
+
+        assert hook_calls, "on_complete should have fired for a successful Run"
+        assert not destroy_calls, "standalone Run must not destroy the root"
+    finally:
+        real_destroy()
+
+
 def test_add_dir_deduplicates_paths(tmp_path: Path) -> None:
     """``_add_dir`` is the single path through which both Add-button and
     drag-and-drop reach the state list; adding the same directory twice
