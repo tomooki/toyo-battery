@@ -9,6 +9,14 @@ def test_import_package() -> None:
     assert toyo_battery.__version__
 
 
+def test_cell_reexported_at_top_level() -> None:
+    """README Quick Start uses ``from toyo_battery import Cell`` — keep it working."""
+    from toyo_battery import Cell
+    from toyo_battery.core.cell import Cell as CoreCell
+
+    assert Cell is CoreCell
+
+
 def test_import_submodules() -> None:
     from toyo_battery import config  # noqa: F401
     from toyo_battery.core import cell  # noqa: F401
