@@ -7,13 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-04-23
+
 ### Changed
 - Default Savitzky-Golay `window_length` for dQ/dV smoothing restored to
   `11` (reverting [#69]). Applies uniformly across
   `echemplot.core.dqdv.get_dqdv_df`, `Cell.dqdv_df`, `plot_dqdv`,
   `echemplot.origin.push_to_origin`, and the Tk GUI's `SG window_length`
   entry. Callers that explicitly pass `window_length=21` / `sg_window=21`
-  are unaffected.
+  are unaffected. ([#88])
 
 ## [0.1.5] - 2026-04-23
 
@@ -191,7 +193,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-alpha.** Public API is unstable and may change without deprecation in
   0.0.x releases.
 
-[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/tomooki/toyo-battery/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/tomooki/toyo-battery/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/tomooki/toyo-battery/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/tomooki/toyo-battery/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/tomooki/toyo-battery/compare/v0.1.1...v0.1.2
@@ -206,6 +210,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#75]: https://github.com/tomooki/toyo-battery/issues/75
 [#79]: https://github.com/tomooki/toyo-battery/pull/79
 [#80]: https://github.com/tomooki/toyo-battery/pull/80
+[#86]: https://github.com/tomooki/toyo-battery/pull/86
+[#88]: https://github.com/tomooki/toyo-battery/pull/88
 [0.0.3]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/tomooki/toyo-battery/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/tomooki/toyo-battery/releases/tag/v0.0.1
