@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `read_cell_dir` no longer raises `ValueError: unknown 状態 codes in
+  source: [9]` on raw 6-digit cell directories whose last data row is
+  the TOYO end-of-test sentinel (state code `9` with zero 経過時間 and
+  zero 電流). The `_finalize` step now drops a contiguous trailing
+  block of such sentinel rows (with a `logger.debug` notice) before
+  state-code mapping. Unknown state codes that appear mid-file or with
+  non-zero flow still raise, and the error now reports the offending
+  row index and a link to file an issue. ([#91])
+
+[#91]: https://github.com/tomooki/toyo-battery/issues/91
+
 ## [0.1.6] - 2026-04-23
 
 ### Changed

@@ -42,6 +42,7 @@ per-segment monotone-non-decreasing 電気量 (matching the convention that
 
 from __future__ import annotations
 
+import logging
 import math
 import re
 from pathlib import Path
@@ -58,6 +59,8 @@ from echemplot.io.schema import (
     STATE_CODE_TO_JA,
     ColumnLang,
 )
+
+logger = logging.getLogger(__name__)
 
 RAW_FILENAME_RE = re.compile(r"[0-9]{6}")
 PTN_SUFFIX = ".ptn"  # matched case-insensitively (Linux CI is case-sensitive)
@@ -261,19 +264,65 @@ def _ensure_capacity(df: pd.DataFrame, mass: float | None) -> pd.DataFrame:
     return cast("pd.DataFrame", out)
 
 
+def _drop_trailing_sentinel_rows(df: pd.DataFrame) -> tuple[pd.DataFrame, list[int]]:
+    """Drop a contiguous tail block of TOYO end-of-test sentinel rows.
+
+    A row is treated as a sentinel iff its 状態 is numeric and unknown
+    (not in :data:`STATE_CODE_TO_JA`) AND ``経過時間[Sec] == 0`` AND
+    ``電流[mA] == 0``. Real TOYO raw 6-digit files emit at least one
+    such row (state code ``9``) per file as the end-of-test marker; the
+    row is not a real measurement and would otherwise blow up state-code
+    mapping in :func:`_finalize`.
+
+    The scan is strictly trailing/contiguous, so a state-9 row in the
+    middle of the file (or with non-zero flow) is *not* dropped — those
+    cases still surface as the ``unknown 状態 codes`` error so genuinely
+    surprising data is not silently swallowed.
+    """
+    if not pd.api.types.is_numeric_dtype(df["状態"]):
+        return df, []
+    if COL_ELAPSED_S not in df.columns or COL_CURRENT_MA not in df.columns:
+        return df, []
+    drop_idx: list[int] = []
+    for i in range(len(df) - 1, -1, -1):
+        state = df["状態"].iat[i]
+        if pd.isna(state) or int(state) in STATE_CODE_TO_JA:
+            break
+        if df[COL_ELAPSED_S].iat[i] == 0 and df[COL_CURRENT_MA].iat[i] == 0:
+            drop_idx.append(int(df.index[i]))
+        else:
+            break
+    if not drop_idx:
+        return df, []
+    return cast("pd.DataFrame", df.drop(index=drop_idx).reset_index(drop=True)), drop_idx
+
+
 def _finalize(df: pd.DataFrame, column_lang: ColumnLang) -> pd.DataFrame:
     missing = [c for c in CANONICAL_COLUMNS_JA if c not in df.columns]
     if missing:
         raise ValueError(f"missing canonical columns after read: {missing}")
     extras = [c for c in df.columns if c not in CANONICAL_COLUMNS_JA]
     out = df.loc[:, [*CANONICAL_COLUMNS_JA, *extras]].copy()
+    out, dropped = _drop_trailing_sentinel_rows(out)
+    if dropped:
+        logger.debug(
+            "Dropped %d trailing TOYO sentinel row(s) at indices %s",
+            len(dropped),
+            dropped,
+        )
     if pd.api.types.is_numeric_dtype(out["状態"]):
         mapped = out["状態"].map(STATE_CODE_TO_JA)
         unmapped_mask = mapped.isna() & out["状態"].notna()
         if unmapped_mask.any():
             bad = sorted(out.loc[unmapped_mask, "状態"].unique().tolist())
+            first_bad_idx = int(out.index[unmapped_mask][0])
             raise ValueError(
-                f"unknown 状態 codes in source: {bad} (known codes: {sorted(STATE_CODE_TO_JA)})"
+                f"unknown 状態 codes in source: {bad} "
+                f"(known codes: {sorted(STATE_CODE_TO_JA)}); "
+                f"first seen at row {first_bad_idx}. If this is a TOYO "
+                "sentinel code, please file an issue at "
+                "https://github.com/tomooki/toyo-battery/issues "
+                "with a sample file."
             )
         out["状態"] = mapped
     out = out.reset_index(drop=True)
