@@ -147,12 +147,20 @@ def test_multi_cycle_multiindex_shape() -> None:
 
 
 def test_column_lang_en() -> None:
+    """EN-mode input carries EN state values (``charge``/``discharge``).
+
+    The reader translates state values when ``column_lang='en'`` is
+    requested (issue #94), so chdis must filter on EN literals in EN
+    mode. Passing JA state values with EN columns (the legacy behavior)
+    is no longer supported — see ``test_en_mode_filters_on_en_state_labels``
+    below for the active EN contract.
+    """
     df = _raw(
         [
-            (1, "充電", 3.50, 0.0),
-            (1, "充電", 3.60, 500.0),
-            (1, "放電", 3.60, 0.0),
-            (1, "放電", 3.40, 500.0),
+            (1, "charge", 3.50, 0.0),
+            (1, "charge", 3.60, 500.0),
+            (1, "discharge", 3.60, 0.0),
+            (1, "discharge", 3.40, 500.0),
         ],
         lang="en",
     )
@@ -160,6 +168,27 @@ def test_column_lang_en() -> None:
     assert set(out.columns.get_level_values("quantity")) == {"capacity", "voltage"}
     assert (1, "ch", "capacity") in out.columns
     assert out[(1, "dis", "voltage")].dropna().tolist() == [3.60, 3.40]
+
+
+def test_en_mode_filters_on_en_state_labels() -> None:
+    """In EN mode, chdis filters on ``charge``/``discharge`` and ignores
+    ``rest``/``charge_rest``/``discharge_rest``/``abort`` rows, mirroring
+    the JA-mode 充電/放電 filter."""
+    df = _raw(
+        [
+            (1, "charge", 3.50, 0.0),
+            (1, "charge", 3.60, 500.0),
+            (1, "charge_rest", 3.61, 500.0),
+            (1, "discharge", 3.60, 0.0),
+            (1, "discharge", 3.40, 500.0),
+            (1, "discharge_rest", 3.40, 500.0),
+            (1, "abort", 3.40, 500.0),
+        ],
+        lang="en",
+    )
+    out = get_chdis_df(df, column_lang="en")
+    assert out[(1, "ch", "capacity")].notna().sum() == 2
+    assert out[(1, "dis", "capacity")].notna().sum() == 2
 
 
 def test_empty_frame_returns_empty_multiindex() -> None:

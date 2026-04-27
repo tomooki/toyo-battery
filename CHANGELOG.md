@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Breaking
+- **Breaking**: `read_cell_dir` (and `_finalize`) now raises `ValueError`
+  on unknown JA-string state values, matching the existing strictness
+  for unknown numeric state codes. State values are also translated to
+  EN when `column_lang='en'` (e.g. `充電休止` → `charge_rest`); previous
+  releases left state values JA regardless of `column_lang`. Downstream
+  `get_chdis_df` is now language-aware: in EN mode it filters on
+  `charge`/`discharge` instead of `充電`/`放電`, so callers passing JA
+  state literals with EN columns (the legacy mixed shape) must either
+  call the reader with `column_lang='en'` or translate state values
+  themselves. ([#94])
 - **Breaking**: `Cell` now deep-copies the input frame on construction and
   returns defensive copies on every read of `raw_df` / `chdis_df` /
   `cap_df` / `dqdv_df`. Code that previously relied on mutating
@@ -315,6 +325,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#86]: https://github.com/tomooki/toyo-battery/pull/86
 [#88]: https://github.com/tomooki/toyo-battery/pull/88
 [#93]: https://github.com/tomooki/toyo-battery/issues/93
+[#94]: https://github.com/tomooki/toyo-battery/issues/94
 [#95]: https://github.com/tomooki/toyo-battery/issues/95
 [#98]: https://github.com/tomooki/toyo-battery/issues/98
 [#99]: https://github.com/tomooki/toyo-battery/issues/99

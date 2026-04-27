@@ -169,6 +169,39 @@ def _write_raw_6digit(
     )
 
 
+def write_renzoku_with_states(
+    cell_dir: Path,
+    *,
+    rows: list[tuple[int, str, str, float, float]],
+    mass_g: float = _DEFAULT_MASS_G,
+) -> None:
+    """Write a native ``連続データ.csv`` with caller-supplied state literals.
+
+    Mirrors :func:`_write_renzoku`'s 7-row header but lets each test pin
+    the exact 状態 string per row — useful for exercising substate
+    coverage (``充電休止``/``放電休止``) and unknown-label rejection in
+    :func:`echemplot.io.reader._finalize`.
+
+    Parameters
+    ----------
+    rows
+        ``[(cycle, mode, state_ja, voltage, capacity), ...]``.
+    """
+    mass_mg = mass_g * 1e3
+    lines = [
+        ",試験名,C:¥synthetic¥test¥path,,,,開始日時,2026-01-01 00:00:00",
+        ",測定備考,",
+        f",重量[mg],{mass_mg:.3f}",
+        "サイクル,モード,状態,電圧,電気量",
+        "1ch,1ch,1ch,1ch,1ch",
+        "-,-,-,-,-",
+        "[],[],[],[V],[mAh/g]",
+    ]
+    for cycle, mode, state_ja, voltage, capacity in rows:
+        lines.append(f"{cycle},{mode},{state_ja},{voltage:.4f},{capacity:.6f}")
+    (cell_dir / "連続データ.csv").write_text("\n".join(lines) + "\n", encoding="shift_jis")
+
+
 def write_ptn_main(
     path: Path,
     *,

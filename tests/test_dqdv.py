@@ -29,12 +29,14 @@ def _linear_chdis_ch_only(
     """
     v = np.linspace(v_lo, v_hi, n_points)
     q = slope * (v - v_lo)
-    rows = [(1, "充電", float(vi), float(qi)) for vi, qi in zip(v, q)]
     if lang == "ja":
+        state = "充電"
         columns = ["サイクル", "状態", "電圧", "電気量"]
     else:
+        # EN-mode chdis filters on EN state literals (issue #94).
+        state = "charge"
         columns = ["cycle", "state", "voltage", "capacity"]
-        # Even with EN column frame, chdis expects JA state strings.
+    rows = [(1, state, float(vi), float(qi)) for vi, qi in zip(v, q)]
     return pd.DataFrame(rows, columns=columns)
 
 
