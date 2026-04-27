@@ -2,7 +2,7 @@
 
 Pins the canonical-key set of ``JA_COLS`` (single source of truth used by
 core / plotting modules), the JA↔EN round-trip via ``JA_TO_EN``, and the
-extended 5-state ``STATE_JA_TO_EN`` / ``STATE_EN_TO_JA`` shape including
+extended 6-state ``STATE_JA_TO_EN`` / ``STATE_EN_TO_JA`` shape including
 the native-CSV ``充電休止`` / ``放電休止`` substates.
 """
 
@@ -12,8 +12,6 @@ import pytest
 
 from echemplot.io.schema import (
     COL_CAPACITY,
-    COL_CURRENT_MA,
-    COL_ELAPSED_S,
     JA_COLS,
     JA_TO_EN,
     STATE_EN_TO_JA,
@@ -23,12 +21,9 @@ from echemplot.io.schema import (
 # Expected canonical keys → (JA literal, EN literal) for the consolidated map.
 _EXPECTED_JA_COLS: dict[str, tuple[str, str]] = {
     "cycle": ("サイクル", "cycle"),
-    "mode": ("モード", "mode"),
     "state": ("状態", "state"),
     "voltage": ("電圧", "voltage"),
     "capacity": ("電気量", "capacity"),
-    "elapsed": ("経過時間[Sec]", "elapsed_time_s"),
-    "current": ("電流[mA]", "current_ma"),
 }
 
 
@@ -47,12 +42,10 @@ def test_ja_cols_round_trip_through_ja_to_en(key: str, expected: tuple[str, str]
 
 
 def test_ja_cols_uses_named_constants() -> None:
-    """Capacity / elapsed / current keys reuse the existing column constants
-    — guards against a future drift where one is updated and the other isn't.
+    """The capacity key reuses the existing ``COL_CAPACITY`` constant —
+    guards against a future drift where one is updated and the other isn't.
     """
     assert JA_COLS["capacity"] == COL_CAPACITY
-    assert JA_COLS["elapsed"] == COL_ELAPSED_S
-    assert JA_COLS["current"] == COL_CURRENT_MA
 
 
 def test_ja_cols_key_set_is_canonical() -> None:
