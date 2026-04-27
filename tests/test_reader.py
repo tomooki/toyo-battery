@@ -238,7 +238,12 @@ def test_read_raw_6digit_mismatched_columns_raises(tmp_path: Path) -> None:
 
 
 def test_unknown_state_code_raises(tmp_path: Path) -> None:
-    """An unrecognized integer 状態 code must not silently pass through."""
+    """An unrecognized integer 状態 code with non-zero flow must raise.
+
+    The sentinel-drop guard in :func:`_finalize` only swallows trailing
+    rows whose 経過時間 *and* 電流 are both zero; this fixture has
+    non-zero values, so it must still surface the unknown code.
+    """
     cell_dir = tmp_path / "bad_state"
     cell_dir.mkdir()
     empty_sep = ",,,,,,"
@@ -249,6 +254,115 @@ def test_unknown_state_code_raises(tmp_path: Path) -> None:
         header,
         f"2025/01/01,00:00:00,00000000,+3.5000,1.000000{empty_sep},1, 1,  1,     1",
         f"2025/01/01,00:30:00,00001800,+3.6000,1.000000{empty_sep},9, 1,  1,     1",
+    ]
+    (cell_dir / "000001").write_text("\n".join(raw) + "\n", encoding="shift_jis")
+    _write_fixed_column_ptn(cell_dir / "pattern.PTN", 0.001)
+    with pytest.raises(ValueError, match="unknown 状態 codes"):
+        read_cell_dir(cell_dir)
+
+
+def test_unknown_state_code_error_message_includes_row_index(tmp_path: Path) -> None:
+    """The unknown-code ValueError must include the offending row index."""
+    cell_dir = tmp_path / "bad_state_msg"
+    cell_dir.mkdir()
+    empty_sep = ",,,,,,"
+    header = f"日付,時刻,経過時間[Sec],電圧[V],電流[mA]{empty_sep},状態,ﾓｰﾄﾞ,ｻｲｸﾙ,総ｻｲｸﾙ"
+    raw = [
+        "0,0,0,0,0,0,0",
+        "",
+        header,
+        f"2025/01/01,00:00:00,00000000,+3.5000,1.000000{empty_sep},1, 1,  1,     1",
+        f"2025/01/01,00:30:00,00001800,+3.6000,1.000000{empty_sep},9, 1,  1,     1",
+    ]
+    (cell_dir / "000001").write_text("\n".join(raw) + "\n", encoding="shift_jis")
+    _write_fixed_column_ptn(cell_dir / "pattern.PTN", 0.001)
+    with pytest.raises(ValueError, match=r"first seen at row \d+"):
+        read_cell_dir(cell_dir)
+
+
+def test_raw_6digit_trailing_state_9_sentinel_is_dropped(tmp_path: Path) -> None:
+    """A trailing state-9 row with zero elapsed and zero current is the
+    documented TOYO end-of-test sentinel and must be silently dropped."""
+    cell_dir = tmp_path / "sentinel"
+    cell_dir.mkdir()
+    empty_sep = ",,,,,,"
+    header = f"日付,時刻,経過時間[Sec],電圧[V],電流[mA]{empty_sep},状態,ﾓｰﾄﾞ,ｻｲｸﾙ,総ｻｲｸﾙ"
+    raw = [
+        "0,0,0,0,0,0,0",
+        "",
+        header,
+        f"2025/01/01,00:00:00,00000000,+3.5000,1.000000{empty_sep},1, 1,  1,     1",
+        f"2025/01/01,00:30:00,00001800,+3.6000,1.000000{empty_sep},1, 1,  1,     1",
+        # Trailing TOYO sentinel: state=9, elapsed=0, current=0
+        f"2025/01/01,00:30:00,00000000,+3.6000,0.000000{empty_sep},9, 1,  1,     1",
+    ]
+    (cell_dir / "000001").write_text("\n".join(raw) + "\n", encoding="shift_jis")
+    _write_fixed_column_ptn(cell_dir / "pattern.PTN", 0.001)
+    df, _ = read_cell_dir(cell_dir)
+    assert len(df) == 2
+    assert df["状態"].tolist() == ["充電", "充電"]
+
+
+def test_raw_6digit_multiple_trailing_sentinels_dropped(tmp_path: Path) -> None:
+    """Two contiguous trailing sentinel rows must both be dropped."""
+    cell_dir = tmp_path / "sentinel_multi"
+    cell_dir.mkdir()
+    empty_sep = ",,,,,,"
+    header = f"日付,時刻,経過時間[Sec],電圧[V],電流[mA]{empty_sep},状態,ﾓｰﾄﾞ,ｻｲｸﾙ,総ｻｲｸﾙ"
+    raw = [
+        "0,0,0,0,0,0,0",
+        "",
+        header,
+        f"2025/01/01,00:00:00,00000000,+3.5000,1.000000{empty_sep},1, 1,  1,     1",
+        f"2025/01/01,00:30:00,00000000,+3.6000,0.000000{empty_sep},9, 1,  1,     1",
+        f"2025/01/01,00:30:00,00000000,+3.6000,0.000000{empty_sep},9, 1,  1,     1",
+    ]
+    (cell_dir / "000001").write_text("\n".join(raw) + "\n", encoding="shift_jis")
+    _write_fixed_column_ptn(cell_dir / "pattern.PTN", 0.001)
+    df, _ = read_cell_dir(cell_dir)
+    assert len(df) == 1
+    assert df["状態"].tolist() == ["充電"]
+
+
+def test_raw_6digit_state_9_midfile_still_raises(tmp_path: Path) -> None:
+    """A state-9 row in the *middle* of the file (followed by a known
+    state) is not the trailing sentinel pattern and must still raise."""
+    cell_dir = tmp_path / "midfile_9"
+    cell_dir.mkdir()
+    empty_sep = ",,,,,,"
+    header = f"日付,時刻,経過時間[Sec],電圧[V],電流[mA]{empty_sep},状態,ﾓｰﾄﾞ,ｻｲｸﾙ,総ｻｲｸﾙ"
+    raw = [
+        "0,0,0,0,0,0,0",
+        "",
+        header,
+        f"2025/01/01,00:00:00,00000000,+3.5000,1.000000{empty_sep},1, 1,  1,     1",
+        # Mid-file state-9 with zero flow: still raises because it is
+        # followed by a valid row, so it isn't a trailing sentinel.
+        f"2025/01/01,00:15:00,00000000,+3.5500,0.000000{empty_sep},9, 1,  1,     1",
+        f"2025/01/01,00:30:00,00001800,+3.6000,1.000000{empty_sep},1, 1,  1,     1",
+    ]
+    (cell_dir / "000001").write_text("\n".join(raw) + "\n", encoding="shift_jis")
+    _write_fixed_column_ptn(cell_dir / "pattern.PTN", 0.001)
+    with pytest.raises(ValueError, match="unknown 状態 codes"):
+        read_cell_dir(cell_dir)
+
+
+def test_raw_6digit_trailing_state_9_with_nonzero_flow_still_raises(
+    tmp_path: Path,
+) -> None:
+    """The sentinel guard requires zero elapsed AND zero current; a
+    trailing state-9 row with non-zero current is not a sentinel."""
+    cell_dir = tmp_path / "trailing_nonzero"
+    cell_dir.mkdir()
+    empty_sep = ",,,,,,"
+    header = f"日付,時刻,経過時間[Sec],電圧[V],電流[mA]{empty_sep},状態,ﾓｰﾄﾞ,ｻｲｸﾙ,総ｻｲｸﾙ"
+    raw = [
+        "0,0,0,0,0,0,0",
+        "",
+        header,
+        f"2025/01/01,00:00:00,00000000,+3.5000,1.000000{empty_sep},1, 1,  1,     1",
+        # Trailing state=9 but current is non-zero → not a sentinel.
+        f"2025/01/01,00:30:00,00000000,+3.6000,0.500000{empty_sep},9, 1,  1,     1",
     ]
     (cell_dir / "000001").write_text("\n".join(raw) + "\n", encoding="shift_jis")
     _write_fixed_column_ptn(cell_dir / "pattern.PTN", 0.001)
