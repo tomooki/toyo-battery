@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from pathlib import Path
 from typing import Callable
@@ -79,6 +80,84 @@ def test_read_renzoku_falls_back_to_ptn_when_metadata_missing(tmp_path: Path) ->
     _write_fixed_column_ptn(d / "pattern.PTN", 0.004)
     _, mass_g = read_cell_dir(d)
     assert mass_g == pytest.approx(0.004)
+
+
+# ---- renzoku header detection (issue #101) -------------------------------
+
+
+def test_read_renzoku_data_detects_header_at_default_position(
+    make_cell_dir: Callable[..., Path],
+) -> None:
+    """Default fixture (3 metadata rows, header at row 3) parses cleanly.
+
+    Sanity-anchors the existing-behaviour-unchanged contract from issue
+    #101: content-based detection must produce the same output as the
+    historical ``header=3, skiprows=[4,5,6]`` positional skip on every
+    file the reader has ever supported.
+    """
+    d = make_cell_dir("renzoku", mass=0.001)
+    df, mass_g = read_cell_dir(d)
+    assert list(df.columns) == list(CANONICAL_COLUMNS_JA)
+    assert len(df) == 5
+    assert df["電気量"].tolist() == pytest.approx([0.0, 1000.0, 0.0, 0.0, 1000.0])
+    assert mass_g == pytest.approx(0.001)
+
+
+def test_read_renzoku_data_detects_header_with_extra_metadata_row(
+    make_cell_dir: Callable[..., Path],
+) -> None:
+    """A future TOYO firmware shipping 4 metadata rows (header at row 4)
+    must still be parsed correctly thanks to content-based detection."""
+    d = make_cell_dir("renzoku", mass=0.001, n_metadata_rows=4)
+    df, mass_g = read_cell_dir(d)
+    assert list(df.columns) == list(CANONICAL_COLUMNS_JA)
+    assert len(df) == 5
+    assert df["電気量"].tolist() == pytest.approx([0.0, 1000.0, 0.0, 0.0, 1000.0])
+    # Mass row is still inside the metadata-scan window (row index 2).
+    assert mass_g == pytest.approx(0.001)
+
+
+def test_read_renzoku_data_detects_header_with_fewer_metadata_rows(
+    make_cell_dir: Callable[..., Path],
+) -> None:
+    """A hypothetical layout with only 2 metadata rows (header at row 2)
+    must also parse. The 重量[mg] row is dropped from this fixture, so
+    mass falls through to NaN — the parse itself is what we assert."""
+    d = make_cell_dir("renzoku", mass=0.001, n_metadata_rows=2)
+    df, _ = read_cell_dir(d)
+    assert list(df.columns) == list(CANONICAL_COLUMNS_JA)
+    assert len(df) == 5
+    assert df["電気量"].tolist() == pytest.approx([0.0, 1000.0, 0.0, 0.0, 1000.0])
+
+
+def test_read_renzoku_data_falls_back_with_warning_on_no_detection(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """No row in the first 20 lines starts with サイクル → reader emits
+    a logger.warning and falls back to the legacy positional skip.
+
+    The fallback layout (``header=3, skiprows=[4,5,6]``) is unlikely to
+    parse the synthetic worst-case file into a canonical schema, so we
+    expect a downstream ``ValueError`` from ``_finalize`` after the
+    warning fires. The contract under test is: warning emitted +
+    fallback attempted, not "fallback succeeds" — the latter would
+    require a file whose first 20 lines bury the header but whose
+    line-3 happens to look canonical, which is contrived."""
+    cell_dir = tmp_path / "no_header"
+    cell_dir.mkdir()
+    # 25 lines of random metadata-looking junk, no サイクル anywhere.
+    lines = [f",ﾒﾓ{i},junk-row-{i}" for i in range(25)]
+    (cell_dir / "連続データ.csv").write_text("\n".join(lines) + "\n", encoding="shift_jis")
+    with (
+        caplog.at_level(logging.WARNING, logger="echemplot.io.reader"),
+        pytest.raises(ValueError),
+    ):
+        read_cell_dir(cell_dir)
+    assert any(
+        "could not detect header row" in rec.message and rec.name == "echemplot.io.reader"
+        for rec in caplog.records
+    )
 
 
 # ---- renzoku_py (normalized output) path ----------------------------------

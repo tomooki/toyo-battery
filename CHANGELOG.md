@@ -47,6 +47,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   columns don't match the expected `[cycle, q_ch, q_dis, ce]` shape.
   Future `cap_df` reorderings now fail loudly instead of silently
   binding wrong columns. ([#100])
+- `_read_renzoku_data` now finds the column-header row by content (first
+  cell == `サイクル`) instead of hardcoded `header=3, skiprows=[4,5,6]`.
+  Falls back to the legacy positional skip with a `logger.warning` if
+  the header isn't found in the first 20 lines, so existing TOYO output
+  is unaffected. ([#101])
 - Consolidated the per-module `_JA_COLS` / `_QUANTITY_KEYS_*` mappings
   duplicated across `core.chdis` / `core.capacity` / `core.dqdv` /
   `core.stats` / `plotting.matplotlib_backend` / `plotting.plotly_backend`
@@ -336,6 +341,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#98]: https://github.com/tomooki/toyo-battery/issues/98
 [#99]: https://github.com/tomooki/toyo-battery/issues/99
 [#100]: https://github.com/tomooki/toyo-battery/issues/100
+[#101]: https://github.com/tomooki/toyo-battery/issues/101
 [#103]: https://github.com/tomooki/toyo-battery/issues/103
 [#104]: https://github.com/tomooki/toyo-battery/issues/104
 [#107]: https://github.com/tomooki/toyo-battery/pull/107

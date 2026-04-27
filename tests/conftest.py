@@ -55,11 +55,12 @@ def make_cell_dir(tmp_path: Path) -> Callable[..., Path]:
         name: str = "cell_A",
         mass: float = _DEFAULT_MASS_G,
         ptn_dialect: PtnDialect = "concat",
+        n_metadata_rows: int = 3,
     ) -> Path:
         d = tmp_path / name
         d.mkdir()
         if layout == "renzoku":
-            _write_renzoku(d, mass_g=mass)
+            _write_renzoku(d, mass_g=mass, n_metadata_rows=n_metadata_rows)
         elif layout == "renzoku_py":
             _write_renzoku_py(d)
         elif layout == "raw_6digit":
@@ -71,7 +72,33 @@ def make_cell_dir(tmp_path: Path) -> Callable[..., Path]:
     return _make
 
 
-def _write_renzoku(cell_dir: Path, *, mass_g: float) -> None:
+def _build_renzoku_metadata(n_metadata_rows: int, mass_mg: float) -> list[str]:
+    """Build the metadata block for the synthetic 連続データ.csv.
+
+    The mass row is always included (so the reader can resolve mass without
+    needing a .PTN); extra rows are filler ``,メモ<i>,`` lines that look
+    like the genuine product's free-form remarks. ``n_metadata_rows=0``
+    yields an empty block — the header lands at row 0.
+    """
+    if n_metadata_rows < 0:
+        raise ValueError(f"n_metadata_rows must be >= 0, got {n_metadata_rows}")
+    base = [
+        ",試験名,C:¥synthetic¥test¥path,,,,開始日時,2026-01-01 00:00:00",
+        ",測定備考,",
+        f",重量[mg],{mass_mg:.3f}",
+    ]
+    if n_metadata_rows <= len(base):
+        return base[:n_metadata_rows]
+    extras = [f",メモ{i},comment-{i}" for i in range(n_metadata_rows - len(base))]
+    return [*base, *extras]
+
+
+def _write_renzoku(
+    cell_dir: Path,
+    *,
+    mass_g: float,
+    n_metadata_rows: int = 3,
+) -> None:
     """Write a native-format 連続データ.csv.
 
     Real format:
@@ -84,12 +111,17 @@ def _write_renzoku(cell_dir: Path, *, mass_g: float) -> None:
       - Row 6: units (``[],[],[],[V],[mAh/g]``)
       - Row 7+: data rows with state as JP strings including
         ``充電休止``/``放電休止`` substates and pre-computed 電気量.
+
+    The ``n_metadata_rows`` knob lets tests exercise hypothetical TOYO
+    firmware layouts that drift from the historical 3-row preamble. The
+    mass row stays inside the metadata block (so the reader's metadata
+    scan still finds it); extra padding rows are inserted before/after as
+    needed.
     """
     mass_mg = mass_g * 1e3
+    metadata_lines = _build_renzoku_metadata(n_metadata_rows, mass_mg)
     lines = [
-        ",試験名,C:¥synthetic¥test¥path,,,,開始日時,2026-01-01 00:00:00",
-        ",測定備考,",
-        f",重量[mg],{mass_mg:.3f}",
+        *metadata_lines,
         "サイクル,モード,状態,電圧,電気量",
         "1ch,1ch,1ch,1ch,1ch",
         "-,-,-,-,-",

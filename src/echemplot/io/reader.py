@@ -2,9 +2,13 @@
 
 Discovery priority for a given cell directory ``path``:
 
-1. ``連続データ.csv``              — native export from the tester
-   (7-line header: 3 metadata rows, then column-name row, channel row,
-   separator row, units row; ``header=3, skiprows=[4,5,6]``)
+1. ``連続データ.csv``              — native export from the tester.
+   Real TOYO firmware emits a 7-line preamble: 3 metadata rows, then
+   column-name row, channel row, separator row, units row (so historically
+   ``header=3, skiprows=[4,5,6]``). The reader now finds the column-name
+   row by content (first cell == ``サイクル``) so an extra/missing
+   metadata row in a future firmware revision does not silently shift the
+   header. See :func:`_detect_renzoku_header`.
 2. ``連続データ_py.csv``           — already-normalized output from a previous run
 3. 6-digit raw file(s) + ``*.PTN`` — factory raw; 電気量 is computed from mass
 
@@ -72,6 +76,33 @@ RAW_FILENAME_RE = re.compile(r"[0-9]{6}")
 PTN_SUFFIX = ".ptn"  # matched case-insensitively (Linux CI is case-sensitive)
 RENZOKU_DATA = "連続データ.csv"
 RENZOKU_DATA_PY = "連続データ_py.csv"
+
+# Number of leading lines to scan when looking for the column-header row in
+# 連続データ.csv. Real TOYO firmware ships with the header at line index 3
+# (3 metadata rows above it); the scan window is sized to absorb a small
+# amount of future drift (extra metadata rows, optional summary lines)
+# while still failing fast on a totally unexpected file.
+_HEADER_SCAN_ROWS = 20
+
+# Legacy positional layout used as a fallback when content-based detection
+# cannot find the header row in the first ``_HEADER_SCAN_ROWS`` lines.
+_LEGACY_HEADER_ROW = 3
+_LEGACY_SKIPROWS = [4, 5, 6]
+
+# First-cell literals identifying the header row of 連続データ.csv. The
+# native export uses the JP literal; the EN form is only present if a user
+# has manually pre-renamed columns, but is cheap to also accept here.
+_HEADER_FIRST_CELL_CANDIDATES: tuple[str, ...] = ("サイクル", "cycle")
+
+# Patterns that mark a row immediately following the header as a unit /
+# channel-id / separator metadata row rather than a data row. We strip the
+# header-following rows greedily until the first row whose first cell parses
+# as a numeric cycle index (a plausible data row).
+_UNIT_ROW_FIRST_CELL_PATTERNS = (
+    re.compile(r"^\[.*\]$"),  # e.g. "[V]", "[mAh/g]"
+    re.compile(r"^-+$"),  # e.g. "-" separator row
+    re.compile(r"^\d+\s*ch$", re.IGNORECASE),  # channel id e.g. "1ch"
+)
 
 # Half-width → full-width canonical rename. The raw 6-digit header row uses
 # half-width katakana for the cycle/mode columns.
@@ -191,10 +222,81 @@ def read_cell_dir(
 def _read_renzoku_data(
     path: Path, mass: float | None, encoding: str, column_lang: ColumnLang
 ) -> pd.DataFrame:
-    df = pd.read_csv(path, header=3, skiprows=[4, 5, 6], encoding=encoding)
+    header_row, skiprows = _detect_renzoku_header(path, encoding)
+    df = pd.read_csv(path, header=header_row, skiprows=skiprows, encoding=encoding)
     df = _clean_columns(df)
     df = _ensure_capacity(df, mass)
     return _finalize(df, column_lang)
+
+
+def _detect_renzoku_header(path: Path, encoding: str) -> tuple[int, list[int]]:
+    """Find the column-header row of 連続データ.csv by content.
+
+    Reads the first :data:`_HEADER_SCAN_ROWS` lines and locates the row
+    whose first non-empty cell matches one of
+    :data:`_HEADER_FIRST_CELL_CANDIDATES` (``サイクル`` for the native JP
+    export; ``cycle`` accepted defensively for hand-renamed sources).
+    Returns ``(header_row, skiprows)`` where ``skiprows`` lists the
+    contiguous unit / channel-id / separator rows that immediately follow
+    the header and should be skipped before the first data row.
+
+    On detection failure (no candidate row in the scan window) emits a
+    ``logger.warning`` and falls back to the historical fixed layout
+    ``(3, [4, 5, 6])``, preserving behaviour on every TOYO file shipped
+    so far while leaving the failure visible in the log stream.
+    """
+    with path.open(encoding=encoding, errors="replace") as f:
+        lines = [f.readline() for _ in range(_HEADER_SCAN_ROWS)]
+    rows: list[list[str]] = [
+        [cell.strip() for cell in line.rstrip("\r\n").split(",")] for line in lines if line
+    ]
+
+    header_row: int | None = None
+    for i, fields in enumerate(rows):
+        first = next((c for c in fields if c), "")
+        # Strip a possible BOM the same way ``_clean_columns`` does, so an
+        # Excel-saved file whose first cell starts with U+FEFF still matches.
+        first = first.replace("﻿", "")
+        if first in _HEADER_FIRST_CELL_CANDIDATES:
+            header_row = i
+            break
+
+    if header_row is None:
+        logger.warning(
+            "could not detect header row in %s, falling back to legacy positional skip",
+            path,
+        )
+        return _LEGACY_HEADER_ROW, list(_LEGACY_SKIPROWS)
+
+    skiprows: list[int] = []
+    for j in range(header_row + 1, len(rows)):
+        first = next((c for c in rows[j] if c), "")
+        if _looks_like_unit_row(first):
+            skiprows.append(j)
+            continue
+        # First plausible data row: stop greedy unit-row consumption.
+        break
+    return header_row, skiprows
+
+
+def _looks_like_unit_row(first_cell: str) -> bool:
+    """Return ``True`` if ``first_cell`` looks like a unit / separator row.
+
+    A row whose first non-empty cell parses as a number is considered a
+    data row and is *not* skipped. Anything matching the unit / channel-id
+    / separator patterns in :data:`_UNIT_ROW_FIRST_CELL_PATTERNS` is.
+    """
+    if not first_cell:
+        # An entirely blank row immediately after the header is treated as
+        # a separator and skipped.
+        return True
+    try:
+        float(first_cell)
+    except ValueError:
+        pass
+    else:
+        return False
+    return any(p.match(first_cell) for p in _UNIT_ROW_FIRST_CELL_PATTERNS)
 
 
 def _read_renzoku_data_py(path: Path, encoding: str, column_lang: ColumnLang) -> pd.DataFrame:
