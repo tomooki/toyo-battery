@@ -180,13 +180,16 @@ def test_only_rest_rows_returns_empty() -> None:
 
 
 def test_cell_chdis_df_is_cached(make_cell_dir: Callable[..., Path]) -> None:
-    """Cell.chdis_df is a cached_property — second access returns the same object."""
+    """Cell.chdis_df returns equal-but-distinct frames; computation is cached."""
     cell_dir = make_cell_dir("renzoku")
     cell = Cell.from_dir(cell_dir)
 
     first = cell.chdis_df
     second = cell.chdis_df
-    assert first is second
+    # Defensive-copy contract: each access returns a fresh frame, but the
+    # underlying cached computation is reused so the contents are identical.
+    assert first is not second
+    pd.testing.assert_frame_equal(first, second)
     assert (1, "ch", "電気量") in first.columns
     assert (1, "dis", "電気量") in first.columns
 

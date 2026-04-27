@@ -265,13 +265,16 @@ def test_cc_cv_plateau_preserves_tail_capacity() -> None:
 
 
 def test_cell_dqdv_df_is_cached(make_cell_dir: Callable[..., Path]) -> None:
-    """Cell.dqdv_df is cached_property — second access returns the same object."""
+    """Cell.dqdv_df returns equal-but-distinct frames; computation is cached."""
     cell_dir = make_cell_dir("renzoku")
     cell = Cell.from_dir(cell_dir)
 
     first = cell.dqdv_df
     second = cell.dqdv_df
-    assert first is second
+    # Defensive-copy contract: each access returns a fresh frame, but the
+    # cached computation is reused so contents are identical.
+    assert first is not second
+    pd.testing.assert_frame_equal(first, second)
     # The synthetic renzoku fixture has a very small voltage span (0.1 V for
     # ch, 0.2 V for dis) so ipnum=int(100*0.1)=10 < window_length=11 → both
     # segments produce NaN columns by design. The shape + column layout must

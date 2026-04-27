@@ -211,11 +211,17 @@ def test_cycle_with_all_nan_ch_side_preserves_row_as_nan() -> None:
 
 
 def test_cell_cap_df_cached_and_columns(make_cell_dir: Callable[..., Path]) -> None:
-    """Cell.cap_df integrates the capacity function and is cached."""
+    """Cell.cap_df integrates the capacity function and is cached.
+
+    Defensive-copy contract: each access returns a fresh frame (not the
+    same object), but the underlying computation is cached so contents
+    match exactly.
+    """
     cell = Cell.from_dir(make_cell_dir("renzoku"))
     first = cell.cap_df
     second = cell.cap_df
-    assert first is second
+    assert first is not second
+    pd.testing.assert_frame_equal(first, second)
     assert (cell.cap_df.columns == ["q_ch", "q_dis", "ce"]).all()
     assert cell.cap_df.index.name == "cycle"
 
