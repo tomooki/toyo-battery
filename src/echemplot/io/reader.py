@@ -68,6 +68,37 @@ from echemplot.io.schema import (
 
 logger = logging.getLogger(__name__)
 
+
+class EncodingError(ValueError):
+    """Raised when a TOYO file cannot be decoded with the configured encoding.
+
+    Subclasses :class:`ValueError` so callers that already catch
+    ``ValueError`` keep working. The message includes the file path, the
+    encoding being attempted, the byte position of the first bad sequence
+    (from :class:`UnicodeDecodeError`), and a hint for overriding the
+    encoding via :func:`read_cell_dir`.
+    """
+
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        expected_encoding: str,
+        original: UnicodeDecodeError,
+    ) -> None:
+        self.path = Path(path)
+        self.expected_encoding = expected_encoding
+        self.original = original
+        msg = (
+            f"failed to decode {self.path} with encoding={expected_encoding!r}: "
+            f"invalid byte(s) at position {original.start}-{original.end} "
+            f"({original.reason}); "
+            f"pass `encoding=<other>` to `read_cell_dir` to override "
+            f"(default 'shift_jis')."
+        )
+        super().__init__(msg)
+
+
 RAW_FILENAME_RE = re.compile(r"[0-9]{6}")
 PTN_SUFFIX = ".ptn"  # matched case-insensitively (Linux CI is case-sensitive)
 RENZOKU_DATA = "連続データ.csv"
@@ -109,8 +140,12 @@ def read_ptn_mass(ptn_path: str | Path) -> float:
     skip them.
     """
     path = Path(ptn_path)
-    with path.open(encoding="shift_jis", errors="replace") as f:
-        first_line = f.readline()
+    encoding = "shift_jis"
+    try:
+        with path.open(encoding=encoding) as f:
+            first_line = f.readline()
+    except UnicodeDecodeError as e:
+        raise EncodingError(path, expected_encoding=encoding, original=e) from e
     tokens = first_line.split()
     if len(tokens) < 3:
         raise ValueError(
@@ -434,19 +469,22 @@ def _extract_mass_from_renzoku_metadata(path: Path, encoding: str) -> float | No
     Native 連続データ.csv has 3 metadata rows before the column-name row;
     the 3rd carries ``,重量[mg],<value>`` where <value> is in milligrams.
     """
-    with path.open(encoding=encoding, errors="replace") as f:
-        for _ in range(_METADATA_SCAN_ROWS):
-            line = f.readline()
-            if not line:
-                return None
-            fields = [c.strip() for c in line.rstrip("\r\n").split(",")]
-            for i, cell in enumerate(fields):
-                if cell == _METADATA_MASS_KEY and i + 1 < len(fields):
-                    try:
-                        mg = float(fields[i + 1])
-                    except ValueError:
-                        return None
-                    return mg * 1e-3
+    try:
+        with path.open(encoding=encoding) as f:
+            for _ in range(_METADATA_SCAN_ROWS):
+                line = f.readline()
+                if not line:
+                    return None
+                fields = [c.strip() for c in line.rstrip("\r\n").split(",")]
+                for i, cell in enumerate(fields):
+                    if cell == _METADATA_MASS_KEY and i + 1 < len(fields):
+                        try:
+                            mg = float(fields[i + 1])
+                        except ValueError:
+                            return None
+                        return mg * 1e-3
+    except UnicodeDecodeError as e:
+        raise EncodingError(path, expected_encoding=encoding, original=e) from e
     return None
 
 
