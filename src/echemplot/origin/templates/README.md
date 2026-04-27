@@ -23,3 +23,11 @@ three filenames. `push_to_origin` resolves templates in this order:
 
 If a required template is missing at runtime, `push_to_origin` raises
 `FileNotFoundError` with a message naming both remediation paths.
+
+**Version coupling note**: When you upgrade `echemplot`, the bundled `.otpu`
+templates may have changed. If you've set `ECHEMPLOT_ORIGIN_TEMPLATE_DIR` to
+a custom directory, unset it (or copy the new bundled templates from
+`<wheel>/echemplot/origin/templates/` into your override directory) — Origin
+will otherwise instantiate graphs using the old template, and the worksheet
+column layout produced by the new code may not match what the old template
+binds to.
