@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+- **Breaking**: `Cell` now deep-copies the input frame on construction and
+  returns defensive copies on every read of `raw_df` / `chdis_df` /
+  `cap_df` / `dqdv_df`. Code that previously relied on mutating
+  `cell.raw_df` to influence cached derivatives must now build a new
+  `Cell`. Memory cost for the constructor copy is ~2× the raw frame
+  size. ([#103])
+
 ### Added
 - `DataIntegrityWarning` (in `echemplot.core`) emitted by `get_chdis_df`
   when the running-max filter drops rows, surfacing previously-silent
@@ -310,6 +318,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#95]: https://github.com/tomooki/toyo-battery/issues/95
 [#98]: https://github.com/tomooki/toyo-battery/issues/98
 [#99]: https://github.com/tomooki/toyo-battery/issues/99
+[#103]: https://github.com/tomooki/toyo-battery/issues/103
 [#104]: https://github.com/tomooki/toyo-battery/issues/104
 [#107]: https://github.com/tomooki/toyo-battery/pull/107
 [#108]: https://github.com/tomooki/toyo-battery/pull/108
