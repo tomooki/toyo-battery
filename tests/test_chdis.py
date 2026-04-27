@@ -82,7 +82,7 @@ def test_capacity_step_boundary_within_charge_state_dropped() -> None:
     CC→CV sub-step boundary in raw-6-digit format, where 経過時間[Sec]
     restarts) must be dropped wholesale — including any row in the new
     sub-step that happens to inch up versus its immediate predecessor.
-    Regression for the V–Q loop-back artifact reported with the negative
+    Regression for the V-Q loop-back artifact reported with the negative
     electrode's first Li-insertion curve."""
     df = _raw(
         [

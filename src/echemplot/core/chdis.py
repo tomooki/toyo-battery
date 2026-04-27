@@ -18,10 +18,10 @@ hand-crafted dataset with polarity applied) segments correctly. Rows
 whose ``|電気量|`` falls below the segment's running maximum are dropped.
 This handles both single-row tester glitches (e.g. 500→400→600, the 400
 is dropped) and sustained discontinuities such as the raw-6-digit CC→CV
-sub-step boundary where ``経過時間[Sec]`` resets and a fresh ``t × I``
-series begins below the prior segment's peak. Such CV-hold ``t × I``
+sub-step boundary where ``経過時間[Sec]`` resets and a fresh ``t*I``
+series begins below the prior segment's peak. Such CV-hold ``t*I``
 values are not true cumulative ``∫I dt`` capacity anyway, so dropping
-them is the correct behavior for V–Q plotting.
+them is the correct behavior for V-Q plotting.
 
 First-cycle-is-charge normalization: if cycle 1 begins with 放電 (discharge),
 *all* 状態 labels in the frame are swapped (充電 ↔ 放電). This is the TOYO
@@ -128,7 +128,7 @@ def get_chdis_df(df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.Data
         # Drop rows whose |電気量| falls below the segment's running maximum.
         # Local diff()<0 was insufficient: in raw-6-digit data 経過時間[Sec]
         # resets at CC→CV sub-step boundaries (not just state boundaries),
-        # so capacity drops by ~200 mAh/g and a row whose t×I happens to
+        # so capacity drops by ~200 mAh/g and a row whose t*I happens to
         # inch up vs. its immediate predecessor would leak through and
         # produce a spurious connecting line in plot_chdis.
         cap = g[cap_col].abs().reset_index(drop=True)
