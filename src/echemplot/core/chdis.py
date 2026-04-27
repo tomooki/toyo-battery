@@ -15,7 +15,13 @@ reproduces the same convention because its ``経過時間[Sec]`` resets at
 state transitions and its ``電流[mA]`` is unsigned. The reversal filter
 nonetheless takes ``|電気量|`` so that *any* signed input (e.g. a
 hand-crafted dataset with polarity applied) segments correctly. Rows
-where ``|電気量|.diff() < 0`` are dropped as tester-side glitches.
+whose ``|電気量|`` falls below the segment's running maximum are dropped.
+This handles both single-row tester glitches (e.g. 500→400→600, the 400
+is dropped) and sustained discontinuities such as the raw-6-digit CC→CV
+sub-step boundary where ``経過時間[Sec]`` resets and a fresh ``t × I``
+series begins below the prior segment's peak. Such CV-hold ``t × I``
+values are not true cumulative ``∫I dt`` capacity anyway, so dropping
+them is the correct behavior for V–Q plotting.
 
 First-cycle-is-charge normalization: if cycle 1 begins with 放電 (discharge),
 *all* 状態 labels in the frame are swapped (充電 ↔ 放電). This is the TOYO
@@ -119,10 +125,15 @@ def get_chdis_df(df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.Data
     pieces: dict[tuple[int, str], pd.DataFrame] = {}
     for (cycle_val, state_val), g in working.groupby([cycle_col, state_col], sort=True):
         side = _STATE_TO_SIDE[str(state_val)]
-        # abs() is defensive: real TOYO data (both 連続データ and raw-6-digit
-        # paths) is already monotone non-decreasing per segment; abs() keeps
-        # the filter correct under any hand-crafted signed input.
-        segment = g[[cap_col, v_col]].loc[~(g[cap_col].abs().diff() < 0)].reset_index(drop=True)
+        # Drop rows whose |電気量| falls below the segment's running maximum.
+        # Local diff()<0 was insufficient: in raw-6-digit data 経過時間[Sec]
+        # resets at CC→CV sub-step boundaries (not just state boundaries),
+        # so capacity drops by ~200 mAh/g and a row whose t×I happens to
+        # inch up vs. its immediate predecessor would leak through and
+        # produce a spurious connecting line in plot_chdis.
+        cap = g[cap_col].abs().reset_index(drop=True)
+        keep = (cap == cap.cummax()).to_numpy()
+        segment = g[[cap_col, v_col]].iloc[keep].reset_index(drop=True)
         pieces[(int(cycle_val), side)] = segment
 
     out = pd.concat(pieces, axis=1)
