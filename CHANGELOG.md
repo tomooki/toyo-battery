@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   size. ([#103])
 
 ### Added
+- Added per-frame row-continuity validation in `_read_raw_6digit`: each
+  constituent 6-digit file is now checked for monotone-non-decreasing
+  `経過時間[Sec]` within state segments. Truncated or corrupt 6-digit
+  files now raise the new `echemplot.io.RawConcatError` instead of
+  silently joining into a stitched DataFrame. ([#97])
 - `DataIntegrityWarning` (in `echemplot.core`) emitted by `get_chdis_df`
   when the running-max filter drops rows, surfacing previously-silent
   data loss for hand-preprocessed inputs. One aggregated summary warning
@@ -344,6 +349,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#94]: https://github.com/tomooki/toyo-battery/issues/94
 [#95]: https://github.com/tomooki/toyo-battery/issues/95
 [#96]: https://github.com/tomooki/toyo-battery/issues/96
+[#97]: https://github.com/tomooki/toyo-battery/issues/97
 [#98]: https://github.com/tomooki/toyo-battery/issues/98
 [#99]: https://github.com/tomooki/toyo-battery/issues/99
 [#100]: https://github.com/tomooki/toyo-battery/issues/100
