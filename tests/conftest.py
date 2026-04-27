@@ -14,6 +14,7 @@ from typing import Callable, Literal
 import pytest
 
 Layout = Literal["renzoku", "renzoku_py", "raw_6digit"]
+PtnDialect = Literal["concat", "spaced"]
 
 # Row template shared between layouts so the three fixtures stay in sync.
 # Each tuple: (cycle, mode, state_int, voltage, elapsed_s, current_mA,
@@ -53,6 +54,7 @@ def make_cell_dir(tmp_path: Path) -> Callable[..., Path]:
         *,
         name: str = "cell_A",
         mass: float = _DEFAULT_MASS_G,
+        ptn_dialect: PtnDialect = "concat",
     ) -> Path:
         d = tmp_path / name
         d.mkdir()
@@ -61,7 +63,7 @@ def make_cell_dir(tmp_path: Path) -> Callable[..., Path]:
         elif layout == "renzoku_py":
             _write_renzoku_py(d)
         elif layout == "raw_6digit":
-            _write_raw_6digit(d, mass_g=mass)
+            _write_raw_6digit(d, mass_g=mass, ptn_dialect=ptn_dialect)
         else:
             raise ValueError(f"unknown layout: {layout}")
         return d
@@ -120,7 +122,12 @@ def _write_renzoku_py(cell_dir: Path) -> None:
     (cell_dir / "連続データ_py.csv").write_text("\n".join(lines) + "\n", encoding="shift_jis")
 
 
-def _write_raw_6digit(cell_dir: Path, *, mass_g: float) -> None:
+def _write_raw_6digit(
+    cell_dir: Path,
+    *,
+    mass_g: float,
+    ptn_dialect: PtnDialect = "concat",
+) -> None:
     """Write a real-format 6-digit raw file plus ``.PTN`` mass files.
 
     Real format:
@@ -153,15 +160,39 @@ def _write_raw_6digit(cell_dir: Path, *, mass_g: float) -> None:
         )
     (cell_dir / "000001").write_text("\n".join(lines) + "\n", encoding="shift_jis")
 
-    # Main PTN: fixed-column. ``split()[2]`` extracts the mass in grams.
-    ptn_main = (
-        f" 1Synthetic                                 2 {mass_g:09.6f}       1{mass_g:09.6f}"
-        f"TestCell                                 24 00000"
-    )
-    (cell_dir / "pattern.PTN").write_text(ptn_main + "\n", encoding="shift_jis")
+    write_ptn_main(cell_dir / "pattern.PTN", mass_g=mass_g, dialect=ptn_dialect)
 
     # Companion PTN: INI-style header, no mass. `read_ptn_mass` raises on this
     # and the reader falls through to the main PTN.
     (cell_dir / "pattern_OPTION.PTN").write_text(
         "[BaseCellCapacity]\nCapacity=0.1\n", encoding="shift_jis"
     )
+
+
+def write_ptn_main(
+    path: Path,
+    *,
+    mass_g: float,
+    dialect: PtnDialect = "concat",
+    operator: str = "Synthetic",
+    sample: str = "TestCell",
+) -> None:
+    """Write a single main ``.PTN`` first-line in the requested TOYO dialect.
+
+    ``concat`` is the newer dialect (cyclers No5/No1) where the per-electrode
+    flag is glued to the mass: ``"00.001000"``. ``spaced`` is the older
+    dialect (cycler No6) where flag and mass are space-separated and the
+    mass uses ``%.5f``: ``"0 0.00100"``. Both occupy a 9-char composite
+    field and the surrounding fixed-width layout is otherwise identical.
+    """
+    operator_field = f" 1{operator}".ljust(42)
+    if dialect == "concat":
+        field1 = f"0{mass_g:.6f}".rjust(9)
+        field2 = f"1{mass_g:.6f}".rjust(9)
+    elif dialect == "spaced":
+        field1 = f"0 {mass_g:.5f}".rjust(9)
+        field2 = f"1 {mass_g:.5f}".rjust(9)
+    else:
+        raise ValueError(f"unknown dialect: {dialect}")
+    line0 = f"{operator_field}2 {field1}       {field2}{sample}"
+    path.write_text(line0 + "\n", encoding="shift_jis")
