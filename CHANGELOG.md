@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-04-27
+
 ### Fixed
 - `read_cell_dir` no longer raises `ValueError: unknown 状態 codes in
   source: [9]` on raw 6-digit cell directories whose last data row is
@@ -16,7 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   state-code mapping. Unknown state codes that appear mid-file or with
   non-zero flow still raise, and the error now reports the offending
   row index and a link to file an issue. ([#91])
+- `read_cell_dir` now handles the older TOYO PTN dialect where the
+  active-material mass is rendered as `"<flag> <mass>"` (e.g.
+  `"0 0.00116"`) instead of the newer concatenated form
+  (`"00.000358"`). The reader previously returned `0.0` (the flag)
+  on the spaced dialect and failed downstream with `mass is missing
+  or non-positive`. The v2.01 heuristic is restored: take
+  `tokens[2]`; if it parses as exactly zero, fall back to
+  `tokens[3]`. ([#90])
 
+[#90]: https://github.com/tomooki/toyo-battery/pull/90
 [#91]: https://github.com/tomooki/toyo-battery/issues/91
 
 ## [0.1.6] - 2026-04-23
@@ -205,7 +216,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-alpha.** Public API is unstable and may change without deprecation in
   0.0.x releases.
 
-[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/tomooki/toyo-battery/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/tomooki/toyo-battery/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/tomooki/toyo-battery/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/tomooki/toyo-battery/compare/v0.1.3...v0.1.4
