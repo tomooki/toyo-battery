@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- `STATE_CODE_TO_JA` / `STATE_CODE_TO_EN` / `STATE_JA_TO_EN` now register
+  state code `9` as `中断` / `abort`. Empirically observed across TOYO
+  cyclers No1, No2, and No6 as the end-of-test / abort sentinel —
+  usually a single trailing row, sometimes with non-zero 経過時間/電流
+  values left from the moment of interruption. v0.1.7 only handled the
+  zero-flow variant via the trailing-sentinel drop; the non-zero-flow
+  variant (e.g. `Z:\TOYO\No2\DAT\KH-337-P2-NaFeNiMn-NiFe-21-37Vdis\13`)
+  still raised. With code 9 promoted to a known state, the row is now
+  preserved as `中断` regardless of position or flow values. Downstream
+  `chdis` filters non-charge/discharge rows out of the segmentation
+  input, so `capacity`, `dQ/dV`, `stats`, plotting, and Origin output
+  are unaffected. ([#91])
+
+### Backwards-compatibility note
+- Raw 6-digit DataFrames whose source file contains state-9 rows now
+  contain those rows as `中断` (JA) / `abort` (EN). Earlier versions
+  silently dropped them when zero-flow (v0.1.7) or raised on them
+  (v0.1.6 and earlier with non-zero flow, v0.1.7 with non-zero flow).
+  Code that iterates over all rows and asserts a state ∈
+  `{充電, 放電, 休止, 充電休止, 放電休止}` set must extend its set to
+  include `中断`.
+
 ## [0.1.7] - 2026-04-27
 
 ### Fixed
