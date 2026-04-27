@@ -46,11 +46,12 @@ import warnings
 import pandas as pd
 
 from echemplot.core import DataIntegrityWarning
-from echemplot.io.schema import JA_COLS, JA_TO_EN, ColumnLang
+from echemplot.io.schema import JA_COLS, JA_TO_EN, STATE_JA_TO_EN, ColumnLang
 
-_CHARGE = "充電"
-_DISCHARGE = "放電"
-_STATE_TO_SIDE = {_CHARGE: "ch", _DISCHARGE: "dis"}
+_CHARGE_JA = "充電"
+_DISCHARGE_JA = "放電"
+_CHARGE_EN = STATE_JA_TO_EN[_CHARGE_JA]
+_DISCHARGE_EN = STATE_JA_TO_EN[_DISCHARGE_JA]
 
 _NEEDED_KEYS = ("cycle", "state", "voltage", "capacity")
 
@@ -59,6 +60,19 @@ def _resolve_cols(column_lang: ColumnLang) -> dict[str, str]:
     if column_lang == "ja":
         return {k: JA_COLS[k] for k in _NEEDED_KEYS}
     return {k: JA_TO_EN[JA_COLS[k]] for k in _NEEDED_KEYS}
+
+
+def _resolve_states(column_lang: ColumnLang) -> tuple[str, str, dict[str, str]]:
+    """Return (charge, discharge, side_map) labels for the active language.
+
+    The reader translates state values when ``column_lang='en'``, so
+    chdis must filter on EN literals in EN mode. ``side_map`` keys are the
+    state literals; values are the canonical "ch"/"dis" side codes used in
+    the output MultiIndex.
+    """
+    if column_lang == "ja":
+        return _CHARGE_JA, _DISCHARGE_JA, {_CHARGE_JA: "ch", _DISCHARGE_JA: "dis"}
+    return _CHARGE_EN, _DISCHARGE_EN, {_CHARGE_EN: "ch", _DISCHARGE_EN: "dis"}
 
 
 def _empty_result() -> pd.DataFrame:
@@ -74,8 +88,11 @@ def get_chdis_df(df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.Data
     df
         Output of :func:`echemplot.io.reader.read_cell_dir`. Must contain
         サイクル/状態/電圧/電気量 columns (or their EN equivalents when
-        ``column_lang="en"``). ``状態`` cell values are always JA
-        (``充電``/``放電``/``休止``) regardless of ``column_lang``.
+        ``column_lang="en"``). ``状態`` cell values follow ``column_lang``:
+        JA literals (``充電``/``放電``/``休止``/``充電休止``/``放電休止``/
+        ``中断``) when ``column_lang='ja'``, EN equivalents (``charge``/
+        ``discharge``/``rest``/``charge_rest``/``discharge_rest``/``abort``)
+        when ``column_lang='en'``.
     column_lang
         Language of the input column names and the ``quantity`` level of
         the returned MultiIndex.
@@ -108,23 +125,28 @@ def get_chdis_df(df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.Data
         cols["cycle"],
         cols["state"],
     )
+    charge_lbl, discharge_lbl, state_to_side = _resolve_states(column_lang)
 
-    working = df.loc[df[state_col].isin([_CHARGE, _DISCHARGE])].reset_index(drop=True)
+    working = df.loc[df[state_col].isin([charge_lbl, discharge_lbl])].reset_index(drop=True)
     if working.empty:
         return _empty_result()
 
     first_cycle = working[cycle_col].min()
     first_state = working.loc[working[cycle_col] == first_cycle, state_col].iloc[0]
-    if first_state == _DISCHARGE:
+    if first_state == discharge_lbl:
         working = working.assign(
-            **{state_col: working[state_col].map({_CHARGE: _DISCHARGE, _DISCHARGE: _CHARGE})}
+            **{
+                state_col: working[state_col].map(
+                    {charge_lbl: discharge_lbl, discharge_lbl: charge_lbl}
+                )
+            }
         )
 
     pieces: dict[tuple[int, str], pd.DataFrame] = {}
     total_dropped = 0
     segments_with_drops = 0
     for (cycle_val, state_val), g in working.groupby([cycle_col, state_col], sort=True):
-        side = _STATE_TO_SIDE[str(state_val)]
+        side = state_to_side[str(state_val)]
         # Drop rows whose |電気量| falls below the segment's running maximum.
         # Local diff()<0 was insufficient: in raw-6-digit data 経過時間[Sec]
         # resets at CC→CV sub-step boundaries (not just state boundaries),

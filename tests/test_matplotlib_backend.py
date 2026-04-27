@@ -85,13 +85,16 @@ def _linear_cell(
     q_ch = 400.0 * (v_ch - v_lo)
     v_dis = np.linspace(v_hi, v_lo, n_points)
     q_dis = 400.0 * (v_hi - v_dis)
-    for cycle in range(1, n_cycles + 1):
-        rows += [(cycle, "1", "充電", float(vi), float(qi)) for vi, qi in zip(v_ch, q_ch)]
-        rows += [(cycle, "1", "放電", float(vi), float(qi)) for vi, qi in zip(v_dis, q_dis)]
     if column_lang == "ja":
+        charge_lbl, discharge_lbl = "充電", "放電"
         columns = ["サイクル", "モード", "状態", "電圧", "電気量"]
     else:
+        # EN-mode chdis filters on EN state literals (issue #94).
+        charge_lbl, discharge_lbl = "charge", "discharge"
         columns = ["cycle", "mode", "state", "voltage", "capacity"]
+    for cycle in range(1, n_cycles + 1):
+        rows += [(cycle, "1", charge_lbl, float(vi), float(qi)) for vi, qi in zip(v_ch, q_ch)]
+        rows += [(cycle, "1", discharge_lbl, float(vi), float(qi)) for vi, qi in zip(v_dis, q_dis)]
     raw = pd.DataFrame(rows, columns=columns)
     return Cell(name=name, mass_g=0.001, raw_df=raw, column_lang=column_lang)
 

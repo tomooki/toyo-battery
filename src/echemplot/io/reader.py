@@ -21,9 +21,11 @@ any extra source columns such as 経過時間[Sec] / 電流[mA] / 日付 / 時�
                                  row, sometimes with non-zero 経過時間/電流.)
       - 連続データ_py.csv:       whatever was persisted (usually the 3-value set)
 
-When ``column_lang="en"`` is requested, only column *names* are translated.
-状態 cell values stay JP — translate via ``schema.STATE_JA_TO_EN`` downstream
-if needed.
+When ``column_lang="en"`` is requested, both column *names* and 状態 cell
+values are translated. State values are mapped via ``schema.STATE_JA_TO_EN``
+(e.g. ``充電休止`` → ``charge_rest``) so EN-mode consumers receive a fully
+EN frame. Unknown JA-string state literals raise ``ValueError`` regardless
+of ``column_lang`` — same strictness as the unknown-numeric-state branch.
 
 The active-material mass (grams) is resolved in this priority order:
 
@@ -60,6 +62,7 @@ from echemplot.io.schema import (
     COL_ELAPSED_S,
     JA_TO_EN,
     STATE_CODE_TO_JA,
+    STATE_JA_TO_EN,
     ColumnLang,
 )
 
@@ -314,6 +317,8 @@ def _finalize(df: pd.DataFrame, column_lang: ColumnLang) -> pd.DataFrame:
             len(dropped),
             dropped,
         )
+    # Step 1: numeric → JA. Both branches (numeric source and already-JA
+    # string source) converge on a JA-string 状態 column before validation.
     if pd.api.types.is_numeric_dtype(out["状態"]):
         mapped = out["状態"].map(STATE_CODE_TO_JA)
         unmapped_mask = mapped.isna() & out["状態"].notna()
@@ -329,8 +334,33 @@ def _finalize(df: pd.DataFrame, column_lang: ColumnLang) -> pd.DataFrame:
                 "with a sample file."
             )
         out["状態"] = mapped
+    # Step 2: validate JA-string 状態 strictly. The numeric branch is
+    # already exhaustive (mapped values are by definition in
+    # STATE_CODE_TO_JA's value set, all of which are STATE_JA_TO_EN keys);
+    # this guard primarily catches unknown literals from native
+    # 連続データ.csv / 連続データ_py.csv sources that were never mapped
+    # through STATE_CODE_TO_JA.
+    state_notna = out["状態"].notna()
+    unknown_mask = state_notna & ~out["状態"].isin(STATE_JA_TO_EN)
+    if unknown_mask.any():
+        bad_labels = sorted(out.loc[unknown_mask, "状態"].unique().tolist())
+        first_bad_idx = int(out.index[unknown_mask][0])
+        raise ValueError(
+            f"unknown 状態 labels in source: {bad_labels} "
+            f"(known labels: {sorted(STATE_JA_TO_EN)}); "
+            f"first seen at row {first_bad_idx}. If this is a TOYO "
+            "label we have not yet catalogued, please file an issue at "
+            "https://github.com/tomooki/toyo-battery/issues "
+            "with a sample file."
+        )
     out = out.reset_index(drop=True)
+    # Step 3: JA → EN translation when requested. Column names always
+    # translate; state values translate so EN-mode callers receive a fully
+    # EN frame. NaN rows are preserved by ``Series.map`` (na_action='ignore'
+    # default in modern pandas, but we pass it explicitly via the dict
+    # which leaves missing values untouched).
     if column_lang == "en":
+        out["状態"] = out["状態"].map(lambda v: STATE_JA_TO_EN[v] if pd.notna(v) else v)
         out = out.rename(columns={c: JA_TO_EN.get(c, c) for c in out.columns})
     return cast("pd.DataFrame", out)
 

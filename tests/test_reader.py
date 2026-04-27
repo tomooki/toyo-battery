@@ -514,9 +514,82 @@ def test_column_lang_en(make_cell_dir: Callable[..., Path]) -> None:
     # extras translated via schema.JA_TO_EN
     assert "elapsed_time_s" in df.columns
     assert "current_ma" in df.columns
-    # state values are NOT translated here — that is schema.STATE_JA_TO_EN's job
-    # when needed by downstream consumers
-    assert set(df["state"].unique()) <= {"休止", "充電", "放電"}
+    # State values are translated to EN (issue #94) so EN-mode consumers
+    # receive a fully EN frame.
+    assert set(df["state"].unique()) <= {"rest", "charge", "discharge"}
+
+
+def test_finalize_translates_state_values_when_lang_en(tmp_path: Path) -> None:
+    """Native 連続データ.csv state literals translate to EN when requested.
+
+    Pins the issue #94 contract: the reader maps every JA literal in the
+    extended STATE_JA_TO_EN set (including 充電休止/放電休止 substates) to
+    its EN equivalent.
+    """
+    from tests.conftest import write_renzoku_with_states
+
+    d = tmp_path / "cell"
+    d.mkdir()
+    write_renzoku_with_states(
+        d,
+        rows=[
+            (1, "1", "充電", 3.50, 0.0),
+            (1, "1", "充電休止", 3.60, 100.0),
+            (1, "1", "放電", 3.55, 0.0),
+            (1, "1", "放電休止", 3.40, 50.0),
+            (1, "1", "中断", 3.40, 50.0),
+        ],
+    )
+    df, _ = read_cell_dir(d, column_lang="en")
+    assert df["state"].tolist() == [
+        "charge",
+        "charge_rest",
+        "discharge",
+        "discharge_rest",
+        "abort",
+    ]
+
+
+def test_finalize_raises_on_unknown_ja_state_string(tmp_path: Path) -> None:
+    """An unrecognized JA state literal (e.g. ``予期しない``) must raise.
+
+    Mirrors the strictness already enforced for unknown numeric state
+    codes — closing the asymmetry called out in issue #94.
+    """
+    from tests.conftest import write_renzoku_with_states
+
+    d = tmp_path / "cell"
+    d.mkdir()
+    write_renzoku_with_states(
+        d,
+        rows=[
+            (1, "1", "充電", 3.50, 0.0),
+            (1, "1", "予期しない", 3.55, 50.0),
+        ],
+    )
+    with pytest.raises(ValueError, match=r"unknown 状態 labels.*予期しない"):
+        read_cell_dir(d)
+
+
+def test_finalize_passes_charge_rest_through_unchanged_when_lang_ja(tmp_path: Path) -> None:
+    """In JA mode, native 充電休止/放電休止 substate labels must round-trip
+    untranslated. Belt-and-suspenders against the new validation step
+    accidentally normalizing JA literals."""
+    from tests.conftest import write_renzoku_with_states
+
+    d = tmp_path / "cell"
+    d.mkdir()
+    write_renzoku_with_states(
+        d,
+        rows=[
+            (1, "1", "充電", 3.50, 0.0),
+            (1, "1", "充電休止", 3.60, 100.0),
+            (1, "1", "放電", 3.55, 0.0),
+            (1, "1", "放電休止", 3.40, 50.0),
+        ],
+    )
+    df, _ = read_cell_dir(d, column_lang="ja")
+    assert df["状態"].tolist() == ["充電", "充電休止", "放電", "放電休止"]
 
 
 # ---- Cell.from_dir wiring -----------------------------------------------

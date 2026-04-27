@@ -437,11 +437,13 @@ def test_column_lang_en_input_produces_english_output() -> None:
     schema is EN-fixed regardless, so the column list is identical to the
     JA-input case.
     """
+    # EN-mode chdis filters on EN state literals (issue #94), so this
+    # frame uses ``charge``/``discharge`` to match its EN column names.
     rows = [
-        (1, "1", "充電", 3.0, 0.0),
-        (1, "1", "充電", 4.2, 1000.0),
-        (1, "1", "放電", 4.2, 0.0),
-        (1, "1", "放電", 3.0, 990.0),
+        (1, "1", "charge", 3.0, 0.0),
+        (1, "1", "charge", 4.2, 1000.0),
+        (1, "1", "discharge", 4.2, 0.0),
+        (1, "1", "discharge", 3.0, 990.0),
     ]
     raw = pd.DataFrame(rows, columns=["cycle", "mode", "state", "voltage", "capacity"])
     cell = Cell(name="en_cell", mass_g=0.001, raw_df=raw, column_lang="en")
