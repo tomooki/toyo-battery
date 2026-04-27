@@ -637,7 +637,9 @@ def test_cap_df_written_with_cycle_as_column(
     assert "cycle" in written.columns, (
         f"cycle column missing from cap_df write: {list(written.columns)}"
     )
-    # Order must match the _CYCLE_COL_* constants in _plots.py.
+    # Order must match the _CYCLE_SHEET_COLUMNS contract in
+    # echemplot.origin._worksheets — the cycle_efficiency template's
+    # add_plot indices are derived from that tuple.
     assert next(iter(written.columns)) == "cycle", list(written.columns)
 
 
@@ -1196,3 +1198,154 @@ def test_ranges_not_applied_when_dataframes_yield_no_finite_values(
 
     layer.axis.assert_not_called()
     layer.lt_exec.assert_not_called()
+
+
+# ----------------------------------------------------------------------
+# cap_df cycle-sheet column contract (issue #100)
+# ----------------------------------------------------------------------
+
+
+def _linear_cell_en(name: str, *, q_ch: float = 1000.0, q_dis: float = 990.0) -> Cell:
+    """Same shape as :func:`_linear_cell` but with EN raw columns + ``column_lang="en"``.
+
+    Used to confirm that the cycle-sheet contract holds across the
+    ``column_lang`` axis: ``get_cap_df`` always emits English derived
+    column names regardless of input language, so the same
+    :data:`_CYCLE_SHEET_COLUMNS` shape applies to both modes.
+    ``状態`` cell values stay JA — that's the documented per-row state
+    convention; only the *column headers* switch.
+    """
+    n_points = 30
+    rows: list[tuple[int, str, str, float, float]] = []
+    v_ch = np.linspace(3.0, 4.2, n_points)
+    q_ch_arr = np.linspace(0.0, q_ch, n_points)
+    rows.extend((1, "1", "充電", float(v), float(q)) for v, q in zip(v_ch, q_ch_arr))
+    v_dis = np.linspace(4.2, 3.0, n_points)
+    q_dis_arr = np.linspace(0.0, q_dis, n_points)
+    rows.extend((1, "1", "放電", float(v), float(q)) for v, q in zip(v_dis, q_dis_arr))
+    raw = pd.DataFrame(rows, columns=["cycle", "mode", "state", "voltage", "capacity"])
+    return Cell(name=name, mass_g=0.001, raw_df=raw, column_lang="en")
+
+
+def test_origin_cycle_sheet_contract_holds_for_default_capdf(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A normally-built ``Cell`` must satisfy the cycle-sheet column contract.
+
+    The Origin cycle_efficiency plot binds columns by 0-based positional
+    index; those indices are derived from
+    :data:`_CYCLE_SHEET_COLUMNS`. As long as
+    :func:`echemplot.core.capacity.get_cap_df` keeps emitting
+    ``[cycle, q_ch, q_dis, ce]`` in that order, ``push_to_origin`` must
+    complete without raising :class:`OriginContractError`.
+    """
+    _stub_templates(monkeypatch, tmp_path)
+    _install_mock_originpro(monkeypatch)
+    cell = _linear_cell("A")
+
+    from echemplot.origin import push_to_origin
+
+    # Must complete without raising the contract error. We don't assert
+    # on call counts here (separate tests already do); the goal is to
+    # exercise the contract gate on the happy path.
+    push_to_origin([cell], stat_cycles=(1,))
+
+
+def test_origin_cycle_sheet_contract_raises_on_reordered_capdf(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Reordering ``cap_df`` columns must raise :class:`OriginContractError`.
+
+    Patches :func:`echemplot.core.capacity.get_cap_df` (looked up where
+    :class:`Cell` imports it from, in :mod:`echemplot.core.cell`) to
+    return a frame whose columns swap ``q_ch`` and ``q_dis`` —
+    exercises the partial-drift case where the column *set* still matches
+    but the *order* is wrong, which would silently bind charge capacity
+    to the discharge-capacity axis if the contract weren't enforced.
+
+    The raised error must name both the expected and actual column
+    lists so a future maintainer can read the contract violation
+    straight from the traceback.
+    """
+    _stub_templates(monkeypatch, tmp_path)
+    _install_mock_originpro(monkeypatch)
+
+    from echemplot.core import cell as cell_mod
+    from echemplot.origin._worksheets import OriginContractError
+
+    real_get_cap_df = cell_mod.get_cap_df
+
+    def _reordered_get_cap_df(*args: Any, **kwargs: Any) -> pd.DataFrame:
+        df = real_get_cap_df(*args, **kwargs)
+        # Swap q_ch and q_dis: column set is unchanged, order is wrong.
+        return df[["q_dis", "q_ch", "ce"]]
+
+    monkeypatch.setattr(cell_mod, "get_cap_df", _reordered_get_cap_df)
+
+    cell = _linear_cell("A")
+
+    from echemplot.origin import push_to_origin
+
+    with pytest.raises(OriginContractError) as excinfo:
+        push_to_origin([cell], stat_cycles=(1,))
+
+    msg = str(excinfo.value)
+    # Both the expected and actual column lists must surface in the
+    # message so a future maintainer can diagnose the violation
+    # without grepping the source.
+    assert "cycle" in msg and "q_ch" in msg and "q_dis" in msg and "ce" in msg, msg
+    # The "got" list is the swapped order produced above
+    # (``cycle`` comes first via ``reset_index`` then the swapped pair).
+    assert "['cycle', 'q_dis', 'q_ch', 'ce']" in msg, msg
+    # And the expected list with the canonical order.
+    assert "['cycle', 'q_ch', 'q_dis', 'ce']" in msg, msg
+
+
+def test_origin_contract_error_subclasses_value_error() -> None:
+    """``OriginContractError`` must subclass ``ValueError``.
+
+    Callers of :func:`push_to_origin` already handle ``ValueError`` (the
+    ``sg_window`` validation raises plain ``ValueError``). Subclassing
+    keeps the broad ``except ValueError`` clauses in their code working
+    without an extra ``except OriginContractError`` arm.
+    """
+    from echemplot.origin._worksheets import OriginContractError
+
+    assert issubclass(OriginContractError, ValueError)
+
+
+@pytest.mark.parametrize("column_lang", ["ja", "en"])
+def test_origin_cycle_sheet_contract_works_for_both_langs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, column_lang: str
+) -> None:
+    """The cycle-sheet contract is the same in JA and EN ``column_lang`` modes.
+
+    :func:`echemplot.core.capacity.get_cap_df` documents its derived
+    column names as "fixed English" — ``column_lang`` only selects the
+    *input* quantity label read out of ``chdis_df``, not the output
+    schema. This test makes that invariant explicit at the Origin push
+    boundary so a future change to ``get_cap_df`` that started honoring
+    ``column_lang`` for output names would fail loudly here AND the
+    underlying ``OriginContractError`` raised from ``write_cell_sheets``.
+    """
+    _stub_templates(monkeypatch, tmp_path)
+    _, sheet_objs, _ = _install_tracking_originpro(monkeypatch)
+
+    cell = _linear_cell("A") if column_lang == "ja" else _linear_cell_en("A")
+
+    from echemplot.origin import push_to_origin
+
+    push_to_origin([cell], stat_cycles=(1,))
+
+    # Sheet creation order: chdis → cycle → dqdv → stat_table.
+    cycle_sheet = sheet_objs[1]
+    from_df_call = cycle_sheet.from_df.call_args
+    assert from_df_call is not None, "from_df not called on cycle sheet"
+    written = from_df_call.args[0]
+    # The contract holds in both modes: same English column names in
+    # the same order, regardless of which language the cell was built
+    # with. If this ever flips the test catches it before Origin
+    # silently mis-binds.
+    assert list(written.columns) == ["cycle", "q_ch", "q_dis", "ce"], (
+        f"column_lang={column_lang!r} produced {list(written.columns)}"
+    )

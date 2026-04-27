@@ -51,6 +51,52 @@ logger = logging.getLogger("echemplot.origin")
 # without an ``op`` handle in tests.
 _SHEET_NAME_MAX = 32
 
+# Contracted column shape for ``cap_df.reset_index()``: the cycle index
+# surfaced as the first column followed by the three derived metrics. The
+# metric columns are always English (``q_ch`` / ``q_dis`` / ``ce``) per
+# :func:`echemplot.core.capacity.get_cap_df`'s "fixed English" contract,
+# regardless of the cell's ``column_lang`` (which only selects the *input*
+# quantity label read out of ``chdis_df``). The cycle index is always
+# named ``cycle`` (set in ``get_cap_df``'s ``out.index.name = "cycle"``).
+#
+# This tuple is the single source of truth for both:
+# * the cycle_efficiency template's add_plot column indices
+#   (:func:`echemplot.origin._plots._bind_cycle`), and
+# * the worksheet-write-time contract assertion enforced in
+#   :func:`write_cell_sheets`.
+#
+# A future refactor that changes ``get_cap_df`` 's column names or order
+# must update this tuple, otherwise :class:`OriginContractError` fires
+# loudly during the next push instead of letting Origin silently bind the
+# wrong column to the cycle_efficiency plot.
+_CYCLE_SHEET_COLUMNS: tuple[str, ...] = ("cycle", "q_ch", "q_dis", "ce")
+
+
+class OriginContractError(ValueError):
+    """Raised when a DataFrame handed to the Origin push path violates a contract.
+
+    The Origin adapter binds plots to worksheet columns by *index*
+    (``add_plot(sheet, colx=..., coly=...)``) since ``originpro``'s
+    template-backed graph API takes 0-based positionals, not column
+    names. Inside the package we look up those positionals by name
+    against a contracted shape (e.g. :data:`_CYCLE_SHEET_COLUMNS` for
+    ``cap_df.reset_index()``); when the shape doesn't match, binding
+    silently to the wrong columns would produce a graph with the right
+    template but wrong-axis data — the worst kind of failure mode for a
+    visual diagnostic tool.
+
+    Subclasses :class:`ValueError` so callers that already catch
+    ``ValueError`` (e.g. ``push_to_origin``'s ``sg_window`` validation)
+    keep working without an extra ``except`` clause.
+
+    The package-internal nature of this exception is intentional: callers
+    of :func:`echemplot.origin.push_to_origin` should treat it as a
+    "your input frame is malformed" :class:`ValueError`, not a special
+    type to catch by name. Re-export from
+    :mod:`echemplot.origin` is therefore deliberately omitted.
+    """
+
+
 # Length of the hash suffix appended when a name must be truncated.
 # 8 hex chars from a SHA-1 gives ~4e9 uniqueness — ample for per-project
 # disambiguation and short enough to leave room for a recognizable prefix.
@@ -237,6 +283,28 @@ def write_cell_sheets(
     # regular column so Origin has an X source for the cycle_efficiency
     # plot. Matches the pattern :func:`write_stat_table` already uses.
     cap = cell.cap_df.reset_index()
+    # Contract gate: the cycle_efficiency plot binds columns by 0-based
+    # positional index, and those indices are derived in :mod:`._plots`
+    # from the canonical name order in :data:`_CYCLE_SHEET_COLUMNS`. If
+    # ``get_cap_df``'s output shape ever drifts (column rename, new
+    # column inserted in the middle, etc.) we want the push to fail
+    # loudly here — a wrong-axis cycle plot is a silent-correctness bug
+    # that would slip past every existing test. Verifying both names AND
+    # order guards against partial drift (e.g. q_ch and q_dis swapping
+    # places: the column set is still correct, but the bind would now
+    # plot charge capacity on the discharge-capacity axis).
+    actual_cap_cols = tuple(str(c) for c in cap.columns)
+    if actual_cap_cols != _CYCLE_SHEET_COLUMNS:
+        raise OriginContractError(
+            "cap_df.reset_index() column shape violates the cycle_efficiency "
+            "plot contract. Expected columns "
+            f"{list(_CYCLE_SHEET_COLUMNS)} (in this order); "
+            f"got {list(actual_cap_cols)}. "
+            "If echemplot.core.capacity.get_cap_df's output schema "
+            "changed intentionally, update _CYCLE_SHEET_COLUMNS in "
+            "echemplot.origin._worksheets and the corresponding bind "
+            "logic in echemplot.origin._plots."
+        )
     dqdv = cell.dqdv_df if dqdv_df is None else dqdv_df
 
     sheets: dict[str, Any] = {}
@@ -248,7 +316,8 @@ def write_cell_sheets(
     )
     # cap_df after reset_index: [cycle, q_ch, q_dis, ce] → "XYYY".
     # q_ch is kept as Y rather than dropped so the user can easily
-    # re-plot it without re-running the pipeline.
+    # re-plot it without re-running the pipeline. Column order is
+    # contract-checked above.
     sheets["cycle"] = _write_sheet(
         op,
         f"{cell.name}_cycle",

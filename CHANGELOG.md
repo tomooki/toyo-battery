@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#99])
 
 ### Changed
+- Replaced positional `_CYCLE_COL_*` integer indices in
+  `origin/_plots.py` with name-based column lookups, and added an
+  `OriginContractError` raised at worksheet-write time if `cap_df`
+  columns don't match the expected `[cycle, q_ch, q_dis, ce]` shape.
+  Future `cap_df` reorderings now fail loudly instead of silently
+  binding wrong columns. ([#100])
 - Consolidated the per-module `_JA_COLS` / `_QUANTITY_KEYS_*` mappings
   duplicated across `core.chdis` / `core.capacity` / `core.dqdv` /
   `core.stats` / `plotting.matplotlib_backend` / `plotting.plotly_backend`
@@ -318,6 +324,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#95]: https://github.com/tomooki/toyo-battery/issues/95
 [#98]: https://github.com/tomooki/toyo-battery/issues/98
 [#99]: https://github.com/tomooki/toyo-battery/issues/99
+[#100]: https://github.com/tomooki/toyo-battery/issues/100
 [#103]: https://github.com/tomooki/toyo-battery/issues/103
 [#104]: https://github.com/tomooki/toyo-battery/issues/104
 [#107]: https://github.com/tomooki/toyo-battery/pull/107

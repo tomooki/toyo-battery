@@ -69,6 +69,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from echemplot.origin._worksheets import _CYCLE_SHEET_COLUMNS
+
 _logger = logging.getLogger("echemplot.origin")
 
 # Exception types that the originpro attribute-API path is observed to raise
@@ -91,14 +93,6 @@ _AXIS_API_EXCEPTIONS: tuple[type[BaseException], ...] = (
 _TEMPLATE_CHDIS = "charge_discharge.otpu"
 _TEMPLATE_CYCLE = "cycle_efficiency.otpu"
 _TEMPLATE_DQDV = "dqdv.otpu"
-
-# Column indices for cap_df after reset_index(): [cycle, q_ch, q_dis, ce].
-# Pinned here so the cycle_efficiency bind is resilient to cap_df column
-# reorderings — a future refactor that changes the order must also touch
-# these constants (and would fail a focused test).
-_CYCLE_COL_CYCLE = 0
-_CYCLE_COL_QDIS = 2
-_CYCLE_COL_CE = 3
 
 _TEMPLATE_ENV_VAR = "ECHEMPLOT_ORIGIN_TEMPLATE_DIR"
 
@@ -162,8 +156,9 @@ def compute_global_ranges(cells: Sequence[Any]) -> _GraphRanges:
 
     The function walks every cell once and collects per-axis values from
     ``cell.chdis_df`` (even columns = capacity X, odd = voltage Y),
-    ``cell.cap_df`` (``[cycle, q_ch, q_dis, ce]`` with indices pinned by
-    ``_CYCLE_COL_*`` constants), and ``cell.dqdv_df`` (even columns =
+    ``cell.cap_df`` (resolved to ``[cycle, q_ch, q_dis, ce]`` after
+    ``reset_index()`` and looked up by name — see
+    :data:`_CYCLE_SHEET_COLUMNS`), and ``cell.dqdv_df`` (even columns =
     voltage X, odd = dQ/dV Y). Concatenated arrays are reduced by
     :func:`_safe_range` so empty / all-NaN inputs surface as ``None`` on
     the returned :class:`_GraphRanges` rather than raising.
@@ -171,6 +166,17 @@ def compute_global_ranges(cells: Sequence[Any]) -> _GraphRanges:
     When the input is a single cell, "global" and "that cell's range"
     coincide — the autoscale for a one-cell push is simply the cell's
     own data range.
+
+    Cells whose ``cap_df.reset_index()`` does not satisfy the
+    :data:`_CYCLE_SHEET_COLUMNS` contract are silently skipped for the
+    cycle_x / cycle_left_y / cycle_right_y aggregation here — the hard
+    failure is deferred to
+    :func:`echemplot.origin._worksheets.write_cell_sheets`, which raises
+    :class:`echemplot.origin._worksheets.OriginContractError` at
+    worksheet-write time. Surfacing the contract violation from the
+    range-aggregation path would tie compute_global_ranges to the same
+    error semantics for no benefit; the write path is the single
+    enforcement point.
     """
     chdis_x_vals: list[np.ndarray] = []
     chdis_y_vals: list[np.ndarray] = []
@@ -193,10 +199,16 @@ def compute_global_ranges(cells: Sequence[Any]) -> _GraphRanges:
         # column to match the post-``reset_index`` layout used when
         # writing the sheet. See :func:`._worksheets.write_cell_sheets`.
         cap = cell.cap_df.reset_index()
-        if cap.shape[1] > _CYCLE_COL_CE:
-            cycle_x_vals.append(cap.iloc[:, _CYCLE_COL_CYCLE].to_numpy(dtype=float))
-            cycle_left_vals.append(cap.iloc[:, _CYCLE_COL_QDIS].to_numpy(dtype=float))
-            cycle_right_vals.append(cap.iloc[:, _CYCLE_COL_CE].to_numpy(dtype=float))
+        cap_cols = list(cap.columns)
+        # Only contribute to the aggregation when every contracted
+        # column is present. The write path is the contract gate; here
+        # we just need the lookups to be safe so a malformed cell does
+        # not raise mid-aggregation before write_cell_sheets can produce
+        # the proper OriginContractError.
+        if all(name in cap_cols for name in _CYCLE_SHEET_COLUMNS):
+            cycle_x_vals.append(cap["cycle"].to_numpy(dtype=float))
+            cycle_left_vals.append(cap["q_dis"].to_numpy(dtype=float))
+            cycle_right_vals.append(cap["ce"].to_numpy(dtype=float))
     return _GraphRanges(
         chdis_x=_safe_range(np.concatenate(chdis_x_vals)) if chdis_x_vals else None,
         chdis_y=_safe_range(np.concatenate(chdis_y_vals)) if chdis_y_vals else None,
@@ -364,9 +376,23 @@ def _bind_cycle(graph: Any, sheet: Any) -> None:
     capacity), ``graph[1]`` is the right Y (Coulombic efficiency). Both
     share ``cycle`` as X. Each layer is rescaled after binding so the
     autoscale survives the template's default axis range.
+
+    Column indices are resolved by **name** against
+    :data:`_CYCLE_SHEET_COLUMNS` rather than baked-in positionals, so a
+    future ``get_cap_df`` schema change cannot silently shift which
+    column gets bound to which axis. The contract is enforced at
+    worksheet-write time by
+    :func:`echemplot.origin._worksheets.write_cell_sheets`, so by the
+    time we reach this helper the sheet is guaranteed to expose the
+    four contracted columns in their canonical order — the ``index()``
+    lookups below are therefore O(1) on a fixed-size tuple and cannot
+    miss.
     """
-    graph[0].add_plot(sheet, colx=_CYCLE_COL_CYCLE, coly=_CYCLE_COL_QDIS)
-    graph[1].add_plot(sheet, colx=_CYCLE_COL_CYCLE, coly=_CYCLE_COL_CE)
+    cycle_idx = _CYCLE_SHEET_COLUMNS.index("cycle")
+    qdis_idx = _CYCLE_SHEET_COLUMNS.index("q_dis")
+    ce_idx = _CYCLE_SHEET_COLUMNS.index("ce")
+    graph[0].add_plot(sheet, colx=cycle_idx, coly=qdis_idx)
+    graph[1].add_plot(sheet, colx=cycle_idx, coly=ce_idx)
     graph[0].rescale()
     graph[1].rescale()
 
