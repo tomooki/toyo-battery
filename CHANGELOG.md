@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `DataIntegrityWarning` (in `echemplot.core`) emitted by `get_chdis_df`
+  when the running-max filter drops rows, surfacing previously-silent
+  data loss for hand-preprocessed inputs. One aggregated summary warning
+  is emitted per call (e.g. `"chdis: dropped N rows below segment
+  running-max across M segments"`); the dropped-row behavior and
+  resulting DataFrame shape are unchanged. ([#98])
+
 ### Fixed
 - Narrowed `_set_axis_limits` exception handling and added a
   logger.warning so `originpro` failures are observable rather than
@@ -300,6 +308,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#88]: https://github.com/tomooki/toyo-battery/pull/88
 [#93]: https://github.com/tomooki/toyo-battery/issues/93
 [#95]: https://github.com/tomooki/toyo-battery/issues/95
+[#98]: https://github.com/tomooki/toyo-battery/issues/98
 [#99]: https://github.com/tomooki/toyo-battery/issues/99
 [#104]: https://github.com/tomooki/toyo-battery/issues/104
 [#107]: https://github.com/tomooki/toyo-battery/pull/107

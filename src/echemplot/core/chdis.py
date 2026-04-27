@@ -41,8 +41,11 @@ v2.01 could misread.
 
 from __future__ import annotations
 
+import warnings
+
 import pandas as pd
 
+from echemplot.core import DataIntegrityWarning
 from echemplot.io.schema import JA_COLS, JA_TO_EN, ColumnLang
 
 _CHARGE = "充電"
@@ -118,6 +121,8 @@ def get_chdis_df(df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.Data
         )
 
     pieces: dict[tuple[int, str], pd.DataFrame] = {}
+    total_dropped = 0
+    segments_with_drops = 0
     for (cycle_val, state_val), g in working.groupby([cycle_col, state_col], sort=True):
         side = _STATE_TO_SIDE[str(state_val)]
         # Drop rows whose |電気量| falls below the segment's running maximum.
@@ -128,8 +133,21 @@ def get_chdis_df(df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.Data
         # produce a spurious connecting line in plot_chdis.
         cap = g[cap_col].abs().reset_index(drop=True)
         keep = (cap == cap.cummax()).to_numpy()
+        dropped = int(len(keep) - int(keep.sum()))
+        if dropped > 0:
+            total_dropped += dropped
+            segments_with_drops += 1
         segment = g[[cap_col, v_col]].iloc[keep].reset_index(drop=True)
         pieces[(int(cycle_val), side)] = segment
+
+    if total_dropped > 0:
+        warnings.warn(
+            DataIntegrityWarning(
+                f"chdis: dropped {total_dropped} rows below segment running-max "
+                f"across {segments_with_drops} segments"
+            ),
+            stacklevel=2,
+        )
 
     out = pd.concat(pieces, axis=1)
     out.columns = out.columns.set_names(["cycle", "side", "quantity"])

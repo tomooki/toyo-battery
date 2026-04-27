@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Callable
 
 import pandas as pd
 import pytest
 
+from echemplot.core import DataIntegrityWarning
 from echemplot.core.cell import Cell
 from echemplot.core.chdis import get_chdis_df
 
@@ -223,6 +225,47 @@ def test_wrong_column_lang_raises_with_context() -> None:
     df = _raw([(1, "充電", 3.5, 0.0)], lang="ja")
     with pytest.raises(KeyError, match="column_lang='en'"):
         get_chdis_df(df, column_lang="en")
+
+
+def test_chdis_warns_on_capacity_reversal_drops() -> None:
+    """The running-max filter must surface dropped rows via DataIntegrityWarning.
+
+    Real TOYO data legitimately triggers this warning at CC→CV sub-step
+    boundaries; for hand-preprocessed inputs it surfaces previously-silent
+    data loss.
+    """
+    df = _raw(
+        [
+            (1, "充電", 3.50, 0.0),
+            (1, "充電", 3.60, 500.0),
+            (1, "充電", 3.55, 400.0),  # reversal — drop, should warn
+            (1, "充電", 3.65, 600.0),
+        ]
+    )
+    with pytest.warns(DataIntegrityWarning, match=r"dropped \d+ rows"):
+        out = get_chdis_df(df)
+    # Behavior preserved — the warning is informational and does not change shape.
+    assert out[(1, "ch", "電気量")].dropna().tolist() == [0.0, 500.0, 600.0]
+
+
+def test_chdis_silent_on_monotone_data() -> None:
+    """Strictly monotone-non-decreasing capacity must not emit DataIntegrityWarning."""
+    df = _raw(
+        [
+            (1, "充電", 3.50, 0.0),
+            (1, "充電", 3.55, 100.0),
+            (1, "充電", 3.60, 200.0),
+            (1, "充電", 3.65, 300.0),
+            (1, "放電", 3.60, 0.0),
+            (1, "放電", 3.50, 100.0),
+            (1, "放電", 3.40, 200.0),
+        ]
+    )
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DataIntegrityWarning)
+        get_chdis_df(df)
+    integrity_warnings = [w for w in caught if issubclass(w.category, DataIntegrityWarning)]
+    assert integrity_warnings == []
 
 
 def test_first_cycle_discharge_swaps_all_cycles_globally() -> None:
