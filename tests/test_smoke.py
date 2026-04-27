@@ -32,6 +32,20 @@ def test_schema_roundtrip() -> None:
     assert rename(en, "ja") == ja
 
 
+def test_state_code_9_maps_to_中断() -> None:
+    """State code 9 is the empirical TOYO end-of-test/abort sentinel
+    and must round-trip through all three state mappings."""
+    from echemplot.io.schema import (
+        STATE_CODE_TO_EN,
+        STATE_CODE_TO_JA,
+        STATE_JA_TO_EN,
+    )
+
+    assert STATE_CODE_TO_JA[9] == "中断"
+    assert STATE_CODE_TO_EN[9] == "abort"
+    assert STATE_JA_TO_EN["中断"] == "abort"
+
+
 def test_origin_submodule_imports_without_originpro() -> None:
     """origin submodule must be importable even when originpro is missing."""
     from echemplot import origin

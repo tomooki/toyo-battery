@@ -48,12 +48,25 @@ JA_TO_EN: dict[str, str] = {
 
 EN_TO_JA: dict[str, str] = {v: k for k, v in JA_TO_EN.items()}
 
-STATE_CODE_TO_JA: dict[int, str] = {0: "休止", 1: "充電", 2: "放電"}
-STATE_CODE_TO_EN: dict[int, str] = {0: "rest", 1: "charge", 2: "discharge"}
+# State-code mapping for the raw 6-digit format. Codes {0, 1, 2} are
+# documented; code 9 is empirically observed across multiple TOYO cyclers
+# (No1 / No2 / No6) as an end-of-test "abort" signal — typically a single
+# trailing row, sometimes with non-zero 経過時間/電流 values left from the
+# moment of interruption. We do not have official TOYO documentation for
+# code 9, but it has been validated against real cell directories. Do not
+# strip the 9-entry without re-checking against current data.
+STATE_CODE_TO_JA: dict[int, str] = {0: "休止", 1: "充電", 2: "放電", 9: "中断"}
+STATE_CODE_TO_EN: dict[int, str] = {
+    0: "rest",
+    1: "charge",
+    2: "discharge",
+    9: "abort",
+}
 STATE_JA_TO_EN: dict[str, str] = {
     "休止": "rest",
     "充電": "charge",
     "放電": "discharge",
+    "中断": "abort",
 }
 
 

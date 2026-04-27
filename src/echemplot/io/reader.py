@@ -15,7 +15,10 @@ any extra source columns such as 経過時間[Sec] / 電流[mA] / 日付 / 時�
     Canonical columns: サイクル, モード, 状態, 電圧, 電気量
     状態 values:
       - Native 連続データ.csv:  {"充電", "放電", "充電休止", "放電休止"}
-      - Raw 6-digit (int→JA):   {"充電", "放電", "休止"}
+      - Raw 6-digit (int→JA):   {"充電", "放電", "休止", "中断"}
+                                ("中断" = state code 9, the TOYO end-of-test
+                                 / abort sentinel; usually a single trailing
+                                 row, sometimes with non-zero 経過時間/電流.)
       - 連続データ_py.csv:       whatever was persisted (usually the 3-value set)
 
 When ``column_lang="en"`` is requested, only column *names* are translated.
@@ -265,19 +268,20 @@ def _ensure_capacity(df: pd.DataFrame, mass: float | None) -> pd.DataFrame:
 
 
 def _drop_trailing_sentinel_rows(df: pd.DataFrame) -> tuple[pd.DataFrame, list[int]]:
-    """Drop a contiguous tail block of TOYO end-of-test sentinel rows.
+    """Drop a contiguous tail block of *unknown-code* sentinel rows.
 
-    A row is treated as a sentinel iff its 状態 is numeric and unknown
-    (not in :data:`STATE_CODE_TO_JA`) AND ``経過時間[Sec] == 0`` AND
-    ``電流[mA] == 0``. Real TOYO raw 6-digit files emit at least one
-    such row (state code ``9``) per file as the end-of-test marker; the
-    row is not a real measurement and would otherwise blow up state-code
-    mapping in :func:`_finalize`.
+    Defensive backstop for any future TOYO firmware that emits an
+    end-of-test sentinel with a state code we have not yet catalogued
+    in :data:`STATE_CODE_TO_JA`. A row is treated as a sentinel iff its
+    状態 is numeric and unknown AND ``経過時間[Sec] == 0`` AND
+    ``電流[mA] == 0``. State code ``9`` (``中断``) is *not* a sentinel
+    here — it is now a known state and is mapped to its JA label like
+    any other.
 
-    The scan is strictly trailing/contiguous, so a state-9 row in the
-    middle of the file (or with non-zero flow) is *not* dropped — those
-    cases still surface as the ``unknown 状態 codes`` error so genuinely
-    surprising data is not silently swallowed.
+    The scan is strictly trailing/contiguous; an unknown-code row in
+    the middle of the file (or with non-zero flow) is *not* dropped —
+    those still surface as the ``unknown 状態 codes`` error so
+    genuinely surprising data is not silently swallowed.
     """
     if not pd.api.types.is_numeric_dtype(df["状態"]):
         return df, []
