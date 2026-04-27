@@ -9,6 +9,7 @@ separately in issue #15.
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 from typing import Any
@@ -990,6 +991,75 @@ def test_set_axis_limits_no_fallback_when_op_is_none() -> None:
     # Must not raise despite no fallback being available.
     _set_axis_limits(layer, "y", (1.0, 5.0))
     layer.lt_exec.assert_not_called()
+
+
+def test_set_axis_limits_warns_on_originpro_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Attribute-API failure must be observable via a WARNING log record.
+
+    Issue #99: the previous bare ``except Exception`` swallowed
+    originpro-side failures and let the graph silently degrade to the
+    template's default axis range. A WARNING on the
+    ``echemplot.origin`` logger now surfaces the axis name, the
+    attempted range, and the exception type+message before the LabTalk
+    fallback runs.
+    """
+    from echemplot.origin._plots import _set_axis_limits
+
+    layer = MagicMock()
+    layer.axis.side_effect = RuntimeError("no axis() on this layer build")
+    op = MagicMock()
+    with caplog.at_level(logging.WARNING, logger="echemplot.origin"):
+        _set_axis_limits(layer, "y", (1.0, 5.0), op=op)
+
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert warnings, "expected a WARNING record from the axis fallback"
+    msg = warnings[0].getMessage()
+    assert "'y'" in msg, msg  # axis name present
+    assert "RuntimeError" in msg, msg  # exception type surfaced
+    assert "no axis() on this layer build" in msg, msg  # exception message surfaced
+    # LabTalk fallback still ran — this is warn-and-continue, not warn-and-skip.
+    op.lt_exec.assert_called_once()
+
+
+def test_set_axis_limits_raises_when_strict() -> None:
+    """``strict=True`` re-raises the caught originpro exception.
+
+    Issue #99: callers that prefer fail-fast over a silently degraded
+    graph can opt in via ``strict_axis=True`` on
+    :func:`push_to_origin`, which propagates here as ``strict``. The
+    LabTalk fallback must NOT run when re-raising.
+    """
+    from echemplot.origin._plots import _set_axis_limits
+
+    layer = MagicMock()
+    layer.axis.side_effect = RuntimeError("no axis() on this layer build")
+    op = MagicMock()
+    with pytest.raises(RuntimeError, match="no axis"):
+        _set_axis_limits(layer, "y", (1.0, 5.0), op=op, strict=True)
+    op.lt_exec.assert_not_called()
+
+
+def test_set_axis_limits_silent_on_success(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Normal attribute-API path must not emit any WARNING.
+
+    Guards against the warn-on-success regression: the WARNING is
+    reserved for the failure path so log noise stays meaningful.
+    """
+    from echemplot.origin._plots import _set_axis_limits
+
+    layer = MagicMock()
+    op = MagicMock()
+    with caplog.at_level(logging.WARNING, logger="echemplot.origin"):
+        _set_axis_limits(layer, "x", (0.0, 10.0), op=op)
+
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert not warnings, f"unexpected WARNING records on success path: {warnings}"
+    # And the LabTalk fallback must not have been triggered either.
+    op.lt_exec.assert_not_called()
 
 
 def test_create_cell_plots_applies_ranges_to_every_layer(

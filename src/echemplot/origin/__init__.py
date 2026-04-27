@@ -61,6 +61,7 @@ def push_to_origin(
     stat_cycles: Sequence[int] = (10, 50),
     sg_window: int = _DEFAULT_SG_WINDOW,
     sg_polyorder: int = _DEFAULT_SG_POLYORDER,
+    strict_axis: bool = False,
 ) -> None:
     """Populate the current Origin project with per-cell sheets + plots + stats.
 
@@ -91,6 +92,18 @@ def push_to_origin(
         recompute per cell so the worksheet values reflect the caller's
         choice. ``Cell`` instances are not mutated. ``sg_window`` must be a
         positive odd integer.
+    strict_axis
+        Forwarded to
+        :func:`echemplot.origin._plots.create_cell_plots` and
+        :func:`echemplot.origin._plots.create_comparison_plots` and
+        through them to :func:`_set_axis_limits`. With the default
+        ``False``, an ``originpro`` failure on the axis attribute API is
+        logged at WARNING on the ``echemplot.origin`` logger and the
+        LabTalk fallback runs, so a transient axis bridge issue does
+        not abort the whole push. Set to ``True`` to re-raise the
+        caught exception instead, useful in CI / scripting contexts
+        that prefer fail-fast over a silently degraded graph (issue
+        #99).
 
     Raises
     ------
@@ -144,11 +157,11 @@ def push_to_origin(
                 column_lang=cell.column_lang,
             )
             sheets = write_cell_sheets(op, cell, dqdv_df=dqdv_df)
-        create_cell_plots(op, cell, sheets, ranges=ranges)
+        create_cell_plots(op, cell, sheets, ranges=ranges, strict_axis=strict_axis)
         per_cell_sheets.append(sheets)
 
     if len(cells) > 1:
-        create_comparison_plots(op, cells, per_cell_sheets, ranges=ranges)
+        create_comparison_plots(op, cells, per_cell_sheets, ranges=ranges, strict_axis=strict_axis)
 
     stat_df = stat_table(cells, target_cycles=list(stat_cycles))
     write_stat_table(op, stat_df)
