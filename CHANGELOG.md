@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Consolidated the per-module `_JA_COLS` / `_QUANTITY_KEYS_*` mappings
+  duplicated across `core.chdis` / `core.capacity` / `core.dqdv` /
+  `core.stats` / `plotting.matplotlib_backend` / `plotting.plotly_backend`
+  into a single `JA_COLS` source of truth in `echemplot.io.schema`, and
+  extended `STATE_JA_TO_EN` (and the new reverse `STATE_EN_TO_JA`) with
+  the `充電休止` / `放電休止` substates emitted by native `連続データ.csv`
+  exports. Pure refactor — no runtime behaviour change. ([#93])
+
 ## [0.1.8] - 2026-04-27
 
 ### Fixed
@@ -275,6 +284,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#80]: https://github.com/tomooki/toyo-battery/pull/80
 [#86]: https://github.com/tomooki/toyo-battery/pull/86
 [#88]: https://github.com/tomooki/toyo-battery/pull/88
+[#93]: https://github.com/tomooki/toyo-battery/issues/93
 [#107]: https://github.com/tomooki/toyo-battery/pull/107
 [#108]: https://github.com/tomooki/toyo-battery/pull/108
 [0.0.3]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...v0.0.3

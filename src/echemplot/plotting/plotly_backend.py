@@ -32,7 +32,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from echemplot.core.cell import Cell
-from echemplot.io.schema import ColumnLang
+from echemplot.io.schema import JA_COLS, JA_TO_EN, ColumnLang
 
 _CYCLE_COLOR_FIRST = "red"
 _CYCLE_COLOR_OTHER = "black"
@@ -49,16 +49,10 @@ _SUBPLOT_H_PX = 400
 _C0_BLUE = "#1f77b4"
 _C3_RED = "#d62728"
 
-_QUANTITY_KEYS_JA: dict[str, str] = {
-    "voltage": "電圧",
-    "capacity": "電気量",
-    "dqdv": "dQ/dV",
-}
-_QUANTITY_KEYS_EN: dict[str, str] = {
-    "voltage": "voltage",
-    "capacity": "capacity",
-    "dqdv": "dq_dv",
-}
+# ``dQ/dV`` is a derived-quantity label, not a TOYO source column, so it is
+# not part of the central ``JA_COLS`` and is kept local here.
+_DQDV_LABEL_JA = "dQ/dV"
+_DQDV_LABEL_EN = "dq_dv"
 
 
 def _quantity(column_lang: ColumnLang, key: str) -> str:
@@ -66,8 +60,10 @@ def _quantity(column_lang: ColumnLang, key: str) -> str:
     ``quantity``-level MultiIndex label used by a cell with the given
     ``column_lang``.
     """
-    table = _QUANTITY_KEYS_JA if column_lang == "ja" else _QUANTITY_KEYS_EN
-    return table[key]
+    if key == "dqdv":
+        return _DQDV_LABEL_JA if column_lang == "ja" else _DQDV_LABEL_EN
+    ja_col = JA_COLS[key]
+    return ja_col if column_lang == "ja" else JA_TO_EN[ja_col]
 
 
 def _subplot_grid(n: int) -> tuple[int, int]:

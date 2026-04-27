@@ -43,24 +43,19 @@ from __future__ import annotations
 
 import pandas as pd
 
-from echemplot.io.schema import JA_TO_EN, ColumnLang
+from echemplot.io.schema import JA_COLS, JA_TO_EN, ColumnLang
 
 _CHARGE = "充電"
 _DISCHARGE = "放電"
 _STATE_TO_SIDE = {_CHARGE: "ch", _DISCHARGE: "dis"}
 
-_JA_COLS: dict[str, str] = {
-    "cycle": "サイクル",
-    "state": "状態",
-    "voltage": "電圧",
-    "capacity": "電気量",
-}
+_NEEDED_KEYS = ("cycle", "state", "voltage", "capacity")
 
 
 def _resolve_cols(column_lang: ColumnLang) -> dict[str, str]:
     if column_lang == "ja":
-        return _JA_COLS
-    return {k: JA_TO_EN[v] for k, v in _JA_COLS.items()}
+        return {k: JA_COLS[k] for k in _NEEDED_KEYS}
+    return {k: JA_TO_EN[JA_COLS[k]] for k in _NEEDED_KEYS}
 
 
 def _empty_result() -> pd.DataFrame:

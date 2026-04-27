@@ -57,7 +57,7 @@ import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
 
-from echemplot.io.schema import JA_TO_EN, ColumnLang
+from echemplot.io.schema import JA_COLS, JA_TO_EN, ColumnLang
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -65,21 +65,25 @@ if TYPE_CHECKING:
     # Per-segment result: (V-grid, dQ/dV samples), both same length.
     _SegPair = tuple[NDArray[np.float64], NDArray[np.float64]]
 
-_JA_COLS: dict[str, str] = {
-    "voltage": "電圧",
-    "capacity": "電気量",
-    "dqdv": "dQ/dV",
-}
+# Output ``quantity``-level label for the derived dQ/dV series. Distinct from
+# the central ``JA_COLS`` because dQ/dV is not a TOYO source column — it is
+# a quantity this module synthesises from voltage + capacity.
+_DQDV_LABEL_JA = "dQ/dV"
+_DQDV_LABEL_EN = "dq_dv"
 
 
 def _resolve_cols(column_lang: ColumnLang) -> dict[str, str]:
     if column_lang == "ja":
-        return _JA_COLS
+        return {
+            "voltage": JA_COLS["voltage"],
+            "capacity": JA_COLS["capacity"],
+            "dqdv": _DQDV_LABEL_JA,
+        }
     # Input voltage/capacity follow JA_TO_EN; the dqdv output name is fixed EN.
     return {
-        "voltage": JA_TO_EN[_JA_COLS["voltage"]],
-        "capacity": JA_TO_EN[_JA_COLS["capacity"]],
-        "dqdv": "dq_dv",
+        "voltage": JA_TO_EN[JA_COLS["voltage"]],
+        "capacity": JA_TO_EN[JA_COLS["capacity"]],
+        "dqdv": _DQDV_LABEL_EN,
     }
 
 
