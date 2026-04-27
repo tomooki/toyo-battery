@@ -80,12 +80,24 @@ _METADATA_SCAN_ROWS = 4
 def read_ptn_mass(ptn_path: str | Path) -> float:
     """Extract active-material mass (grams) from a ``.PTN`` file.
 
-    TOYO convention: the mass is the third whitespace-separated token on
-    line 0 of a main pattern file. Auxiliary ``.PTN`` files that TOYO ships
-    alongside the main one (``*_OPTION.PTN``, ``*_Option2.PTN``, etc.)
-    carry INI- or CSV-style configuration, not a mass; calling this on
-    them will raise ``ValueError``, which :func:`_resolve_mass_from_ptn`
-    relies on to skip them.
+    TOYO ships at least two PTN dialects that differ in how the mass field
+    is rendered on line 0. Both encode the field as a 9-byte composite of
+    ``<flag><mass>``:
+
+    * Older dialect (e.g. cycler "No6"): ``"0 0.00116"`` — flag, space,
+      ``%.5f`` mass. ``str.split()`` yields the flag at ``tokens[2]`` and
+      the mass at ``tokens[3]``.
+    * Newer dialect (e.g. cyclers "No5"/"No1"): ``"00.000358"`` — flag
+      glued to a ``%.6f`` mass. ``tokens[2]`` parses directly as the mass.
+
+    Match the legacy ``TOYO_Origin_2.01`` heuristic: take ``tokens[2]``,
+    and if it parses as exactly zero, fall back to ``tokens[3]``.
+
+    Auxiliary ``.PTN`` files that TOYO ships alongside the main one
+    (``*_OPTION.PTN``, ``*_Option2.PTN``, etc.) carry INI- or CSV-style
+    configuration, not a mass; calling this on them will raise
+    ``ValueError``, which :func:`_resolve_mass_from_ptn` relies on to
+    skip them.
     """
     path = Path(ptn_path)
     with path.open(encoding="shift_jis", errors="replace") as f:
@@ -96,9 +108,20 @@ def read_ptn_mass(ptn_path: str | Path) -> float:
             f"{path} line 0 has fewer than 3 tokens; cannot extract active-material mass"
         )
     try:
-        return float(tokens[2])
+        candidate = float(tokens[2])
     except ValueError as e:
         raise ValueError(f"{path} line 0 token[2]={tokens[2]!r} is not a valid float mass") from e
+    if candidate != 0.0:
+        return candidate
+    if len(tokens) >= 4:
+        try:
+            return float(tokens[3])
+        except ValueError:
+            pass
+    raise ValueError(
+        f"{path} line 0: token[2]=0 and token[3] absent or non-numeric; "
+        "cannot extract active-material mass"
+    )
 
 
 def read_cell_dir(
