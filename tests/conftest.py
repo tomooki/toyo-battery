@@ -234,6 +234,47 @@ def write_renzoku_with_states(
     (cell_dir / "連続データ.csv").write_text("\n".join(lines) + "\n", encoding="shift_jis")
 
 
+def write_raw_6digit_file(
+    path: Path,
+    rows: list[tuple[int, str, int, float, float, float]],
+    *,
+    include_elapsed: bool = True,
+    total_cycle: int = 1,
+) -> None:
+    """Write a single TOYO-style 6-digit raw file with explicit row content.
+
+    ``rows`` is a list of ``(cycle, mode, state_int, voltage, elapsed_s,
+    current_mA)`` tuples. When ``include_elapsed=False`` the
+    ``経過時間[Sec]`` column and value are omitted from the header and
+    data rows respectively, mirroring the older firmware revision that
+    predates the elapsed-time column. Used by the row-continuity tests
+    in ``test_reader.py`` to build per-segment-truncated and
+    elapsed-missing fixtures.
+    """
+    empty_sep = ",,,,,,"
+    if include_elapsed:
+        header = f"日付,時刻,経過時間[Sec],電圧[V],電流[mA]{empty_sep},状態,ﾓｰﾄﾞ,ｻｲｸﾙ,総ｻｲｸﾙ"
+    else:
+        header = f"日付,時刻,電圧[V],電流[mA]{empty_sep},状態,ﾓｰﾄﾞ,ｻｲｸﾙ,総ｻｲｸﾙ"
+    lines = ["0,0,0,0,0,0,0", "", "", header]
+    date = "2026/01/01"
+    time = "00:00:00"
+    for cycle, mode, state_int, voltage, elapsed, current in rows:
+        if include_elapsed:
+            data = (
+                f"{date},{time},{int(elapsed):08d},+{voltage:.4f},"
+                f"{current:.6f}{empty_sep}"
+                f",{state_int:d}, {mode},  {cycle:d},     {total_cycle:d}"
+            )
+        else:
+            data = (
+                f"{date},{time},+{voltage:.4f},{current:.6f}{empty_sep}"
+                f",{state_int:d}, {mode},  {cycle:d},     {total_cycle:d}"
+            )
+        lines.append(data)
+    path.write_text("\n".join(lines) + "\n", encoding="shift_jis")
+
+
 def write_ptn_main(
     path: Path,
     *,

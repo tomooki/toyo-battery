@@ -12,8 +12,10 @@ import pytest
 
 from echemplot.core.cell import Cell
 from echemplot.io import EncodingError as EncodingErrorReexport
+from echemplot.io import RawConcatError as RawConcatErrorReexport
 from echemplot.io.reader import (
     EncodingError,
+    RawConcatError,
     _extract_mass_from_renzoku_metadata,
     read_cell_dir,
     read_ptn_mass,
@@ -318,6 +320,155 @@ def test_read_raw_6digit_mismatched_columns_raises(tmp_path: Path) -> None:
     _write_fixed_column_ptn(cell_dir / "pattern.PTN", 0.001)
     with pytest.raises(ValueError, match="columns differing"):
         read_cell_dir(cell_dir)
+
+
+# ---- 6-digit raw row-continuity validation (#97) -------------------------
+
+
+def test_raw_concat_error_re_exported_from_io_package() -> None:
+    """`RawConcatError` is part of the public ``echemplot.io`` surface."""
+    assert RawConcatErrorReexport is RawConcatError
+    assert issubclass(RawConcatError, ValueError)
+
+
+def test_read_raw_6digit_concat_normal_two_segment_pass(tmp_path: Path) -> None:
+    """Two consistent 6-digit files concatenate without raising.
+
+    File A: a charge segment with monotone-increasing 経過時間.
+    File B: a discharge segment with monotone-increasing 経過時間.
+    State transitions occur cleanly at file boundaries; no per-segment
+    backwards diff anywhere; row-continuity validation must pass.
+    """
+    from tests.conftest import write_ptn_main, write_raw_6digit_file
+
+    cell_dir = tmp_path / "two_seg"
+    cell_dir.mkdir()
+    write_raw_6digit_file(
+        cell_dir / "000001",
+        [
+            (1, "1", 1, 3.50, 0.0, 1.0),
+            (1, "1", 1, 3.55, 1800.0, 1.0),
+            (1, "1", 1, 3.60, 3600.0, 1.0),
+        ],
+    )
+    write_raw_6digit_file(
+        cell_dir / "000002",
+        [
+            (1, "1", 2, 3.40, 0.0, 1.0),
+            (1, "1", 2, 3.30, 1800.0, 1.0),
+            (1, "1", 2, 3.20, 3600.0, 1.0),
+        ],
+    )
+    write_ptn_main(cell_dir / "pattern.PTN", mass_g=0.001)
+    df, mass_g = read_cell_dir(cell_dir)
+    assert mass_g == pytest.approx(0.001)
+    assert len(df) == 6
+    # Two charge rows from each file's last sample land at indices 2 and 5.
+    assert df["状態"].tolist() == ["充電", "充電", "充電", "放電", "放電", "放電"]
+    # Per-segment monotone capacity (3 rows each, last hits 1000 mAh/g).
+    assert df["電気量"].tolist() == pytest.approx([0.0, 500.0, 1000.0, 0.0, 500.0, 1000.0])
+
+
+def test_read_raw_6digit_raises_on_truncated_segment(tmp_path: Path) -> None:
+    """An elapsed-time backstep within a state segment surfaces as RawConcatError.
+
+    Simulates a tester that crashed mid-charge and resumed: the second
+    "row 1" of the charge segment sees ``経過時間`` go from 1800 back to
+    300 — the truncation/resume signature this validation is designed
+    to catch. The error message must include the segment index.
+    """
+    from tests.conftest import write_ptn_main, write_raw_6digit_file
+
+    cell_dir = tmp_path / "truncated"
+    cell_dir.mkdir()
+    write_raw_6digit_file(
+        cell_dir / "000001",
+        [
+            (1, "1", 1, 3.50, 0.0, 1.0),
+            (1, "1", 1, 3.55, 1800.0, 1.0),
+            # Backstep: tester crashed and resumed mid-charge.
+            (1, "1", 1, 3.52, 300.0, 1.0),
+            (1, "1", 1, 3.60, 3600.0, 1.0),
+        ],
+    )
+    write_ptn_main(cell_dir / "pattern.PTN", mass_g=0.001)
+    with pytest.raises(RawConcatError) as exc_info:
+        read_cell_dir(cell_dir)
+    err = exc_info.value
+    assert err.file_path.name == "000001"
+    assert err.segment_index == 0  # The first (and only) state segment.
+    assert "segment_index=0" in str(err)
+    assert "経過時間[Sec]" in str(err)
+
+
+def test_read_raw_6digit_skips_validation_when_elapsed_missing(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Files lacking 経過時間[Sec] read successfully with a debug notice.
+
+    Some older TOYO firmware revisions emit raw files without the
+    elapsed-time column. The continuity check must be skipped (not
+    raise) for that schema, and the skip must be observable at debug
+    level so a user investigating downstream weirdness can find it.
+
+    Also verifies that the absence of the elapsed column does not
+    prevent ``_ensure_capacity`` from raising: the fixture has no
+    pre-computed 電気量 either, so we expect the existing
+    "missing columns" ValueError. The test asserts that we reach that
+    point — i.e. continuity validation did NOT short-circuit with a
+    RawConcatError first.
+    """
+    from tests.conftest import write_ptn_main, write_raw_6digit_file
+
+    cell_dir = tmp_path / "no_elapsed"
+    cell_dir.mkdir()
+    write_raw_6digit_file(
+        cell_dir / "000001",
+        [
+            (1, "1", 1, 3.50, 0.0, 1.0),
+            (1, "1", 1, 3.60, 0.0, 1.0),
+        ],
+        include_elapsed=False,
+    )
+    write_ptn_main(cell_dir / "pattern.PTN", mass_g=0.001)
+    caplog.set_level(logging.DEBUG, logger="echemplot.io.reader")
+    # Without 経過時間 the capacity column cannot be derived, so the
+    # downstream _ensure_capacity raises. We catch that to assert we
+    # got past validation; the validation step is the focus of this test.
+    with pytest.raises(ValueError, match="cannot compute"):
+        read_cell_dir(cell_dir)
+    assert any(
+        "skipping per-segment continuity check" in rec.getMessage() for rec in caplog.records
+    )
+    # Negative assertion: no RawConcatError was raised on the way to that ValueError.
+    assert not any(
+        rec.exc_info and isinstance(rec.exc_info[1], RawConcatError) for rec in caplog.records
+    )
+
+
+def test_read_raw_6digit_raises_on_empty_data_section(tmp_path: Path) -> None:
+    """A 6-digit file with header but zero data rows raises RawConcatError.
+
+    Covers the ``segment_index=None`` branch — the empty-frame check
+    fires before per-segment RLE could even be computed.
+    """
+    from tests.conftest import write_ptn_main
+
+    cell_dir = tmp_path / "empty_data"
+    cell_dir.mkdir()
+    empty_sep = ",,,,,,"
+    header = f"日付,時刻,経過時間[Sec],電圧[V],電流[mA]{empty_sep},状態,ﾓｰﾄﾞ,ｻｲｸﾙ,総ｻｲｸﾙ"
+    (cell_dir / "000001").write_text(
+        "\n".join(["0,0,0,0,0,0,0", "", "", header]) + "\n",
+        encoding="shift_jis",
+    )
+    write_ptn_main(cell_dir / "pattern.PTN", mass_g=0.001)
+    with pytest.raises(RawConcatError) as exc_info:
+        read_cell_dir(cell_dir)
+    err = exc_info.value
+    assert err.file_path.name == "000001"
+    assert err.segment_index is None
+    assert "segment_index=n/a" in str(err)
 
 
 def test_unknown_state_code_raises(tmp_path: Path) -> None:

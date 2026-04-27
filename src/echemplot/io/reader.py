@@ -57,6 +57,7 @@ import re
 from pathlib import Path
 from typing import cast
 
+import numpy as np
 import pandas as pd
 
 from echemplot.io.schema import (
@@ -101,6 +102,44 @@ class EncodingError(ValueError):
             f"(default 'shift_jis')."
         )
         super().__init__(msg)
+
+
+class RawConcatError(ValueError):
+    """Raised when a constituent 6-digit raw file fails row-continuity validation.
+
+    A single ``000NNN`` raw file is expected to be internally consistent before
+    being concatenated with its siblings — specifically, ``経過時間[Sec]`` must
+    be monotone-non-decreasing within each run of identical ``状態`` values
+    (state transitions reset elapsed_time). A negative diff inside a single
+    state segment indicates the file was truncated mid-cycle and resumed,
+    silently joining two distinct runs into one DataFrame.
+
+    Attributes
+    ----------
+    file_path : Path
+        The offending 6-digit raw file.
+    segment_index : int | None
+        0-based index of the state-run segment that failed the check, counting
+        from the top of the file. ``None`` for whole-file failures (e.g. an
+        empty file).
+    reason : str
+        Human-readable explanation of the failure mode.
+    """
+
+    def __init__(
+        self,
+        file_path: Path,
+        segment_index: int | None,
+        reason: str,
+    ) -> None:
+        self.file_path = file_path
+        self.segment_index = segment_index
+        self.reason = reason
+        seg_str = "n/a" if segment_index is None else str(segment_index)
+        super().__init__(
+            f"raw file {file_path.name} failed row-continuity validation "
+            f"(segment_index={seg_str}): {reason}"
+        )
 
 
 RAW_FILENAME_RE = re.compile(r"[0-9]{6}")
@@ -355,11 +394,104 @@ def _read_raw_6digit(
                 f"raw file {f.name} has columns differing from {raw_files[0].name}: "
                 f"{list(frame.columns)} vs {base_cols}"
             )
+    # Row-continuity validation: each constituent file must be internally
+    # consistent before concat. A truncated-and-resumed file would otherwise
+    # silently splice two unrelated runs into a single state segment. See
+    # _validate_raw_frame_continuity for the precise rules.
+    for f, frame in zip(raw_files, frames):
+        _validate_raw_frame_continuity(f, frame)
     df = pd.concat(frames, axis=0, ignore_index=True)
     df = _clean_columns(df)
     df = _drop_unnamed(df)
     df = _ensure_capacity(df, mass)
     return _finalize(df, column_lang), mass
+
+
+def _validate_raw_frame_continuity(file_path: Path, frame: pd.DataFrame) -> None:
+    """Validate one raw 6-digit frame's internal row continuity.
+
+    Checks performed:
+
+    * Frame is non-empty. A 6-digit file with zero data rows is suspicious
+      (the on-disk format always carries at least the summary marker plus
+      header, but the data section can be empty if the cycler crashed
+      before any sample landed). Raises :class:`RawConcatError` with
+      ``segment_index=None``.
+    * ``経過時間[Sec]`` is monotone-non-decreasing within each contiguous
+      run of identical ``状態`` values. State transitions reset elapsed
+      time in the TOYO raw format, so we check per-segment, not globally.
+      Run-length segments are computed via a state-change cumsum.
+
+    The elapsed-time column is *optional* in the TOYO 6-digit dialect —
+    some older firmware revisions emit files without it. In that case we
+    skip the continuity check (with a ``logger.debug`` notice) rather
+    than raise; the column-equality check upstream still guarantees that
+    every constituent file in a given concat shares the same schema, so
+    the missing column is consistent across siblings.
+
+    Edge case: if ``状態`` itself is missing we cannot RLE the segments,
+    so we treat the entire frame as one segment for the diff check.
+    """
+    if len(frame) == 0:
+        raise RawConcatError(
+            file_path,
+            None,
+            "frame has 0 data rows after header skip; file is empty or truncated before "
+            "any sample landed",
+        )
+
+    # The reader runs continuity validation pre-_clean_columns, so at this
+    # point ``frame`` carries the source-literal column names. The elapsed
+    # column is the canonical JP form ``経過時間[Sec]``; the state column
+    # is ``状態``.
+    if COL_ELAPSED_S not in frame.columns:
+        logger.debug(
+            "raw file %s: %s column missing; skipping per-segment continuity check",
+            file_path.name,
+            COL_ELAPSED_S,
+        )
+        return
+
+    elapsed = pd.to_numeric(frame[COL_ELAPSED_S], errors="coerce").to_numpy()
+    if "状態" in frame.columns:
+        # Run-length encode: a new segment starts wherever 状態 changes
+        # (using fillna-aware comparison so two consecutive NaN states
+        # are treated as a single segment, matching np.diff semantics on
+        # the elapsed column itself).
+        state_series = frame["状態"]
+        # shift().ne(state_series) marks each row where the state differs
+        # from its predecessor; cumsum turns that into a 0,1,2,... segment id.
+        # We use ne(...) | (both NaN) — pandas' default ne treats NaN!=NaN, so
+        # we compensate by also accepting matching NaNs as same-segment.
+        prev = state_series.shift()
+        changed = state_series.ne(prev) & ~(state_series.isna() & prev.isna())
+        # The very first row's "changed" is True by definition (no
+        # predecessor); cumsum gives segment ids starting at 1.
+        segment_ids = changed.cumsum().to_numpy()
+    else:
+        segment_ids = np.ones(len(frame), dtype=np.int64)
+
+    unique_segments = np.unique(segment_ids)
+    for seg_idx, seg_id in enumerate(unique_segments):
+        mask = segment_ids == seg_id
+        seg_elapsed = elapsed[mask]
+        if seg_elapsed.size < 2:
+            continue
+        diffs = np.diff(seg_elapsed)
+        # NaN diffs are not negative — treat them as inconclusive and skip.
+        # Any strictly-negative diff inside a single state segment is the
+        # truncation/resume signature.
+        bad = diffs < 0
+        if bool(np.any(bad)) and not bool(np.all(np.isnan(diffs[bad]))):
+            first_bad = int(np.argmax(bad))
+            raise RawConcatError(
+                file_path,
+                seg_idx,
+                f"{COL_ELAPSED_S} decreased within state segment "
+                f"(prev={seg_elapsed[first_bad]!r}, "
+                f"next={seg_elapsed[first_bad + 1]!r}); file likely truncated "
+                "and resumed mid-segment",
+            )
 
 
 def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
