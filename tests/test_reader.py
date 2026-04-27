@@ -10,7 +10,13 @@ import pandas as pd
 import pytest
 
 from echemplot.core.cell import Cell
-from echemplot.io.reader import read_cell_dir, read_ptn_mass
+from echemplot.io import EncodingError as EncodingErrorReexport
+from echemplot.io.reader import (
+    EncodingError,
+    _extract_mass_from_renzoku_metadata,
+    read_cell_dir,
+    read_ptn_mass,
+)
 from echemplot.io.schema import CANONICAL_COLUMNS_EN, CANONICAL_COLUMNS_JA
 
 
@@ -502,6 +508,82 @@ def test_read_ptn_mass_ini_style_raises(tmp_path: Path) -> None:
     ptn.write_text("[BaseCellCapacity]\nCapacity=0.1\n", encoding="shift_jis")
     with pytest.raises(ValueError):
         read_ptn_mass(ptn)
+
+
+# ---- strict-encoding error surface (Issue #96) ----------------------------
+
+
+def _write_corrupt_shift_jis_ptn(path: Path) -> None:
+    """Write a PTN file with a valid Shift-JIS prefix and an invalid byte mid-stream.
+
+    ``0xFF`` is not a legal Shift-JIS lead byte in any common dialect, so
+    Python's ``shift_jis`` codec rejects it strictly. A trailing valid
+    suffix is included so the failure is genuinely mid-stream rather than
+    at EOF.
+    """
+    valid_prefix = " 1Operator                                 2 ".encode("shift_jis")
+    invalid_bytes = b"\xff\xfe"
+    valid_suffix = b" 0.001000       1 0.001000TestCell\n"
+    path.write_bytes(valid_prefix + invalid_bytes + valid_suffix)
+
+
+def test_encoding_error_is_reexported_from_io_package() -> None:
+    """``echemplot.io.EncodingError`` must be the same class as the reader's."""
+    assert EncodingErrorReexport is EncodingError
+    assert issubclass(EncodingError, ValueError)
+
+
+def test_read_ptn_mass_raises_encoding_error_on_corrupt_bytes(tmp_path: Path) -> None:
+    """A PTN with bytes invalid for Shift-JIS must raise EncodingError, not silently
+    return ``?`` replacements that break downstream float parsing with a misleading
+    error pointing at the replacement character."""
+    ptn = tmp_path / "corrupt_shift_jis_ptn.PTN"
+    _write_corrupt_shift_jis_ptn(ptn)
+    with pytest.raises(EncodingError) as exc_info:
+        read_ptn_mass(ptn)
+    # Path is part of the message so the failure is actionable
+    assert str(ptn) in str(exc_info.value)
+    # Byte position from the underlying UnicodeDecodeError surfaces in the message
+    assert "position" in str(exc_info.value)
+    # The invalid bytes are in the prefix region; assert a numeric byte offset shows
+    assert any(ch.isdigit() for ch in str(exc_info.value))
+
+
+def test_read_ptn_mass_strict_message_includes_hint(tmp_path: Path) -> None:
+    """Users must see how to override the encoding from the error message."""
+    ptn = tmp_path / "corrupt.PTN"
+    _write_corrupt_shift_jis_ptn(ptn)
+    with pytest.raises(EncodingError) as exc_info:
+        read_ptn_mass(ptn)
+    msg = str(exc_info.value)
+    assert "encoding=" in msg
+    # Hint mentions the default so users know what is being overridden
+    assert "shift_jis" in msg
+
+
+def test_read_ptn_mass_encoding_error_is_value_error(tmp_path: Path) -> None:
+    """EncodingError must be a ValueError so existing handlers keep working."""
+    ptn = tmp_path / "corrupt2.PTN"
+    _write_corrupt_shift_jis_ptn(ptn)
+    with pytest.raises(ValueError):
+        read_ptn_mass(ptn)
+
+
+def test_extract_mass_from_renzoku_metadata_raises_encoding_error(tmp_path: Path) -> None:
+    """The renzoku-metadata reader must surface invalid bytes the same way."""
+    csv = tmp_path / "連続データ.csv"
+    valid_prefix = ",試験名,synthetic,,,,開始日時,2026-01-01\n,測定備考,\n,重量[mg],".encode(
+        "shift_jis"
+    )
+    invalid_bytes = b"\xff\xfe"
+    valid_suffix = b"1.0\n"
+    csv.write_bytes(valid_prefix + invalid_bytes + valid_suffix)
+    with pytest.raises(EncodingError) as exc_info:
+        _extract_mass_from_renzoku_metadata(csv, "shift_jis")
+    msg = str(exc_info.value)
+    assert str(csv) in msg
+    assert "encoding=" in msg
+    assert "shift_jis" in msg
 
 
 # ---- column_lang translation ---------------------------------------------

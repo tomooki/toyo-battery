@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   state literals with EN columns (the legacy mixed shape) must either
   call the reader with `column_lang='en'` or translate state values
   themselves. ([#94])
+- **Breaking**: `read_cell_dir` (and helpers) no longer silently replaces
+  undecodable bytes with `?` (the previous `errors='replace'` behavior).
+  Files containing bytes invalid for the configured encoding now raise
+  the new `echemplot.io.EncodingError` (a `ValueError` subclass). Pass
+  `encoding=` explicitly if the file is not Shift-JIS. ([#96])
 - **Breaking**: `Cell` now deep-copies the input frame on construction and
   returns defensive copies on every read of `raw_df` / `chdis_df` /
   `cap_df` / `dqdv_df`. Code that previously relied on mutating
@@ -333,6 +338,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#93]: https://github.com/tomooki/toyo-battery/issues/93
 [#94]: https://github.com/tomooki/toyo-battery/issues/94
 [#95]: https://github.com/tomooki/toyo-battery/issues/95
+[#96]: https://github.com/tomooki/toyo-battery/issues/96
 [#98]: https://github.com/tomooki/toyo-battery/issues/98
 [#99]: https://github.com/tomooki/toyo-battery/issues/99
 [#100]: https://github.com/tomooki/toyo-battery/issues/100
