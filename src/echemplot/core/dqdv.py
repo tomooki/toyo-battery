@@ -248,6 +248,9 @@ def get_dqdv_df(
         v_arr: NDArray[np.float64] = frame["v"].to_numpy(dtype=float)
         q_arr: NDArray[np.float64] = frame["q"].to_numpy(dtype=float)
         v_min, v_max = float(v_arr.min()), float(v_arr.max())
+        # Floor to 2 ensures ``linspace`` produces a usable array; segments
+        # where ``ipnum < window_length`` will return None below and surface
+        # as NaN columns.
         ipnum = max(int(inter_num * (v_max - v_min)), 2)
 
         if ipnum < window_length:

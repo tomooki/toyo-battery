@@ -138,6 +138,12 @@ def _integrate_v_dq(v_arr: NDArray[np.float64], q_arr: NDArray[np.float64]) -> f
     # simpson() returns a numpy scalar; explicit float() cast pins the
     # return contract for mypy under the scipy.* ignore_missing_imports
     # override so callers see a plain float, not an ``Any``.
+    #
+    # V2.01 (``TOYO_Origin_2.01.py`` L578) called ``simps(v_latent_dis,
+    # ip_cap_dis)`` with the integration variable in the ``y`` argument
+    # position by mistake, computing ``∫V dV`` instead of ``∫V dQ``.
+    # This rewrite passes them as named args so the integration variable
+    # is unambiguous.
     return float(simpson(y=v, x=q))
 
 

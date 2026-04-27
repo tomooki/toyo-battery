@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exports. Pure refactor — no runtime behaviour change. ([#93])
 - Moved V2.01 parity tests into `tests/legacy_v201/` to clarify the
   boundary between primary-spec and legacy-compatibility tests. ([#95])
+- Updated stale documentation, added explanatory inline comments for
+  V2.01-derived design decisions (Simpson integration order, dQ/dV
+  `ipnum` floor), added an info-level log when Origin sheet names are
+  truncated, and replaced lingering `toyo_battery` references in
+  CLAUDE.md with the current `echemplot` package name. ([#104])
 
 ## [0.1.8] - 2026-04-27
 
@@ -296,6 +301,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#93]: https://github.com/tomooki/toyo-battery/issues/93
 [#95]: https://github.com/tomooki/toyo-battery/issues/95
 [#99]: https://github.com/tomooki/toyo-battery/issues/99
+[#104]: https://github.com/tomooki/toyo-battery/issues/104
 [#107]: https://github.com/tomooki/toyo-battery/pull/107
 [#108]: https://github.com/tomooki/toyo-battery/pull/108
 [0.0.3]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...v0.0.3

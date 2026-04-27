@@ -37,10 +37,13 @@ stable across column orders (pandas preserves tuple order in
 from __future__ import annotations
 
 import hashlib
+import logging
 from typing import Any
 
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger("echemplot.origin")
 
 # Origin's worksheet-name length limit. Hard-coded here rather than
 # re-read from ``originpro`` because the constant is a platform invariant
@@ -66,7 +69,9 @@ def _sanitize_sheet_name(name: str) -> str:
     digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:_HASH_SUFFIX_LEN]
     # Leave a single "_" separator between prefix and hash.
     prefix_len = _SHEET_NAME_MAX - _HASH_SUFFIX_LEN - 1
-    return f"{name[:prefix_len]}_{digest}"
+    truncated = f"{name[:prefix_len]}_{digest}"
+    logger.info("sheet name truncated: %r -> %r (original len %d)", name, truncated, len(name))
+    return truncated
 
 
 def _flatten_columns(df: pd.DataFrame) -> pd.DataFrame:
