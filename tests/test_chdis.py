@@ -77,6 +77,33 @@ def test_capacity_reversal_rows_dropped() -> None:
     assert out[(1, "ch", "電圧")].dropna().tolist() == [3.50, 3.60, 3.65]
 
 
+def test_capacity_step_boundary_within_charge_state_dropped() -> None:
+    """A sustained capacity reset within the same 充電 group (e.g. the
+    CC→CV sub-step boundary in raw-6-digit format, where 経過時間[Sec]
+    restarts) must be dropped wholesale — including any row in the new
+    sub-step that happens to inch up versus its immediate predecessor.
+    Regression for the V-Q loop-back artifact reported with the negative
+    electrode's first Li-insertion curve."""
+    df = _raw(
+        [
+            (1, "充電", 0.0023, 212.58808),
+            (1, "充電", 0.0020, 213.45448),
+            (1, "充電", 0.0017, 214.26966),
+            (1, "充電", 0.0014, 215.16914),
+            (1, "充電", 0.0015, 19.28384),
+            (1, "充電", 0.0016, 15.97689),
+            (1, "充電", 0.0016, 14.97401),
+            (1, "充電", 0.0016, 14.64183),
+            (1, "充電", 0.0016, 12.49434),
+            (1, "充電", 0.0016, 12.13643),
+            (1, "充電", 0.0016, 12.14260),  # diff>0 vs predecessor, but < running max
+        ]
+    )
+    out = get_chdis_df(df)
+    cap = out[(1, "ch", "電気量")].dropna().tolist()
+    assert cap == [212.58808, 213.45448, 214.26966, 215.16914]
+
+
 def test_discharge_first_triggers_state_swap() -> None:
     """If the first cycle starts with 放電, all state labels are swapped so
     the cell is treated as charge-first."""
