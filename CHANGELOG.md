@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Narrowed `_set_axis_limits` exception handling and added a
+  logger.warning so `originpro` failures are observable rather than
+  silently degrading to template-default axis ranges. New `strict_axis`
+  kwarg on `push_to_origin` re-raises instead of warn-and-continue.
+  ([#99])
+
 ### Changed
 - Consolidated the per-module `_JA_COLS` / `_QUANTITY_KEYS_*` mappings
   duplicated across `core.chdis` / `core.capacity` / `core.dqdv` /
@@ -285,6 +292,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#86]: https://github.com/tomooki/toyo-battery/pull/86
 [#88]: https://github.com/tomooki/toyo-battery/pull/88
 [#93]: https://github.com/tomooki/toyo-battery/issues/93
+[#99]: https://github.com/tomooki/toyo-battery/issues/99
 [#107]: https://github.com/tomooki/toyo-battery/pull/107
 [#108]: https://github.com/tomooki/toyo-battery/pull/108
 [0.0.3]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...v0.0.3

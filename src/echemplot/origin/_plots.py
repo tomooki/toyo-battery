@@ -58,6 +58,7 @@ remediation message rather than spreading that concern across callers.
 
 from __future__ import annotations
 
+import logging
 import math
 import os
 from collections.abc import Sequence
@@ -67,6 +68,25 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+
+_logger = logging.getLogger("echemplot.origin")
+
+# Exception types that the originpro attribute-API path is observed to raise
+# when the layer / axis bridge is unavailable or misbehaves. ``originpro``
+# does not document a public exception hierarchy, so we whitelist the
+# narrow set of types we have actually seen in the wild and in the test
+# mocks: ``RuntimeError`` (the generic raise pattern from the C bridge
+# wrapper), ``AttributeError`` (older ``originpro`` builds where ``layer``
+# does not expose ``axis()`` at all), and ``TypeError`` (defensive — covers
+# ``axis()`` returning ``None`` or some other non-axis sentinel that fails
+# attribute writes). Bare ``Exception`` is deliberately avoided so genuine
+# bugs (e.g. a typo in this module) surface rather than silently degrading
+# to template-default scaling.
+_AXIS_API_EXCEPTIONS: tuple[type[BaseException], ...] = (
+    RuntimeError,
+    AttributeError,
+    TypeError,
+)
 
 _TEMPLATE_CHDIS = "charge_discharge.otpu"
 _TEMPLATE_CYCLE = "cycle_efficiency.otpu"
@@ -194,6 +214,7 @@ def _set_axis_limits(
     limits: tuple[float, float] | None,
     *,
     op: Any | None = None,
+    strict: bool = False,
 ) -> None:
     """Apply ``(lo, hi)`` to ``layer``'s named axis. No-op when ``limits`` is ``None``.
 
@@ -217,6 +238,19 @@ def _set_axis_limits(
     scaling picks a sensible unit-wide window rather than collapsing the
     axis to a zero-width line. NaN / inf are filtered upstream by
     :func:`_safe_range`, so they never reach this helper.
+
+    Exception handling: the attribute-API path catches a narrow tuple
+    of exception types observed when calling ``originpro`` from real
+    Origin (``RuntimeError`` from the C bridge, ``AttributeError`` from
+    older builds without ``layer.axis()``, ``TypeError`` for
+    ``axis()`` returning a sentinel that fails attribute writes). Other
+    exception types propagate unchanged so genuine bugs surface. When
+    a known exception is caught, a ``WARNING`` is logged on the
+    ``echemplot.origin`` logger naming the axis, the attempted range,
+    and the exception type+message; the call then falls through to the
+    LabTalk path. Set ``strict=True`` to re-raise the caught exception
+    instead of warn-and-continue — useful for callers that prefer a
+    hard failure over a silently degraded graph.
 
     Both the attribute and LabTalk paths ultimately need real-Origin
     verification (see issue #15). The round-trip check is the best-effort
@@ -242,7 +276,18 @@ def _set_axis_limits(
         attr_ok = math.isclose(float(ax.begin), lo, rel_tol=1e-9, abs_tol=1e-12) and math.isclose(
             float(ax.end), hi, rel_tol=1e-9, abs_tol=1e-12
         )
-    except Exception:  # pragma: no cover - exercised only in real Origin
+    except _AXIS_API_EXCEPTIONS as exc:
+        if strict:
+            raise
+        _logger.warning(
+            "originpro axis attribute API failed for axis=%r range=(%r, %r): %s: %s; "
+            "falling back to LabTalk",
+            axis,
+            lo,
+            hi,
+            type(exc).__name__,
+            exc,
+        )
         attr_ok = False
 
     if attr_ok:
@@ -332,6 +377,7 @@ def create_cell_plots(
     sheets: dict[str, Any],
     *,
     ranges: _GraphRanges | None = None,
+    strict_axis: bool = False,
 ) -> list[Any]:
     """Create the three per-cell graphs from templates.
 
@@ -345,26 +391,32 @@ def create_cell_plots(
     graph via :func:`_set_axis_limits`. Pass ``None`` (the default) to
     keep the template's built-in axis scaling, matching the legacy
     pre-#61 behaviour.
+
+    ``strict_axis`` is forwarded to :func:`_set_axis_limits`. With the
+    default ``False`` an originpro attribute-API failure is logged at
+    WARNING and the LabTalk fallback runs; with ``True`` the caught
+    exception is re-raised so the caller can fail-fast on a degraded
+    axis range instead of silently shipping a template-default graph.
     """
     chdis_graph = _new_graph_from_template(op, _TEMPLATE_CHDIS, f"{cell.name}_chdis_plot")
     _bind_xy_pairs(chdis_graph[0], sheets["chdis"], cell.chdis_df.shape[1])
     if ranges is not None:
-        _set_axis_limits(chdis_graph[0], "x", ranges.chdis_x, op=op)
-        _set_axis_limits(chdis_graph[0], "y", ranges.chdis_y, op=op)
+        _set_axis_limits(chdis_graph[0], "x", ranges.chdis_x, op=op, strict=strict_axis)
+        _set_axis_limits(chdis_graph[0], "y", ranges.chdis_y, op=op, strict=strict_axis)
 
     cycle_graph = _new_graph_from_template(op, _TEMPLATE_CYCLE, f"{cell.name}_cycle_plot")
     _bind_cycle(cycle_graph, sheets["cycle"])
     if ranges is not None:
-        _set_axis_limits(cycle_graph[0], "x", ranges.cycle_x, op=op)
-        _set_axis_limits(cycle_graph[0], "y", ranges.cycle_left_y, op=op)
-        _set_axis_limits(cycle_graph[1], "x", ranges.cycle_x, op=op)
-        _set_axis_limits(cycle_graph[1], "y", ranges.cycle_right_y, op=op)
+        _set_axis_limits(cycle_graph[0], "x", ranges.cycle_x, op=op, strict=strict_axis)
+        _set_axis_limits(cycle_graph[0], "y", ranges.cycle_left_y, op=op, strict=strict_axis)
+        _set_axis_limits(cycle_graph[1], "x", ranges.cycle_x, op=op, strict=strict_axis)
+        _set_axis_limits(cycle_graph[1], "y", ranges.cycle_right_y, op=op, strict=strict_axis)
 
     dqdv_graph = _new_graph_from_template(op, _TEMPLATE_DQDV, f"{cell.name}_dqdv_plot")
     _bind_xy_pairs(dqdv_graph[0], sheets["dqdv"], cell.dqdv_df.shape[1])
     if ranges is not None:
-        _set_axis_limits(dqdv_graph[0], "x", ranges.dqdv_x, op=op)
-        _set_axis_limits(dqdv_graph[0], "y", ranges.dqdv_y, op=op)
+        _set_axis_limits(dqdv_graph[0], "x", ranges.dqdv_x, op=op, strict=strict_axis)
+        _set_axis_limits(dqdv_graph[0], "y", ranges.dqdv_y, op=op, strict=strict_axis)
 
     return [chdis_graph, cycle_graph, dqdv_graph]
 
@@ -375,6 +427,7 @@ def create_comparison_plots(
     per_cell_sheets: list[dict[str, Any]],
     *,
     ranges: _GraphRanges | None = None,
+    strict_axis: bool = False,
 ) -> list[Any]:
     """Create three overlay graphs that combine every cell's sheets.
 
@@ -392,28 +445,31 @@ def create_comparison_plots(
     ``ranges`` applies the same per-axis ``(lo, hi)`` overrides as in
     :func:`create_cell_plots`, so per-cell and comparison graphs share a
     single axis scale — the core of the issue #61 fix.
+
+    ``strict_axis`` is forwarded to :func:`_set_axis_limits` with the
+    same semantics as :func:`create_cell_plots`.
     """
     chdis_graph = _new_graph_from_template(op, _TEMPLATE_CHDIS, "comparison_chdis_plot")
     for cell, sheets in zip(cells, per_cell_sheets):
         _bind_xy_pairs(chdis_graph[0], sheets["chdis"], cell.chdis_df.shape[1])
     if ranges is not None:
-        _set_axis_limits(chdis_graph[0], "x", ranges.chdis_x, op=op)
-        _set_axis_limits(chdis_graph[0], "y", ranges.chdis_y, op=op)
+        _set_axis_limits(chdis_graph[0], "x", ranges.chdis_x, op=op, strict=strict_axis)
+        _set_axis_limits(chdis_graph[0], "y", ranges.chdis_y, op=op, strict=strict_axis)
 
     cycle_graph = _new_graph_from_template(op, _TEMPLATE_CYCLE, "comparison_cycle_plot")
     for _cell, sheets in zip(cells, per_cell_sheets):
         _bind_cycle(cycle_graph, sheets["cycle"])
     if ranges is not None:
-        _set_axis_limits(cycle_graph[0], "x", ranges.cycle_x, op=op)
-        _set_axis_limits(cycle_graph[0], "y", ranges.cycle_left_y, op=op)
-        _set_axis_limits(cycle_graph[1], "x", ranges.cycle_x, op=op)
-        _set_axis_limits(cycle_graph[1], "y", ranges.cycle_right_y, op=op)
+        _set_axis_limits(cycle_graph[0], "x", ranges.cycle_x, op=op, strict=strict_axis)
+        _set_axis_limits(cycle_graph[0], "y", ranges.cycle_left_y, op=op, strict=strict_axis)
+        _set_axis_limits(cycle_graph[1], "x", ranges.cycle_x, op=op, strict=strict_axis)
+        _set_axis_limits(cycle_graph[1], "y", ranges.cycle_right_y, op=op, strict=strict_axis)
 
     dqdv_graph = _new_graph_from_template(op, _TEMPLATE_DQDV, "comparison_dqdv_plot")
     for cell, sheets in zip(cells, per_cell_sheets):
         _bind_xy_pairs(dqdv_graph[0], sheets["dqdv"], cell.dqdv_df.shape[1])
     if ranges is not None:
-        _set_axis_limits(dqdv_graph[0], "x", ranges.dqdv_x, op=op)
-        _set_axis_limits(dqdv_graph[0], "y", ranges.dqdv_y, op=op)
+        _set_axis_limits(dqdv_graph[0], "x", ranges.dqdv_x, op=op, strict=strict_axis)
+        _set_axis_limits(dqdv_graph[0], "y", ranges.dqdv_y, op=op, strict=strict_axis)
 
     return [chdis_graph, cycle_graph, dqdv_graph]
