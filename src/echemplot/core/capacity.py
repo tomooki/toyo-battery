@@ -30,19 +30,17 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from echemplot.io.schema import JA_TO_EN, ColumnLang
+from echemplot.io.schema import JA_COLS, JA_TO_EN, ColumnLang
 
 # Single-entry today; retained in dict form to match the :mod:`chdis` pattern
 # and keep the door open for adding voltage or current when stats.py joins.
-_JA_COLS: dict[str, str] = {
-    "capacity": "電気量",
-}
+_NEEDED_KEYS = ("capacity",)
 
 
 def _resolve_cols(column_lang: ColumnLang) -> dict[str, str]:
     if column_lang == "ja":
-        return _JA_COLS
-    return {k: JA_TO_EN[v] for k, v in _JA_COLS.items()}
+        return {k: JA_COLS[k] for k in _NEEDED_KEYS}
+    return {k: JA_TO_EN[JA_COLS[k]] for k in _NEEDED_KEYS}
 
 
 def _empty_result() -> pd.DataFrame:

@@ -48,6 +48,29 @@ JA_TO_EN: dict[str, str] = {
 
 EN_TO_JA: dict[str, str] = {v: k for k, v in JA_TO_EN.items()}
 
+# Canonical-key → JA column literal. Single source of truth used by every
+# core/plotting module that needs to address TOYO source columns by a
+# language-neutral logical name. Callers select either ``JA_COLS[k]`` (when
+# the in-memory frame is ``column_lang="ja"``) or
+# ``JA_TO_EN[JA_COLS[k]]`` (when ``column_lang="en"``).
+#
+# Keys are kept tight: only the columns at least one ``core`` / ``plotting``
+# module dereferences by logical name today. Do not add a key without a
+# real consumer — non-canonical TOYO source columns (経過時間[Sec], 電流[mA],
+# モード, …) live as ``COL_*`` named constants above and are addressed
+# directly by the reader, not via this map.
+#
+# * ``cycle``     — per-row cycle index
+# * ``state``     — JP state literal (``充電``/``放電``/``休止`` etc.)
+# * ``voltage``   — terminal voltage column
+# * ``capacity``  — accumulated charge/discharge capacity column
+JA_COLS: dict[str, str] = {
+    "cycle": "サイクル",
+    "state": "状態",
+    "voltage": "電圧",
+    "capacity": COL_CAPACITY,
+}
+
 # State-code mapping for the raw 6-digit format. Codes {0, 1, 2} are
 # documented; code 9 is empirically observed across multiple TOYO cyclers
 # (No1 / No2 / No6) as an end-of-test "abort" signal — typically a single
@@ -62,12 +85,20 @@ STATE_CODE_TO_EN: dict[int, str] = {
     2: "discharge",
     9: "abort",
 }
+# Native ``連続データ.csv`` exports surface ``充電休止`` / ``放電休止`` as
+# distinct labels alongside the basic 3-state set (and the 中断 abort
+# sentinel), so the JA→EN map carries six entries. The raw 6-digit path
+# only emits the basic codes {0, 1, 2, 9}, so ``STATE_CODE_TO_JA`` keeps
+# its 4-entry shape.
 STATE_JA_TO_EN: dict[str, str] = {
     "休止": "rest",
     "充電": "charge",
     "放電": "discharge",
     "中断": "abort",
+    "充電休止": "charge_rest",
+    "放電休止": "discharge_rest",
 }
+STATE_EN_TO_JA: dict[str, str] = {v: k for k, v in STATE_JA_TO_EN.items()}
 
 
 def rename(columns: list[str], target: ColumnLang) -> list[str]:

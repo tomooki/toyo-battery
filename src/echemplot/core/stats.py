@@ -65,23 +65,20 @@ import numpy as np
 import pandas as pd
 from scipy.integrate import simpson, trapezoid
 
-from echemplot.io.schema import JA_TO_EN, ColumnLang
+from echemplot.io.schema import JA_COLS, JA_TO_EN, ColumnLang
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from echemplot.core.cell import Cell
 
-_JA_COLS: dict[str, str] = {
-    "voltage": "電圧",
-    "capacity": "電気量",
-}
+_NEEDED_KEYS = ("voltage", "capacity")
 
 
 def _resolve_cols(column_lang: ColumnLang) -> dict[str, str]:
     if column_lang == "ja":
-        return _JA_COLS
-    return {k: JA_TO_EN[v] for k, v in _JA_COLS.items()}
+        return {k: JA_COLS[k] for k in _NEEDED_KEYS}
+    return {k: JA_TO_EN[JA_COLS[k]] for k in _NEEDED_KEYS}
 
 
 def _build_column_order(target_cycles: Sequence[int], pct: int) -> list[str]:
