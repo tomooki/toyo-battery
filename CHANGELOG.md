@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-04-27
+
+### Fixed
+- `chdis` no longer leaks rows from a later CC→CV sub-step into the
+  preceding sub-step's V-Q segment, eliminating the spurious V≈0
+  "loop-back" line in `plot_chdis` against raw 6-digit data. The
+  reversal filter previously used a local `~(|電気量|.diff() < 0)`
+  comparison, which fails when 経過時間[Sec] resets at sub-step
+  boundaries (not just state boundaries) and 電気量 drops by ~200
+  mAh/g — any row in the new sub-step whose `t * I` happened to inch
+  up vs. its immediate predecessor leaked through. The filter now
+  drops any row whose absolute 電気量 is below the segment's running
+  maximum (`cap == cap.cummax()`); single-row reversals
+  (500→400→600) still resolve to `{500, 600}` as before. ([#108])
+
 ### Changed
 - `STATE_CODE_TO_JA` / `STATE_CODE_TO_EN` / `STATE_JA_TO_EN` now register
   state code `9` as `中断` / `abort`. Empirically observed across TOYO
@@ -19,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   preserved as `中断` regardless of position or flow values. Downstream
   `chdis` filters non-charge/discharge rows out of the segmentation
   input, so `capacity`, `dQ/dV`, `stats`, plotting, and Origin output
-  are unaffected. ([#91])
+  are unaffected. ([#107])
 
 ### Backwards-compatibility note
 - Raw 6-digit DataFrames whose source file contains state-9 rows now
@@ -239,7 +254,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-alpha.** Public API is unstable and may change without deprecation in
   0.0.x releases.
 
-[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/tomooki/toyo-battery/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/tomooki/toyo-battery/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/tomooki/toyo-battery/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/tomooki/toyo-battery/compare/v0.1.4...v0.1.5
@@ -259,6 +275,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#80]: https://github.com/tomooki/toyo-battery/pull/80
 [#86]: https://github.com/tomooki/toyo-battery/pull/86
 [#88]: https://github.com/tomooki/toyo-battery/pull/88
+[#107]: https://github.com/tomooki/toyo-battery/pull/107
+[#108]: https://github.com/tomooki/toyo-battery/pull/108
 [0.0.3]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/tomooki/toyo-battery/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/tomooki/toyo-battery/releases/tag/v0.0.1
