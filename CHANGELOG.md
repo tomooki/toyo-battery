@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-28
+
 ### Breaking
 - **Breaking**: `read_cell_dir` (and `_finalize`) now raises `ValueError`
   on unknown JA-string state values, matching the existing strictness
@@ -332,6 +334,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0.0.x releases.
 
 [Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.8...HEAD
+[0.2.0]: https://github.com/tomooki/toyo-battery/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/tomooki/toyo-battery/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/tomooki/toyo-battery/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/tomooki/toyo-battery/compare/v0.1.5...v0.1.6
