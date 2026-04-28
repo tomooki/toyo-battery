@@ -823,6 +823,59 @@ def test_compute_global_ranges_extracts_per_axis_min_max() -> None:
     assert ranges.dqdv_y == (-8.0, 22.0)
 
 
+def test_compute_global_ranges_handles_cells_with_different_column_counts() -> None:
+    """Cells with mismatched (cycle, side) pair counts must not raise.
+
+    Regression for the np.concatenate "along dimension 1" failure that
+    surfaced when Run-ing multiple cells whose chdis_df / dqdv_df had
+    different numbers of column pairs (e.g. 50 cycles x 2 sides vs.
+    1 cycle x 1 side).
+    """
+    from echemplot.origin._plots import compute_global_ranges
+
+    chdis_a = pd.DataFrame(
+        {
+            "q_ch": [0.0, 500.0],
+            "v_ch": [3.0, 4.0],
+            "q_dis": [0.0, 480.0],
+            "v_dis": [4.0, 3.0],
+        }
+    )
+    chdis_b = pd.DataFrame({"q_ch": [0.0, 800.0], "v_ch": [3.1, 4.2]})
+
+    cap_a = pd.DataFrame(
+        {
+            "cycle": [1, 2],
+            "q_ch": [1000.0, 990.0],
+            "q_dis": [990.0, 980.0],
+            "ce": [99.0, 98.9],
+        }
+    ).set_index("cycle")
+    cap_b = pd.DataFrame(
+        {"cycle": [1], "q_ch": [800.0], "q_dis": [760.0], "ce": [95.0]}
+    ).set_index("cycle")
+
+    dqdv_a = pd.DataFrame(
+        {
+            "v_ch": [3.0, 3.5, 4.0],
+            "dqdv_ch": [10.0, 20.0, -5.0],
+            "v_dis": [4.0, 3.5, 3.0],
+            "dqdv_dis": [-3.0, -8.0, -1.0],
+        }
+    )
+    dqdv_b = pd.DataFrame({"v": [3.1, 4.1], "dqdv": [12.0, -8.0]})
+
+    a = _fake_cell(chdis=chdis_a, cap=cap_a, dqdv=dqdv_a, name="A")
+    b = _fake_cell(chdis=chdis_b, cap=cap_b, dqdv=dqdv_b, name="B")
+
+    ranges = compute_global_ranges([a, b])
+
+    assert ranges.chdis_x == (0.0, 800.0)
+    assert ranges.chdis_y == (3.0, 4.2)
+    assert ranges.dqdv_x == (3.0, 4.1)
+    assert ranges.dqdv_y == (-8.0, 20.0)
+
+
 def test_compute_global_ranges_single_cell_equals_cell_range() -> None:
     """With a single cell, global == that cell's own data range."""
     from echemplot.origin._plots import compute_global_ranges
