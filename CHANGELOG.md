@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-04-29
+
+### Fixed
+- `get_chdis_df` no longer collapses two physically distinct cycles into a
+  single `(cycle, state)` group when a multi-mode TOYO test program (e.g.
+  formation in mode 1 followed by regular cycling in mode 2) resets the
+  per-mode `サイクル` counter at every mode boundary. The chdis cycle key
+  now prefers the global counter `総サイクル` (or its EN form `total_cycle`)
+  when present, falling back to `サイクル` otherwise. The reader
+  canonicalizes the half-width source spelling `総ｻｲｸﾙ` to the full-width
+  `総サイクル` so chdis can look it up regardless of source dialect.
+  Eliminates the visible V drop / "cycle 2 curve drawn inside cycle 1"
+  artifact in `comparison_chdis_plot` (and `plot_chdis`) for cells whose
+  cycler emitted multiple charge sub-runs under a shared `サイクル=1`. ([#127])
+- `echemplot.__version__` is now bumped in lockstep with `pyproject.toml`
+  again — v0.2.1 left `_version.py` at `"0.2.0"` so `echemplot.__version__`
+  silently misreported the installed release.
+
 ## [0.2.1] - 2026-04-28
 
 ### Fixed
@@ -345,7 +363,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-alpha.** Public API is unstable and may change without deprecation in
   0.0.x releases.
 
-[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/tomooki/toyo-battery/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/tomooki/toyo-battery/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tomooki/toyo-battery/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/tomooki/toyo-battery/compare/v0.1.7...v0.1.8
@@ -383,6 +402,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#107]: https://github.com/tomooki/toyo-battery/pull/107
 [#108]: https://github.com/tomooki/toyo-battery/pull/108
 [#125]: https://github.com/tomooki/toyo-battery/pull/125
+[#127]: https://github.com/tomooki/toyo-battery/pull/127
 [0.0.3]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/tomooki/toyo-battery/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/tomooki/toyo-battery/releases/tag/v0.0.1
