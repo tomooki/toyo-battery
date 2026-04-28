@@ -303,6 +303,36 @@ def test_read_raw_6digit_multi_file(tmp_path: Path) -> None:
     assert df["サイクル"].tolist() == [1, 1, 2, 2]
 
 
+def test_read_raw_6digit_canonicalizes_total_cycle_column(tmp_path: Path) -> None:
+    """Raw 6-digit ``総ｻｲｸﾙ`` (half-width) is canonicalized to ``総サイクル``.
+
+    chdis.py prefers the global cycle counter as the cycle key; the reader
+    has to surface it under the full-width canonical spelling so chdis can
+    look it up without knowing the source dialect.
+    """
+    cell_dir = tmp_path / "total_cycle"
+    cell_dir.mkdir()
+    empty_sep = ",,,,,,"
+    header = f"日付,時刻,経過時間[Sec],電圧[V],電流[mA]{empty_sep},状態,ﾓｰﾄﾞ,ｻｲｸﾙ,総ｻｲｸﾙ"
+    rows = [
+        "0,0,0,0,0,0,0",
+        "",
+        header,
+        f"2025/01/01,00:00:00,00000000,+3.5000,1.000000{empty_sep},1, 1,  1,     1",
+        f"2025/01/01,00:30:00,00001800,+3.5500,1.000000{empty_sep},1, 1,  1,     2",
+    ]
+    (cell_dir / "000001").write_text("\n".join(rows) + "\n", encoding="shift_jis")
+    _write_fixed_column_ptn(cell_dir / "pattern.PTN", 0.001)
+    df, _ = read_cell_dir(cell_dir)
+    assert "総サイクル" in df.columns
+    assert "総ｻｲｸﾙ" not in df.columns
+    assert df["総サイクル"].tolist() == [1, 2]
+    # EN-mode rename: 総サイクル → total_cycle via JA_TO_EN.
+    df_en, _ = read_cell_dir(cell_dir, column_lang="en")
+    assert "total_cycle" in df_en.columns
+    assert df_en["total_cycle"].tolist() == [1, 2]
+
+
 def test_read_raw_6digit_mismatched_columns_raises(tmp_path: Path) -> None:
     cell_dir = tmp_path / "mismatch"
     cell_dir.mkdir()

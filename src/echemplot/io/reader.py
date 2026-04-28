@@ -14,7 +14,10 @@ Discovery priority for a given cell directory ``path``:
 
 All three paths converge on the same canonical schema (canonical columns first;
 any extra source columns such as 経過時間[Sec] / 電流[mA] / 日付 / 時刻 /
-総ｻｲｸﾙ are preserved after them so downstream P1 phases can use them):
+総サイクル are preserved after them so downstream P1 phases can use them.
+The half-width source spelling ``総ｻｲｸﾙ`` is canonicalized to the full-width
+``総サイクル`` here so :mod:`echemplot.core.chdis` can prefer it over
+``サイクル`` as the cycle key without re-asking which form the reader emitted):
 
     Canonical columns: サイクル, モード, 状態, 電圧, 電気量
     状態 values:
@@ -176,8 +179,17 @@ _UNIT_ROW_FIRST_CELL_PATTERNS = (
 )
 
 # Half-width → full-width canonical rename. The raw 6-digit header row uses
-# half-width katakana for the cycle/mode columns.
-_RAW_TO_CANONICAL = {"ｻｲｸﾙ": "サイクル", "ﾓｰﾄﾞ": "モード", "電圧[V]": "電圧"}
+# half-width katakana for the cycle/mode columns. ``総ｻｲｸﾙ`` is the global
+# cycle counter (does not reset across mode boundaries); chdis prefers it as
+# the cycle key when present so multi-mode programs (e.g. formation in mode 1
+# followed by regular cycling in mode 2) do not collapse two physically
+# distinct cycles into a single chdis_df group.
+_RAW_TO_CANONICAL = {
+    "ｻｲｸﾙ": "サイクル",
+    "総ｻｲｸﾙ": "総サイクル",
+    "ﾓｰﾄﾞ": "モード",
+    "電圧[V]": "電圧",
+}
 
 # Metadata key used by the native 連続データ.csv to carry active-material mass.
 _METADATA_MASS_KEY = "重量[mg]"
@@ -342,7 +354,8 @@ def read_cell_dir(
         Canonical columns first (see :data:`schema.CANONICAL_COLUMNS_JA` or
         the EN equivalent when ``column_lang="en"``), followed by any extra
         columns present in the source file (e.g. 経過時間[Sec], 電流[mA],
-        日付, 時刻, 総ｻｲｸﾙ).
+        日付, 時刻, 総サイクル — half-width ``総ｻｲｸﾙ`` from the raw 6-digit
+        header is canonicalized to the full-width spelling).
     mass_g : float
         Active-material mass used for the capacity calculation, in grams.
         ``math.nan`` if the source already had 電気量 precomputed and no
@@ -595,7 +608,8 @@ def _drop_unnamed(df: pd.DataFrame) -> pd.DataFrame:
 
     Raw TOYO 6-digit files have 6-7 empty separator columns between the
     sensor block (``経過時間[Sec]/電圧[V]/電流[mA]``) and the per-row
-    metadata block (``状態/ﾓｰﾄﾞ/ｻｲｸﾙ/総ｻｲｸﾙ``). pandas names them
+    metadata block (``状態/ﾓｰﾄﾞ/ｻｲｸﾙ/総ｻｲｸﾙ``, which ``_clean_columns``
+    later canonicalizes to ``状態/モード/サイクル/総サイクル``). pandas names them
     ``Unnamed: 5``, ``Unnamed: 6``, ... — noise, never useful downstream.
     """
     keep = [c for c in df.columns if not str(c).startswith("Unnamed:")]
