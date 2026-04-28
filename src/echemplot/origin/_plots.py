@@ -185,16 +185,25 @@ def compute_global_ranges(cells: Sequence[Any]) -> _GraphRanges:
     cycle_x_vals: list[np.ndarray] = []
     cycle_left_vals: list[np.ndarray] = []
     cycle_right_vals: list[np.ndarray] = []
+    # Each cell's chdis_df / dqdv_df can have a different number of
+    # (cycle, side) column pairs and a different row count, so the 2D
+    # arrays from different cells do not share a common axis-1 size.
+    # ``np.concatenate`` (default axis=0) requires every non-concat axis
+    # to match exactly, which would raise "along dimension 1, size N vs.
+    # size M" when cells have differing pair counts. ``_safe_range``
+    # ravels its input before computing min/max anyway, so we ravel here
+    # at append time and concatenate flat 1D arrays — equivalent result,
+    # no shape constraint.
     for cell in cells:
         chdis = cell.chdis_df
         if chdis.shape[1] >= 2:
             # even = capacity (x), odd = voltage (y)
-            chdis_x_vals.append(chdis.iloc[:, 0::2].to_numpy(dtype=float))
-            chdis_y_vals.append(chdis.iloc[:, 1::2].to_numpy(dtype=float))
+            chdis_x_vals.append(chdis.iloc[:, 0::2].to_numpy(dtype=float).ravel())
+            chdis_y_vals.append(chdis.iloc[:, 1::2].to_numpy(dtype=float).ravel())
         dqdv = cell.dqdv_df
         if dqdv.shape[1] >= 2:
-            dqdv_x_vals.append(dqdv.iloc[:, 0::2].to_numpy(dtype=float))
-            dqdv_y_vals.append(dqdv.iloc[:, 1::2].to_numpy(dtype=float))
+            dqdv_x_vals.append(dqdv.iloc[:, 0::2].to_numpy(dtype=float).ravel())
+            dqdv_y_vals.append(dqdv.iloc[:, 1::2].to_numpy(dtype=float).ravel())
         # cap_df carries the cycle number in its index; surface it as a
         # column to match the post-``reset_index`` layout used when
         # writing the sheet. See :func:`._worksheets.write_cell_sheets`.
