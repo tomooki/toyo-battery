@@ -53,6 +53,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import re
 from pathlib import Path
 from typing import cast
@@ -186,36 +187,84 @@ _METADATA_MASS_KEY = "重量[mg]"
 # a scan of the first 4 rows is generous.
 _METADATA_SCAN_ROWS = 4
 
+# Fixed-column layout for the PTN mass field on line 0. The TOYO PTN format
+# always places a 9-character ``<flag><mass>`` composite at character offset
+# 44 (after a 42-char operator field + the literal ``"2 "`` electrode-count
+# prefix). The 9-char composite is one of two known dialects:
+#
+# * "concat" (cyclers No5 / No1):  ``flag(1) + mass(%.6f, 8 chars)``
+#                                  e.g. ``"00.000358"`` — flag at index 0,
+#                                  mass at index 1..8.
+# * "spaced" (cycler No6):         ``flag(1) + " "(1) + mass(%.5f, 7 chars)``
+#                                  e.g. ``"0 0.00116"`` — mass at index 2..8.
+#
+# Detection: examine the byte at index 1 of the 9-char composite. ``" "`` →
+# spaced dialect; otherwise concat. ``tests/conftest.py:write_ptn_main`` is
+# the synthetic-fixture truth source; real-data validation against No1 / No5
+# / No6 cyclers is recorded in PR #90 (issue #90). Character indexing is safe
+# even when the operator field contains multi-byte JP names because the file
+# is decoded Shift-JIS first and ``str.ljust`` pads in characters.
+_PTN_MASS_FIELD_START = 44
+_PTN_MASS_FIELD_LEN = 9
+_PTN_MASS_FIELD_END = _PTN_MASS_FIELD_START + _PTN_MASS_FIELD_LEN  # 53
 
-def read_ptn_mass(ptn_path: str | Path) -> float:
-    """Extract active-material mass (grams) from a ``.PTN`` file.
+# Escape hatch: when this env var is set to a truthy value the legacy
+# ``TOYO_Origin_2.01`` heuristic (``str.split()`` + ``token[2] / token[3]``
+# fallback) is used instead of the fixed-column parser. Provided for users
+# who hit a third PTN dialect in the wild — file an issue if you need this.
+_PTN_LEGACY_ENV_VAR = "ECHEMPLOT_PTN_LEGACY"
 
-    TOYO ships at least two PTN dialects that differ in how the mass field
-    is rendered on line 0. Both encode the field as a 9-byte composite of
-    ``<flag><mass>``:
 
-    * Older dialect (e.g. cycler "No6"): ``"0 0.00116"`` — flag, space,
-      ``%.5f`` mass. ``str.split()`` yields the flag at ``tokens[2]`` and
-      the mass at ``tokens[3]``.
-    * Newer dialect (e.g. cyclers "No5"/"No1"): ``"00.000358"`` — flag
-      glued to a ``%.6f`` mass. ``tokens[2]`` parses directly as the mass.
+def _is_legacy_ptn_mode() -> bool:
+    val = os.environ.get(_PTN_LEGACY_ENV_VAR, "").strip().lower()
+    return val in {"1", "true", "yes", "on"}
 
-    Match the legacy ``TOYO_Origin_2.01`` heuristic: take ``tokens[2]``,
-    and if it parses as exactly zero, fall back to ``tokens[3]``.
 
-    Auxiliary ``.PTN`` files that TOYO ships alongside the main one
-    (``*_OPTION.PTN``, ``*_Option2.PTN``, etc.) carry INI- or CSV-style
-    configuration, not a mass; calling this on them will raise
-    ``ValueError``, which :func:`_resolve_mass_from_ptn` relies on to
-    skip them.
+def _parse_ptn_mass_fixed_column(first_line: str, path: Path) -> float:
+    """Parse the 9-char fixed-column mass field on line 0.
+
+    Detects the dialect by inspecting index 1 of the 9-char composite. Raises
+    ``ValueError`` on a short line, a non-numeric mass, or a non-positive
+    parsed value — :func:`_resolve_mass_from_ptn` relies on this to skip
+    auxiliary PTN files (e.g. ``*_OPTION.PTN``).
     """
-    path = Path(ptn_path)
-    encoding = "shift_jis"
+    if len(first_line) < _PTN_MASS_FIELD_END:
+        raise ValueError(
+            f"{path} line 0 is too short for the fixed-column PTN format "
+            f"(need {_PTN_MASS_FIELD_END} chars, got {len(first_line)}); "
+            f"set {_PTN_LEGACY_ENV_VAR}=1 to fall back to the legacy "
+            "whitespace-split parser if your file uses a different layout."
+        )
+    composite = first_line[_PTN_MASS_FIELD_START:_PTN_MASS_FIELD_END]
+    if composite[1] == " ":
+        dialect = "spaced"
+        mass_str = composite[2:].strip()
+    else:
+        dialect = "concat"
+        mass_str = composite[1:].strip()
     try:
-        with path.open(encoding=encoding) as f:
-            first_line = f.readline()
-    except UnicodeDecodeError as e:
-        raise EncodingError(path, expected_encoding=encoding, original=e) from e
+        mass = float(mass_str)
+    except ValueError as e:
+        raise ValueError(
+            f"{path} line 0 fixed-column mass field {composite!r} (dialect={dialect!r}) "
+            f"is not a valid float; "
+            f"set {_PTN_LEGACY_ENV_VAR}=1 to fall back to the legacy parser if needed."
+        ) from e
+    if not math.isfinite(mass) or mass <= 0:
+        raise ValueError(
+            f"{path} line 0 fixed-column mass field {composite!r} (dialect={dialect!r}) "
+            f"parsed as non-positive value {mass!r}"
+        )
+    return mass
+
+
+def _parse_ptn_mass_legacy(first_line: str, path: Path) -> float:
+    """Legacy ``TOYO_Origin_2.01`` whitespace-split heuristic.
+
+    Take ``tokens[2]``; if it parses as exactly zero, fall back to
+    ``tokens[3]``. Preserved for the ``ECHEMPLOT_PTN_LEGACY=1`` escape hatch
+    and for the V2.01 parity tests under ``tests/legacy_v201/``.
+    """
     tokens = first_line.split()
     if len(tokens) < 3:
         raise ValueError(
@@ -236,6 +285,46 @@ def read_ptn_mass(ptn_path: str | Path) -> float:
         f"{path} line 0: token[2]=0 and token[3] absent or non-numeric; "
         "cannot extract active-material mass"
     )
+
+
+def read_ptn_mass(ptn_path: str | Path) -> float:
+    """Extract active-material mass (grams) from a ``.PTN`` file.
+
+    Uses a **fixed-column parser** by default: the TOYO PTN format places a
+    9-char ``<flag><mass>`` composite at character offset 44 of line 0, in
+    one of two known dialects:
+
+    * "concat" (cyclers No5 / No1): flag glued to a ``%.6f`` mass —
+      ``"00.000358"``.
+    * "spaced" (cycler No6): flag, space, then a ``%.5f`` mass —
+      ``"0 0.00116"``.
+
+    Dialect is auto-detected by the byte at index 1 of the composite (a
+    space implies spaced; otherwise concat). Both decode to the same numeric
+    mass.
+
+    The previous :data:`TOYO_Origin_2.01`-derived whitespace-split heuristic
+    (``tokens[2]``, falling back to ``tokens[3]`` when ``tokens[2]==0``) is
+    available behind the ``ECHEMPLOT_PTN_LEGACY=1`` environment variable as
+    an escape hatch for users who hit a third dialect in the wild.
+
+    Auxiliary ``.PTN`` files that TOYO ships alongside the main one
+    (``*_OPTION.PTN``, ``*_Option2.PTN``, etc.) carry INI- or CSV-style
+    configuration whose first line is too short for the fixed-column layout
+    and whose tokens don't form a positive mass; calling this on them will
+    raise ``ValueError``, which :func:`_resolve_mass_from_ptn` relies on to
+    skip them.
+    """
+    path = Path(ptn_path)
+    encoding = "shift_jis"
+    try:
+        with path.open(encoding=encoding) as f:
+            first_line = f.readline()
+    except UnicodeDecodeError as e:
+        raise EncodingError(path, expected_encoding=encoding, original=e) from e
+    if _is_legacy_ptn_mode():
+        return _parse_ptn_mass_legacy(first_line, path)
+    return _parse_ptn_mass_fixed_column(first_line, path)
 
 
 def read_cell_dir(
