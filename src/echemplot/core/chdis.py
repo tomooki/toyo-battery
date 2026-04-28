@@ -4,7 +4,15 @@ Splits a raw DataFrame (from :func:`echemplot.io.reader.read_cell_dir`)
 into per-cycle charge/discharge segments. The output is a wide DataFrame
 with a 3-level column MultiIndex:
 
-    level 0  cycle    — int cycle number (1, 2, 3, ...)
+    level 0  cycle    — int cycle number (1, 2, 3, ...). Sourced from
+                        ``総サイクル`` (the global cycle counter) when the
+                        column is present, otherwise from ``サイクル`` (per-
+                        mode counter). Multi-mode TOYO programs reset
+                        ``サイクル`` at every mode boundary so two physically
+                        distinct cycles can share ``サイクル=1`` — preferring
+                        ``総サイクル`` keeps them as separate groups so the
+                        running-max filter below does not have to disentangle
+                        sub-runs across mode boundaries.
     level 1  side     — "ch" or "dis"
     level 2  quantity — "電気量"/"電圧" (or EN equivalents) as in the input
 
@@ -46,7 +54,13 @@ import warnings
 import pandas as pd
 
 from echemplot.core import DataIntegrityWarning
-from echemplot.io.schema import JA_COLS, JA_TO_EN, STATE_JA_TO_EN, ColumnLang
+from echemplot.io.schema import (
+    COL_TOTAL_CYCLE_JA,
+    JA_COLS,
+    JA_TO_EN,
+    STATE_JA_TO_EN,
+    ColumnLang,
+)
 
 _CHARGE_JA = "充電"
 _DISCHARGE_JA = "放電"
@@ -55,11 +69,28 @@ _DISCHARGE_EN = STATE_JA_TO_EN[_DISCHARGE_JA]
 
 _NEEDED_KEYS = ("cycle", "state", "voltage", "capacity")
 
+_TOTAL_CYCLE_EN = JA_TO_EN[COL_TOTAL_CYCLE_JA]
+
 
 def _resolve_cols(column_lang: ColumnLang) -> dict[str, str]:
     if column_lang == "ja":
         return {k: JA_COLS[k] for k in _NEEDED_KEYS}
     return {k: JA_TO_EN[JA_COLS[k]] for k in _NEEDED_KEYS}
+
+
+def _resolve_cycle_col(df: pd.DataFrame, column_lang: ColumnLang, fallback: str) -> str:
+    """Return the column name used as the cycle key for groupby.
+
+    Prefers the global counter (``総サイクル`` / ``total_cycle``) when present
+    in ``df.columns``, otherwise returns ``fallback`` (the per-mode
+    ``サイクル`` / ``cycle`` column resolved by :func:`_resolve_cols`). The
+    global counter is the right key for multi-mode TOYO programs where the
+    per-mode counter resets at mode boundaries — see the module docstring.
+    """
+    total_col = COL_TOTAL_CYCLE_JA if column_lang == "ja" else _TOTAL_CYCLE_EN
+    if total_col in df.columns:
+        return total_col
+    return fallback
 
 
 def _resolve_states(column_lang: ColumnLang) -> tuple[str, str, dict[str, str]]:
@@ -119,12 +150,12 @@ def get_chdis_df(df: pd.DataFrame, *, column_lang: ColumnLang = "ja") -> pd.Data
             f"for column_lang={column_lang!r}; got columns={list(df.columns)}"
         )
 
-    cap_col, v_col, cycle_col, state_col = (
+    cap_col, v_col, state_col = (
         cols["capacity"],
         cols["voltage"],
-        cols["cycle"],
         cols["state"],
     )
+    cycle_col = _resolve_cycle_col(df, column_lang, fallback=cols["cycle"])
     charge_lbl, discharge_lbl, state_to_side = _resolve_states(column_lang)
 
     working = df.loc[df[state_col].isin([charge_lbl, discharge_lbl])].reset_index(drop=True)

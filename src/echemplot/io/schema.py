@@ -25,6 +25,15 @@ COL_ELAPSED_S: str = "経過時間[Sec]"
 COL_CURRENT_MA: str = "電流[mA]"
 COL_CAPACITY: str = "電気量"
 
+# Optional global cycle counter that the TOYO firmware emits alongside the
+# per-mode ``サイクル`` column. Cyclers running multi-mode test programs
+# (e.g. mode 1 = formation, mode 2 = regular cycling) reset ``サイクル`` at
+# every mode boundary while ``総サイクル`` keeps counting monotonically; chdis
+# prefers ``総サイクル`` as the cycle key when present so cycles from
+# different modes do not get conflated. Half-width ``総ｻｲｸﾙ`` is the source
+# spelling and is canonicalized to this full-width form by the reader.
+COL_TOTAL_CYCLE_JA: str = "総サイクル"
+
 CANONICAL_COLUMNS_EN: tuple[str, ...] = (
     "cycle",
     "mode",
@@ -35,6 +44,7 @@ CANONICAL_COLUMNS_EN: tuple[str, ...] = (
 
 JA_TO_EN: dict[str, str] = {
     "サイクル": "cycle",
+    "総サイクル": "total_cycle",
     "モード": "mode",
     "状態": "state",
     "電圧": "voltage",

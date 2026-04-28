@@ -325,3 +325,121 @@ def test_first_cycle_discharge_swaps_all_cycles_globally() -> None:
     for cycle in (1, 2, 3):
         assert out[(cycle, "ch", "電圧")].dropna().tolist() == [3.60, 3.40]
         assert out[(cycle, "dis", "電圧")].dropna().tolist() == [3.40, 3.60]
+
+
+def _raw_with_total_cycle(
+    rows: list[tuple[int, int, str, float, float]],
+    *,
+    lang: str = "ja",
+) -> pd.DataFrame:
+    """Build a frame with both ``サイクル`` and ``総サイクル``.
+
+    Row tuple = (cycle, total_cycle, state, voltage, capacity).
+    """
+    if lang == "ja":
+        columns = ["サイクル", "総サイクル", "状態", "電圧", "電気量"]
+    else:
+        columns = ["cycle", "total_cycle", "state", "voltage", "capacity"]
+    return pd.DataFrame(rows, columns=columns)
+
+
+def test_total_cycle_column_supersedes_cycle() -> None:
+    """When ``総サイクル`` is present it is preferred over ``サイクル`` for grouping.
+
+    Multi-mode TOYO programs reset ``サイクル`` at every mode boundary while
+    ``総サイクル`` keeps counting monotonically. Without this preference, two
+    physically distinct cycles that share ``サイクル=1`` collapse into a
+    single chdis_df group; preferring ``総サイクル`` keeps them separate.
+    """
+    df = _raw_with_total_cycle(
+        [
+            # Mode 1, サイクル=1 → 総サイクル=1
+            (1, 1, "充電", 3.50, 0.0),
+            (1, 1, "充電", 3.60, 500.0),
+            (1, 1, "放電", 3.60, 0.0),
+            (1, 1, "放電", 3.40, 500.0),
+            # Mode 2 boundary: cycler resets サイクル to 1 again
+            # but 総サイクル continues to 2.
+            (1, 2, "充電", 3.55, 0.0),
+            (1, 2, "充電", 3.65, 600.0),
+            (1, 2, "放電", 3.65, 0.0),
+            (1, 2, "放電", 3.45, 600.0),
+        ]
+    )
+    out = get_chdis_df(df)
+    assert sorted(out.columns.get_level_values("cycle").unique().tolist()) == [1, 2]
+    # First mode's run lands under cycle 1 only.
+    assert out[(1, "ch", "電気量")].dropna().tolist() == [0.0, 500.0]
+    assert out[(1, "dis", "電気量")].dropna().tolist() == [0.0, 500.0]
+    # Second mode's run lands under cycle 2 only — no cross-contamination.
+    assert out[(2, "ch", "電気量")].dropna().tolist() == [0.0, 600.0]
+    assert out[(2, "dis", "電気量")].dropna().tolist() == [0.0, 600.0]
+
+
+def test_no_total_cycle_falls_back_to_cycle() -> None:
+    """Without ``総サイクル`` the per-mode ``サイクル`` is the cycle key (legacy)."""
+    df = _raw(
+        [
+            (1, "充電", 3.50, 0.0),
+            (1, "充電", 3.60, 500.0),
+            (2, "充電", 3.55, 0.0),
+            (2, "充電", 3.65, 600.0),
+        ]
+    )
+    out = get_chdis_df(df)
+    assert sorted(out.columns.get_level_values("cycle").unique().tolist()) == [1, 2]
+    assert out[(1, "ch", "電気量")].dropna().tolist() == [0.0, 500.0]
+    assert out[(2, "ch", "電気量")].dropna().tolist() == [0.0, 600.0]
+
+
+def test_multi_run_within_cycle_no_leakage_regression() -> None:
+    """Regression for the No6 ``98`` cell artifact (cycle 2 leaking into cycle 1).
+
+    Two charge sub-runs share ``サイクル=1`` because the cycler resets the
+    per-mode counter at the mode 1→2 boundary. The second sub-run's tail
+    capacity (1100) exceeds the first sub-run's max (1000); under the legacy
+    ``サイクル``-only grouping the running-max filter would keep the second
+    sub-run's tail and stitch it onto cycle 1's curve as a visible V drop.
+    With ``総サイクル`` as the cycle key the sub-runs become cycles 1 and 2
+    respectively and no leakage is possible.
+    """
+    df = _raw_with_total_cycle(
+        [
+            # Sub-run 1: smooth charge to 1000
+            (1, 1, "充電", 3.00, 0.0),
+            (1, 1, "充電", 3.50, 500.0),
+            (1, 1, "充電", 4.00, 1000.0),
+            # Sub-run 2: cycler reset capacity but kept サイクル=1
+            (1, 2, "充電", 2.50, 0.0),
+            (1, 2, "充電", 3.20, 500.0),
+            (1, 2, "充電", 3.70, 1100.0),  # tail exceeds sub-run 1's max
+        ]
+    )
+    out = get_chdis_df(df)
+    # Cycle 1 must contain ONLY sub-run 1 (no tail of sub-run 2 leaking in).
+    cycle1_cap = out[(1, "ch", "電気量")].dropna().tolist()
+    cycle1_v = out[(1, "ch", "電圧")].dropna().tolist()
+    assert cycle1_cap == [0.0, 500.0, 1000.0]
+    assert cycle1_v == [3.00, 3.50, 4.00]
+    # Cycle 2 must contain sub-run 2's full data, untouched.
+    cycle2_cap = out[(2, "ch", "電気量")].dropna().tolist()
+    cycle2_v = out[(2, "ch", "電圧")].dropna().tolist()
+    assert cycle2_cap == [0.0, 500.0, 1100.0]
+    assert cycle2_v == [2.50, 3.20, 3.70]
+
+
+def test_total_cycle_column_supersedes_cycle_en_mode() -> None:
+    """EN-mode equivalent of test_total_cycle_column_supersedes_cycle."""
+    df = _raw_with_total_cycle(
+        [
+            (1, 1, "charge", 3.50, 0.0),
+            (1, 1, "charge", 3.60, 500.0),
+            (1, 2, "charge", 3.55, 0.0),
+            (1, 2, "charge", 3.65, 600.0),
+        ],
+        lang="en",
+    )
+    out = get_chdis_df(df, column_lang="en")
+    assert sorted(out.columns.get_level_values("cycle").unique().tolist()) == [1, 2]
+    assert out[(1, "ch", "capacity")].dropna().tolist() == [0.0, 500.0]
+    assert out[(2, "ch", "capacity")].dropna().tolist() == [0.0, 600.0]
