@@ -51,6 +51,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#99])
 
 ### Changed
+- Replaced the whitespace-split PTN parser in `read_ptn_mass` with a
+  fixed-column parser per the TOYO PTN format spec. The two known
+  dialects (concat: `0XX.XXXXXX`, spaced: `0 X.XXXXX`) are auto-detected
+  by the byte at index 1 of the 9-char composite at column 44. The
+  previous V2.01 whitespace-split heuristic remains available behind the
+  `ECHEMPLOT_PTN_LEGACY=1` environment variable as a debug escape hatch
+  for hypothetical third dialects. ([#102])
 - Replaced positional `_CYCLE_COL_*` integer indices in
   `origin/_plots.py` with name-based column lookups, and added an
   `OriginContractError` raised at worksheet-write time if `cap_df`
@@ -354,6 +361,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#99]: https://github.com/tomooki/toyo-battery/issues/99
 [#100]: https://github.com/tomooki/toyo-battery/issues/100
 [#101]: https://github.com/tomooki/toyo-battery/issues/101
+[#102]: https://github.com/tomooki/toyo-battery/issues/102
 [#103]: https://github.com/tomooki/toyo-battery/issues/103
 [#104]: https://github.com/tomooki/toyo-battery/issues/104
 [#107]: https://github.com/tomooki/toyo-battery/pull/107

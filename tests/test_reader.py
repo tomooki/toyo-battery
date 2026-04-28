@@ -24,11 +24,17 @@ from echemplot.io.schema import CANONICAL_COLUMNS_EN, CANONICAL_COLUMNS_JA
 
 
 def _write_fixed_column_ptn(path: Path, mass_g: float) -> None:
-    """Write a TOYO-style fixed-column PTN whose first line has the mass at token[2]."""
-    line = (
-        f" 1TestName                                 2 {mass_g:09.6f}       1{mass_g:09.6f}"
-        f"TestCell                                 24 00000"
-    )
+    """Write a TOYO-style fixed-column PTN whose first line has the mass at token[2].
+
+    Layout matches ``conftest.write_ptn_main`` (concat dialect): a 42-char
+    operator/electrode field, the literal ``"2 "`` electrode-count prefix,
+    a 9-char ``<flag><mass>`` composite at columns 44..52, 7 spaces, then a
+    9-char companion electrode block.
+    """
+    operator_field = " 1TestName".ljust(42)
+    field1 = f"0{mass_g:.6f}".rjust(9)
+    field2 = f"1{mass_g:.6f}".rjust(9)
+    line = f"{operator_field}2 {field1}       {field2}TestCell"
     path.write_text(line + "\n", encoding="shift_jis")
 
 
@@ -707,24 +713,46 @@ def test_read_ptn_mass_happy(tmp_path: Path) -> None:
     assert read_ptn_mass(ptn) == pytest.approx(1.234)
 
 
-def test_read_ptn_mass_simple_whitespace_format(tmp_path: Path) -> None:
-    """Legacy tests used to write ``ACTIVE_MATERIAL WEIGHT <float>``; that
-    format also works because ``split()[2]`` still picks the float."""
+def test_read_ptn_mass_simple_whitespace_format_under_legacy_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Under ``ECHEMPLOT_PTN_LEGACY=1``, the V2.01 whitespace-split heuristic
+    accepts hand-crafted formats like ``ACTIVE_MATERIAL WEIGHT <float>`` that
+    the new fixed-column parser rejects. This pins the escape-hatch path."""
+    monkeypatch.setenv("ECHEMPLOT_PTN_LEGACY", "1")
     ptn = tmp_path / "x.PTN"
     ptn.write_text("ACTIVE_MATERIAL WEIGHT 1.234\n", encoding="shift_jis")
     assert read_ptn_mass(ptn) == pytest.approx(1.234)
 
 
-def test_read_ptn_mass_malformed_raises(tmp_path: Path) -> None:
+def test_read_ptn_mass_too_short_raises(tmp_path: Path) -> None:
+    """A PTN whose first line is shorter than the fixed-column mass field
+    raises so ``_resolve_mass_from_ptn`` can skip it (e.g. ``*_OPTION.PTN``)."""
+    ptn = tmp_path / "x.PTN"
+    ptn.write_text("too short\n", encoding="shift_jis")
+    with pytest.raises(ValueError, match="too short for the fixed-column PTN format"):
+        read_ptn_mass(ptn)
+
+
+def test_read_ptn_mass_legacy_short_line_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """In legacy mode, a line with fewer than 3 whitespace tokens still raises."""
+    monkeypatch.setenv("ECHEMPLOT_PTN_LEGACY", "1")
     ptn = tmp_path / "x.PTN"
     ptn.write_text("too short\n", encoding="shift_jis")
     with pytest.raises(ValueError, match="fewer than 3 tokens"):
         read_ptn_mass(ptn)
 
 
-def test_read_ptn_mass_non_numeric_raises(tmp_path: Path) -> None:
+def test_read_ptn_mass_non_numeric_field_raises(tmp_path: Path) -> None:
+    """A 53+-char line whose 9-char composite field at columns 44..52 contains
+    non-numeric content raises ``ValueError`` mentioning the dialect."""
     ptn = tmp_path / "x.PTN"
-    ptn.write_text("A B NOT_A_NUMBER\n", encoding="shift_jis")
+    # 44 leading chars (canonical operator+"2 " block) followed by a 9-char
+    # garbage composite at the mass position.
+    junk = "X" * 44 + "0XXNOTANUM" + "extra"
+    ptn.write_text(junk + "\n", encoding="shift_jis")
     with pytest.raises(ValueError, match="not a valid float"):
         read_ptn_mass(ptn)
 
@@ -738,6 +766,62 @@ def test_read_ptn_mass_ini_style_raises(tmp_path: Path) -> None:
     ptn.write_text("[BaseCellCapacity]\nCapacity=0.1\n", encoding="shift_jis")
     with pytest.raises(ValueError):
         read_ptn_mass(ptn)
+
+
+# ---- read_ptn_mass fixed-column parser (#102) ----------------------------
+
+
+def test_read_ptn_mass_concat_dialect(tmp_path: Path) -> None:
+    """Concat dialect (cyclers No5/No1): flag glued to ``%.6f`` mass."""
+    from .conftest import write_ptn_main
+
+    ptn = tmp_path / "x.PTN"
+    write_ptn_main(ptn, mass_g=0.000358, dialect="concat")
+    assert read_ptn_mass(ptn) == pytest.approx(0.000358)
+
+
+def test_read_ptn_mass_spaced_dialect(tmp_path: Path) -> None:
+    """Spaced dialect (cycler No6): flag, space, then ``%.5f`` mass."""
+    from .conftest import write_ptn_main
+
+    ptn = tmp_path / "x.PTN"
+    write_ptn_main(ptn, mass_g=0.00116, dialect="spaced")
+    assert read_ptn_mass(ptn) == pytest.approx(0.00116)
+
+
+def test_read_ptn_mass_japanese_operator_name(tmp_path: Path) -> None:
+    """Multi-byte JP operator names don't shift the fixed-column position
+    because the file is decoded Shift-JIS first and ``ljust`` pads in
+    characters, not bytes."""
+    from .conftest import write_ptn_main
+
+    ptn = tmp_path / "x.PTN"
+    write_ptn_main(ptn, mass_g=0.00116, dialect="spaced", operator="ともい")
+    assert read_ptn_mass(ptn) == pytest.approx(0.00116)
+
+
+def test_read_ptn_mass_negative_mass_field_raises(tmp_path: Path) -> None:
+    """A composite that parses but yields a non-positive mass raises so the
+    file is skipped (defensive against malformed flag bytes)."""
+    ptn = tmp_path / "x.PTN"
+    # 44-char prefix + composite "0-0.00100" (concat-shape, parses to -0.00100).
+    junk = "X" * 44 + "0-0.00100" + "tail"
+    ptn.write_text(junk + "\n", encoding="shift_jis")
+    with pytest.raises(ValueError, match="non-positive"):
+        read_ptn_mass(ptn)
+
+
+def test_read_ptn_mass_legacy_env_falls_back_to_whitespace_split(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``ECHEMPLOT_PTN_LEGACY=1`` enables the V2.01 ``token[2] / token[3]``
+    fallback for hypothetical third dialects."""
+    monkeypatch.setenv("ECHEMPLOT_PTN_LEGACY", "1")
+    ptn = tmp_path / "x.PTN"
+    # Line that is too short for the fixed-column parser but valid for
+    # whitespace-split with token[2] non-zero.
+    ptn.write_text("name id 1.234\n", encoding="shift_jis")
+    assert read_ptn_mass(ptn) == pytest.approx(1.234)
 
 
 # ---- strict-encoding error surface (Issue #96) ----------------------------
