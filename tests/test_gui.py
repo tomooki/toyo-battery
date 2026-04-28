@@ -449,12 +449,17 @@ def test_app_origin_mode_destroys_root_after_successful_run(
         real_destroy()
 
 
-def test_app_origin_mode_keeps_root_when_on_complete_raises(
+def test_app_origin_mode_destroys_root_when_on_complete_raises(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """If the on_complete hook raises, ``_fail`` surfaces the error and
-    the root stays alive — the user needs the window to see the dialog
-    and retry.
+    """In origin_mode the Tk mainloop blocks the Origin Python Console;
+    if a Run fails inside ``on_complete`` (e.g. ``push_to_origin``
+    raises) we still need to free the Console after the user dismisses
+    the modal error. Otherwise Origin's "is a Python script running?"
+    probe trips when the user clicks the Origin close button and shows
+    the "stop external script execution" warning. ``messagebox.showerror``
+    is modal so the user sees the error before destroy fires; re-running
+    is one more ``launch_gui()`` call from the Console.
     """
     import tkinter as tk
     from tkinter import messagebox
@@ -487,7 +492,134 @@ def test_app_origin_mode_keeps_root_when_on_complete_raises(
 
         app._on_run()
 
-        assert not destroy_calls, "root must stay alive when on_complete raises"
+        assert destroy_calls, "root must be destroyed when on_complete raises in origin_mode"
+    finally:
+        real_destroy()
+
+
+def test_app_origin_mode_destroys_root_when_controller_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Same Console-block rationale as the on_complete test, but for the
+    earlier controller-error branch: a directory that cannot be loaded
+    or a plotting failure inside ``run()`` must also auto-close the Tk
+    root in origin_mode so the Origin Python Console is freed.
+    """
+    import tkinter as tk
+    from tkinter import messagebox
+
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        pytest.skip(f"no display available for Tk: {exc}")
+
+    import echemplot.gui.tk_app as tk_app
+
+    real_destroy = root.destroy
+    destroy_calls: list[None] = []
+
+    def spy_destroy() -> None:
+        destroy_calls.append(None)
+
+    def raising_run(_req: object) -> None:
+        raise RuntimeError("simulated controller failure")
+
+    try:
+        monkeypatch.setattr(tk_app, "run", raising_run)
+        monkeypatch.setattr(messagebox, "showerror", lambda *_a, **_kw: None)
+
+        app = tk_app._App(root, origin_mode=True, on_complete=lambda *_a: None)
+        app._dirs = [tmp_path]
+        root.destroy = spy_destroy  # type: ignore[assignment,method-assign]
+
+        app._on_run()
+
+        assert destroy_calls, "root must be destroyed when controller raises in origin_mode"
+    finally:
+        real_destroy()
+
+
+def test_app_origin_mode_destroys_root_on_input_validation_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Input parsing in origin_mode is narrow (only ``SG window_length``
+    flows through) but still raises ``ValueError`` for non-positive or
+    even integers. That early-exit branch must also destroy the root in
+    origin_mode for the same Console-block reason.
+    """
+    import tkinter as tk
+    from tkinter import messagebox
+
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        pytest.skip(f"no display available for Tk: {exc}")
+
+    import echemplot.gui.tk_app as tk_app
+
+    real_destroy = root.destroy
+    destroy_calls: list[None] = []
+
+    def spy_destroy() -> None:
+        destroy_calls.append(None)
+
+    try:
+        monkeypatch.setattr(messagebox, "showerror", lambda *_a, **_kw: None)
+
+        app = tk_app._App(root, origin_mode=True, on_complete=lambda *_a: None)
+        app._dirs = [tmp_path]
+        # Even integers fail ``_parse_sg_window`` (positive odd required).
+        app._entry_sg.delete(0, "end")
+        app._entry_sg.insert(0, "10")
+        root.destroy = spy_destroy  # type: ignore[assignment,method-assign]
+
+        app._on_run()
+
+        assert destroy_calls, "root must be destroyed on input validation error in origin_mode"
+    finally:
+        real_destroy()
+
+
+def test_app_standalone_mode_keeps_root_when_on_complete_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Regression guard for the standalone GUI: when ``origin_mode=False``
+    the auto-close behavior is gated off and the window must stay alive
+    after a failed Run so the user can fix inputs and retry without
+    losing the matplotlib Toplevels.
+    """
+    import tkinter as tk
+    from tkinter import messagebox
+
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        pytest.skip(f"no display available for Tk: {exc}")
+
+    import echemplot.gui.tk_app as tk_app
+    from echemplot.gui._controller import RunResult
+
+    real_destroy = root.destroy
+    destroy_calls: list[None] = []
+
+    def spy_destroy() -> None:
+        destroy_calls.append(None)
+
+    try:
+        monkeypatch.setattr(tk_app, "run", lambda _req: RunResult(cells=[], figures=[]))
+        monkeypatch.setattr(messagebox, "showerror", lambda *_a, **_kw: None)
+
+        def raising_hook(_cells: object, _figs: object, _sg: int) -> None:
+            raise RuntimeError("simulated push failure")
+
+        # No origin_mode flag — defaults to False.
+        app = tk_app._App(root, on_complete=raising_hook)
+        app._dirs = [tmp_path]
+        root.destroy = spy_destroy  # type: ignore[assignment,method-assign]
+
+        app._on_run()
+
+        assert not destroy_calls, "standalone mode must not destroy root on error"
     finally:
         real_destroy()
 

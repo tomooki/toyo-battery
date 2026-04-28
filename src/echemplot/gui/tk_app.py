@@ -387,17 +387,17 @@ class _App:
                     dqdv_range=_parse_range(self._entry_drange.get(), "dQ/dV range"),
                 )
         except ValueError as exc:
-            self._fail(f"Invalid input: {exc}")
+            self._fail_and_maybe_close(f"Invalid input: {exc}")
             return
 
         # Controller-level validation (empty dirs / no kinds) raises too.
         try:
             result = run(request)
         except ValueError as exc:
-            self._fail(f"Invalid request: {exc}")
+            self._fail_and_maybe_close(f"Invalid request: {exc}")
             return
         except Exception as exc:
-            self._fail(f"Error running pipeline: {exc}")
+            self._fail_and_maybe_close(f"Error running pipeline: {exc}")
             return
 
         if self._on_complete is not None:
@@ -410,7 +410,17 @@ class _App:
                 # effect on the pushed output. See issue #60.
                 self._on_complete(result.cells, result.figures, request.sg_window)
             except Exception as exc:
-                self._fail(f"Error in completion hook: {exc}")
+                # Drop the traceback chain BEFORE the modal blocks: in
+                # origin_mode the chain transitively pins partial Origin
+                # COM proxies created by ``push_to_origin`` before it
+                # raised, and Origin's "is a Python script running?"
+                # probe can fire while ``messagebox.showerror`` is up.
+                # Implicit ``del exc`` at end-of-except runs too late
+                # (after ``root.destroy``). See issue history for the
+                # "stop external script execution" dialog bug.
+                msg = f"Error in completion hook: {exc}"
+                exc = None  # type: ignore[assignment]
+                self._fail_and_maybe_close(msg)
                 return
             self._status.set(f"Ran {len(result.figures)} figure(s); pushed via hook.")
             if self._origin_mode:
@@ -458,6 +468,27 @@ class _App:
         """Surface ``message`` via a modal error and the status bar."""
         messagebox.showerror("echemplot", message, parent=self.root)
         self._status.set(message)
+
+    def _fail_and_maybe_close(self, message: str) -> None:
+        """Surface error, then auto-close the root in ``origin_mode``.
+
+        In origin_mode the Tk mainloop blocks the Origin Python Console
+        (``launch_gui()`` is a one-shot batch). If we leave the window
+        open after a failed Run, Origin's "is a Python script running?"
+        check trips when the user later clicks the Origin close button
+        and shows a confusing "stop external script execution" warning.
+        ``messagebox.showerror`` is modal, so by the time we get here the
+        user has already dismissed the dialog; auto-closing the window
+        afterwards lets them re-invoke ``launch_gui()`` from the Console.
+        ``gc.collect()`` releases any Origin COM proxies that participate
+        in reference cycles before mainloop exits.
+        """
+        self._fail(message)
+        if self._origin_mode:
+            import gc
+
+            gc.collect()
+            self.root.destroy()
 
 
 def launch_gui(
