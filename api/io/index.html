@@ -1,0 +1,1646 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="OSS Python toolkit for TOYO battery cycler data.">
+      
+      
+      
+        <link rel="canonical" href="https://tomooki.github.io/toyo-battery/api/io/">
+      
+      
+        <link rel="prev" href="../cell/">
+      
+      
+        <link rel="next" href="../core/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>IO - echemplot</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#io" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="echemplot" class="md-header__button md-logo" aria-label="echemplot" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            echemplot
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              IO
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_1">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/tomooki/toyo-battery" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    tomooki/toyo-battery
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../quickstart/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Quick start
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../cell/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../ORIGIN_SETUP/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Origin setup
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="echemplot" class="md-nav__button md-logo" aria-label="echemplot" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    echemplot
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/tomooki/toyo-battery" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    tomooki/toyo-battery
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cell/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cell
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IO
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IO
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#reader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reader
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#echemplot.io.reader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reader
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="reader">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.io.reader.EncodingError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EncodingError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.io.reader.RawConcatError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RawConcatError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RawConcatError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.io.reader.RawConcatError--attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attributes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.io.reader.read_cell_dir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        read_cell_dir
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="read_cell_dir">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.io.reader.read_cell_dir--returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Returns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.io.reader.read_ptn_mass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        read_ptn_mass
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#echemplot.io.schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.io.schema.rename" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rename
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plotting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plotting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ORIGIN_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Origin setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#reader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reader
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#echemplot.io.reader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reader
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="reader">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.io.reader.EncodingError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EncodingError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.io.reader.RawConcatError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RawConcatError
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RawConcatError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.io.reader.RawConcatError--attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attributes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.io.reader.read_cell_dir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        read_cell_dir
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="read_cell_dir">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.io.reader.read_cell_dir--returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Returns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.io.reader.read_ptn_mass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        read_ptn_mass
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#echemplot.io.schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.io.schema.rename" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rename
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="io">IO<a class="headerlink" href="#io" title="Permanent link">&para;</a></h1>
+<h2 id="reader">Reader<a class="headerlink" href="#reader" title="Permanent link">&para;</a></h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="echemplot.io.reader" class="doc doc-heading">
+            <code>echemplot.io.reader</code>
+
+
+<a href="#echemplot.io.reader" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Reader for TOYO cycler output directories.</p>
+<p>Discovery priority for a given cell directory <code>path</code>:</p>
+<ol>
+<li><code>連続データ.csv</code>              — native export from the tester.
+   Real TOYO firmware emits a 7-line preamble: 3 metadata rows, then
+   column-name row, channel row, separator row, units row (so historically
+   <code>header=3, skiprows=[4,5,6]</code>). The reader now finds the column-name
+   row by content (first cell == <code>サイクル</code>) so an extra/missing
+   metadata row in a future firmware revision does not silently shift the
+   header. See :func:<code>_detect_renzoku_header</code>.</li>
+<li><code>連続データ_py.csv</code>           — already-normalized output from a previous run</li>
+<li>6-digit raw file(s) + <code>*.PTN</code> — factory raw; 電気量 is computed from mass</li>
+</ol>
+<p>All three paths converge on the same canonical schema (canonical columns first;
+any extra source columns such as 経過時間[Sec] / 電流[mA] / 日付 / 時刻 /
+総サイクル are preserved after them so downstream P1 phases can use them.
+The half-width source spelling <code>総ｻｲｸﾙ</code> is canonicalized to the full-width
+<code>総サイクル</code> here so :mod:<code>echemplot.core.chdis</code> can prefer it over
+<code>サイクル</code> as the cycle key without re-asking which form the reader emitted):</p>
+<pre><code>Canonical columns: サイクル, モード, 状態, 電圧, 電気量
+状態 values:
+  - Native 連続データ.csv:  {"充電", "放電", "充電休止", "放電休止"}
+  - Raw 6-digit (int→JA):   {"充電", "放電", "休止", "中断"}
+                            ("中断" = state code 9, the TOYO end-of-test
+                             / abort sentinel; usually a single trailing
+                             row, sometimes with non-zero 経過時間/電流.)
+  - 連続データ_py.csv:       whatever was persisted (usually the 3-value set)
+</code></pre>
+<p>When <code>column_lang="en"</code> is requested, both column <em>names</em> and 状態 cell
+values are translated. State values are mapped via <code>schema.STATE_JA_TO_EN</code>
+(e.g. <code>充電休止</code> → <code>charge_rest</code>) so EN-mode consumers receive a fully
+EN frame. Unknown JA-string state literals raise <code>ValueError</code> regardless
+of <code>column_lang</code> — same strictness as the unknown-numeric-state branch.</p>
+<p>The active-material mass (grams) is resolved in this priority order:</p>
+<ol>
+<li>Explicit <code>mass=</code> argument (grams)</li>
+<li><code>重量[mg]</code> from <code>連続データ.csv</code> metadata row 3 (converted mg → g)</li>
+<li>A <code>*.PTN</code> file whose first line's 3rd whitespace-separated token parses
+   as float (grams). Other <code>.PTN</code> files (e.g. <code>*_OPTION.PTN</code> config
+   files shipped alongside the main pattern file) are skipped automatically.</li>
+</ol>
+<p>On the raw 6-digit path the formula is::</p>
+<pre><code>電気量 = 経過時間[Sec] / 3600  * 電流[mA] / mass
+</code></pre>
+<p>Real TOYO raw files set <code>経過時間[Sec]</code> to reset at each state transition
+and emit <code>電流[mA]</code> as an unsigned magnitude, so this formula produces
+per-segment monotone-non-decreasing 電気量 (matching the convention that
+<code>連続データ.csv</code> already uses inline).</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="echemplot.io.reader.EncodingError" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">EncodingError</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">expected_encoding</span><span class="p">,</span> <span class="n">original</span><span class="p">)</span></code>
+
+<a href="#echemplot.io.reader.EncodingError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="ValueError">ValueError</span></code></p>
+
+
+
+        <p>Raised when a TOYO file cannot be decoded with the configured encoding.</p>
+<p>Subclasses :class:<code>ValueError</code> so callers that already catch
+<code>ValueError</code> keep working. The message includes the file path, the
+encoding being attempted, the byte position of the first bad sequence
+(from :class:<code>UnicodeDecodeError</code>), and a hint for overriding the
+encoding via :func:<code>read_cell_dir</code>.</p>
+
+
+
+
+
+
+
+
+                  <details class="mkdocstrings-source">
+                    <summary>Source code in <code>src/echemplot/io/reader.py</code></summary>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">expected_encoding</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">original</span><span class="p">:</span> <span class="ne">UnicodeDecodeError</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">expected_encoding</span> <span class="o">=</span> <span class="n">expected_encoding</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">original</span> <span class="o">=</span> <span class="n">original</span>
+    <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;failed to decode </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="si">}</span><span class="s2"> with encoding=</span><span class="si">{</span><span class="n">expected_encoding</span><span class="si">!r}</span><span class="s2">: &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;invalid byte(s) at position </span><span class="si">{</span><span class="n">original</span><span class="o">.</span><span class="n">start</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">original</span><span class="o">.</span><span class="n">end</span><span class="si">}</span><span class="s2"> &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">original</span><span class="o">.</span><span class="n">reason</span><span class="si">}</span><span class="s2">); &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;pass `encoding=&lt;other&gt;` to `read_cell_dir` to override &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;(default &#39;shift_jis&#39;).&quot;</span>
+    <span class="p">)</span>
+    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+                  </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="echemplot.io.reader.RawConcatError" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">RawConcatError</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="n">segment_index</span><span class="p">,</span> <span class="n">reason</span><span class="p">)</span></code>
+
+<a href="#echemplot.io.reader.RawConcatError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="ValueError">ValueError</span></code></p>
+
+
+
+        <p>Raised when a constituent 6-digit raw file fails row-continuity validation.</p>
+<p>A single <code>000NNN</code> raw file is expected to be internally consistent before
+being concatenated with its siblings — specifically, <code>経過時間[Sec]</code> must
+be monotone-non-decreasing within each run of identical <code>状態</code> values
+(state transitions reset elapsed_time). A negative diff inside a single
+state segment indicates the file was truncated mid-cycle and resumed,
+silently joining two distinct runs into one DataFrame.</p>
+<h5 id="echemplot.io.reader.RawConcatError--attributes">Attributes<a class="headerlink" href="#echemplot.io.reader.RawConcatError--attributes" title="Permanent link">&para;</a></h5>
+<p>file_path : Path
+    The offending 6-digit raw file.
+segment_index : int | None
+    0-based index of the state-run segment that failed the check, counting
+    from the top of the file. <code>None</code> for whole-file failures (e.g. an
+    empty file).
+reason : str
+    Human-readable explanation of the failure mode.</p>
+
+
+
+
+
+
+
+
+                  <details class="mkdocstrings-source">
+                    <summary>Source code in <code>src/echemplot/io/reader.py</code></summary>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">file_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">segment_index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">reason</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">file_path</span> <span class="o">=</span> <span class="n">file_path</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">segment_index</span> <span class="o">=</span> <span class="n">segment_index</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">reason</span> <span class="o">=</span> <span class="n">reason</span>
+    <span class="n">seg_str</span> <span class="o">=</span> <span class="s2">&quot;n/a&quot;</span> <span class="k">if</span> <span class="n">segment_index</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="n">segment_index</span><span class="p">)</span>
+    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;raw file </span><span class="si">{</span><span class="n">file_path</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> failed row-continuity validation &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;(segment_index=</span><span class="si">{</span><span class="n">seg_str</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="n">reason</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+                  </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="echemplot.io.reader.read_cell_dir" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">read_cell_dir</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">mass</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;shift_jis&#39;</span><span class="p">,</span> <span class="n">column_lang</span><span class="o">=</span><span class="s1">&#39;ja&#39;</span><span class="p">)</span></code>
+
+<a href="#echemplot.io.reader.read_cell_dir" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Read a single cell directory into a normalized DataFrame.</p>
+<h5 id="echemplot.io.reader.read_cell_dir--returns">Returns<a class="headerlink" href="#echemplot.io.reader.read_cell_dir--returns" title="Permanent link">&para;</a></h5>
+<p>df : DataFrame
+    Canonical columns first (see :data:<code>schema.CANONICAL_COLUMNS_JA</code> or
+    the EN equivalent when <code>column_lang="en"</code>), followed by any extra
+    columns present in the source file (e.g. 経過時間[Sec], 電流[mA],
+    日付, 時刻, 総サイクル — half-width <code>総ｻｲｸﾙ</code> from the raw 6-digit
+    header is canonicalized to the full-width spelling).
+mass_g : float
+    Active-material mass used for the capacity calculation, in grams.
+    <code>math.nan</code> if the source already had 電気量 precomputed and no
+    mass information was available anywhere.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/echemplot/io/reader.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">read_cell_dir</span><span class="p">(</span>
+    <span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">mass</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;shift_jis&quot;</span><span class="p">,</span>
+    <span class="n">column_lang</span><span class="p">:</span> <span class="n">ColumnLang</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read a single cell directory into a normalized DataFrame.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    df : DataFrame</span>
+<span class="sd">        Canonical columns first (see :data:`schema.CANONICAL_COLUMNS_JA` or</span>
+<span class="sd">        the EN equivalent when ``column_lang=&quot;en&quot;``), followed by any extra</span>
+<span class="sd">        columns present in the source file (e.g. 経過時間[Sec], 電流[mA],</span>
+<span class="sd">        日付, 時刻, 総サイクル — half-width ``総ｻｲｸﾙ`` from the raw 6-digit</span>
+<span class="sd">        header is canonicalized to the full-width spelling).</span>
+<span class="sd">    mass_g : float</span>
+<span class="sd">        Active-material mass used for the capacity calculation, in grams.</span>
+<span class="sd">        ``math.nan`` if the source already had 電気量 precomputed and no</span>
+<span class="sd">        mass information was available anywhere.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">p</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">p</span><span class="si">}</span><span class="s2"> does not exist&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">p</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">NotADirectoryError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">p</span><span class="si">}</span><span class="s2"> is not a directory&quot;</span><span class="p">)</span>
+
+    <span class="n">native</span> <span class="o">=</span> <span class="n">p</span> <span class="o">/</span> <span class="n">RENZOKU_DATA</span>
+    <span class="k">if</span> <span class="n">native</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">resolved_mass</span> <span class="o">=</span> <span class="n">_resolve_mass</span><span class="p">(</span><span class="n">mass</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">native_csv</span><span class="o">=</span><span class="n">native</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">)</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">_read_renzoku_data</span><span class="p">(</span><span class="n">native</span><span class="p">,</span> <span class="n">resolved_mass</span><span class="p">,</span> <span class="n">encoding</span><span class="p">,</span> <span class="n">column_lang</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">df</span><span class="p">,</span> <span class="n">_nan_if_none</span><span class="p">(</span><span class="n">resolved_mass</span><span class="p">)</span>
+
+    <span class="n">py_version</span> <span class="o">=</span> <span class="n">p</span> <span class="o">/</span> <span class="n">RENZOKU_DATA_PY</span>
+    <span class="k">if</span> <span class="n">py_version</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="n">resolved_mass</span> <span class="o">=</span> <span class="n">_resolve_mass</span><span class="p">(</span><span class="n">mass</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">_read_renzoku_data_py</span><span class="p">(</span><span class="n">py_version</span><span class="p">,</span> <span class="n">encoding</span><span class="p">,</span> <span class="n">column_lang</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">df</span><span class="p">,</span> <span class="n">_nan_if_none</span><span class="p">(</span><span class="n">resolved_mass</span><span class="p">)</span>
+
+    <span class="n">raw_files</span> <span class="o">=</span> <span class="n">_find_raw_files</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">raw_files</span><span class="p">:</span>
+        <span class="n">resolved_mass</span> <span class="o">=</span> <span class="n">_resolve_mass</span><span class="p">(</span><span class="n">mass</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">resolved_mass</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;6-digit raw files found but no mass available. &quot;</span>
+                <span class="s2">&quot;Pass `mass=&lt;grams&gt;` or place a `.PTN` file in the directory.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">_read_raw_6digit</span><span class="p">(</span><span class="n">raw_files</span><span class="p">,</span> <span class="n">resolved_mass</span><span class="p">,</span> <span class="n">encoding</span><span class="p">,</span> <span class="n">column_lang</span><span class="p">)</span>
+
+    <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;no TOYO data found under </span><span class="si">{</span><span class="n">p</span><span class="si">}</span><span class="s2">: expected &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;&#39;</span><span class="si">{</span><span class="n">RENZOKU_DATA</span><span class="si">}</span><span class="s2">&#39;, &#39;</span><span class="si">{</span><span class="n">RENZOKU_DATA_PY</span><span class="si">}</span><span class="s2">&#39;, or 6-digit raw files&quot;</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="echemplot.io.reader.read_ptn_mass" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">read_ptn_mass</span><span class="p">(</span><span class="n">ptn_path</span><span class="p">)</span></code>
+
+<a href="#echemplot.io.reader.read_ptn_mass" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extract active-material mass (grams) from a <code>.PTN</code> file.</p>
+<p>Uses a <strong>fixed-column parser</strong> by default: the TOYO PTN format places a
+9-char <code>&lt;flag&gt;&lt;mass&gt;</code> composite at character offset 44 of line 0, in
+one of two known dialects:</p>
+<ul>
+<li>"concat" (cyclers No5 / No1): flag glued to a <code>%.6f</code> mass —
+  <code>"00.000358"</code>.</li>
+<li>"spaced" (cycler No6): flag, space, then a <code>%.5f</code> mass —
+  <code>"0 0.00116"</code>.</li>
+</ul>
+<p>Dialect is auto-detected by the byte at index 1 of the composite (a
+space implies spaced; otherwise concat). Both decode to the same numeric
+mass.</p>
+<p>The previous :data:<code>TOYO_Origin_2.01</code>-derived whitespace-split heuristic
+(<code>tokens[2]</code>, falling back to <code>tokens[3]</code> when <code>tokens[2]==0</code>) is
+available behind the <code>ECHEMPLOT_PTN_LEGACY=1</code> environment variable as
+an escape hatch for users who hit a third dialect in the wild.</p>
+<p>Auxiliary <code>.PTN</code> files that TOYO ships alongside the main one
+(<code>*_OPTION.PTN</code>, <code>*_Option2.PTN</code>, etc.) carry INI- or CSV-style
+configuration whose first line is too short for the fixed-column layout
+and whose tokens don't form a positive mass; calling this on them will
+raise <code>ValueError</code>, which :func:<code>_resolve_mass_from_ptn</code> relies on to
+skip them.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/echemplot/io/reader.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span>
+<span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">read_ptn_mass</span><span class="p">(</span><span class="n">ptn_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract active-material mass (grams) from a ``.PTN`` file.</span>
+
+<span class="sd">    Uses a **fixed-column parser** by default: the TOYO PTN format places a</span>
+<span class="sd">    9-char ``&lt;flag&gt;&lt;mass&gt;`` composite at character offset 44 of line 0, in</span>
+<span class="sd">    one of two known dialects:</span>
+
+<span class="sd">    * &quot;concat&quot; (cyclers No5 / No1): flag glued to a ``%.6f`` mass —</span>
+<span class="sd">      ``&quot;00.000358&quot;``.</span>
+<span class="sd">    * &quot;spaced&quot; (cycler No6): flag, space, then a ``%.5f`` mass —</span>
+<span class="sd">      ``&quot;0 0.00116&quot;``.</span>
+
+<span class="sd">    Dialect is auto-detected by the byte at index 1 of the composite (a</span>
+<span class="sd">    space implies spaced; otherwise concat). Both decode to the same numeric</span>
+<span class="sd">    mass.</span>
+
+<span class="sd">    The previous :data:`TOYO_Origin_2.01`-derived whitespace-split heuristic</span>
+<span class="sd">    (``tokens[2]``, falling back to ``tokens[3]`` when ``tokens[2]==0``) is</span>
+<span class="sd">    available behind the ``ECHEMPLOT_PTN_LEGACY=1`` environment variable as</span>
+<span class="sd">    an escape hatch for users who hit a third dialect in the wild.</span>
+
+<span class="sd">    Auxiliary ``.PTN`` files that TOYO ships alongside the main one</span>
+<span class="sd">    (``*_OPTION.PTN``, ``*_Option2.PTN``, etc.) carry INI- or CSV-style</span>
+<span class="sd">    configuration whose first line is too short for the fixed-column layout</span>
+<span class="sd">    and whose tokens don&#39;t form a positive mass; calling this on them will</span>
+<span class="sd">    raise ``ValueError``, which :func:`_resolve_mass_from_ptn` relies on to</span>
+<span class="sd">    skip them.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">ptn_path</span><span class="p">)</span>
+    <span class="n">encoding</span> <span class="o">=</span> <span class="s2">&quot;shift_jis&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">first_line</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">UnicodeDecodeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">EncodingError</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">expected_encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">,</span> <span class="n">original</span><span class="o">=</span><span class="n">e</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+    <span class="k">if</span> <span class="n">_is_legacy_ptn_mode</span><span class="p">():</span>
+        <span class="k">return</span> <span class="n">_parse_ptn_mass_legacy</span><span class="p">(</span><span class="n">first_line</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_parse_ptn_mass_fixed_column</span><span class="p">(</span><span class="n">first_line</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="schema">Schema<a class="headerlink" href="#schema" title="Permanent link">&para;</a></h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="echemplot.io.schema" class="doc doc-heading">
+            <code>echemplot.io.schema</code>
+
+
+<a href="#echemplot.io.schema" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Column name mapping between Japanese (TOYO native) and English.</p>
+<p>The canonical in-memory column set after reading is the JA list below. When
+<code>column_lang="en"</code> is requested, columns are renamed to EN at the end of the
+read pipeline.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="echemplot.io.schema.rename" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span></code>
+
+<a href="#echemplot.io.schema.rename" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Translate a list of column names to the target language.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/echemplot/io/schema.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rename</span><span class="p">(</span><span class="n">columns</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">target</span><span class="p">:</span> <span class="n">ColumnLang</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Translate a list of column names to the target language.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">target</span> <span class="o">==</span> <span class="s2">&quot;ja&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">EN_TO_JA</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">]</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">JA_TO_EN</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">]</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "content.code.copy", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2937 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="OSS Python toolkit for TOYO battery cycler data.">
+      
+      
+      
+        <link rel="canonical" href="https://tomooki.github.io/toyo-battery/api/core/">
+      
+      
+        <link rel="prev" href="../io/">
+      
+      
+        <link rel="next" href="../plotting/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Core - echemplot</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#core" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="echemplot" class="md-header__button md-logo" aria-label="echemplot" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            echemplot
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Core
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-hidden="true"  type="radio" name="__palette" id="__palette_1">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/tomooki/toyo-battery" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    tomooki/toyo-battery
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../quickstart/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Quick start
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../cell/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../ORIGIN_SETUP/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Origin setup
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="echemplot" class="md-nav__button md-logo" aria-label="echemplot" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    echemplot
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/tomooki/toyo-battery" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    tomooki/toyo-battery
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cell/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cell
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IO
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#chdis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        chdis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#echemplot.core.chdis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        chdis
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="chdis">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.chdis.get_chdis_df" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_chdis_df
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="get_chdis_df">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.chdis.get_chdis_df--parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.chdis.get_chdis_df--returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Returns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.chdis.get_chdis_df--raises" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raises
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        capacity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#echemplot.core.capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        capacity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="capacity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.capacity.get_cap_df" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_cap_df
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="get_cap_df">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.capacity.get_cap_df--parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.capacity.get_cap_df--returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Returns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.capacity.get_cap_df--raises" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raises
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dqdv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dqdv
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#echemplot.core.dqdv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dqdv
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="dqdv">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.dqdv.get_dqdv_df" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_dqdv_df
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="get_dqdv_df">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.dqdv.get_dqdv_df--parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.dqdv.get_dqdv_df--returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Returns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.dqdv.get_dqdv_df--raises" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raises
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.dqdv.get_dqdv_df--notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#echemplot.core.stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="stats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.stats.stat_table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stat_table
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="stat_table">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.stats.stat_table--parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.stats.stat_table--returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Returns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.stats.stat_table--raises" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raises
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.stats.stat_table--notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plotting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plotting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ORIGIN_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Origin setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#chdis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        chdis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#echemplot.core.chdis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        chdis
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="chdis">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.chdis.get_chdis_df" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_chdis_df
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="get_chdis_df">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.chdis.get_chdis_df--parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.chdis.get_chdis_df--returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Returns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.chdis.get_chdis_df--raises" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raises
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        capacity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#echemplot.core.capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        capacity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="capacity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.capacity.get_cap_df" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_cap_df
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="get_cap_df">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.capacity.get_cap_df--parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.capacity.get_cap_df--returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Returns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.capacity.get_cap_df--raises" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raises
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dqdv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dqdv
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#echemplot.core.dqdv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dqdv
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="dqdv">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.dqdv.get_dqdv_df" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_dqdv_df
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="get_dqdv_df">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.dqdv.get_dqdv_df--parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.dqdv.get_dqdv_df--returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Returns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.dqdv.get_dqdv_df--raises" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raises
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.dqdv.get_dqdv_df--notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stats
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#echemplot.core.stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="stats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.stats.stat_table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stat_table
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="stat_table">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.stats.stat_table--parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.stats.stat_table--returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Returns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.stats.stat_table--raises" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raises
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#echemplot.core.stats.stat_table--notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="core">Core<a class="headerlink" href="#core" title="Permanent link">&para;</a></h1>
+<h2 id="chdis">chdis<a class="headerlink" href="#chdis" title="Permanent link">&para;</a></h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="echemplot.core.chdis" class="doc doc-heading">
+            <code>echemplot.core.chdis</code>
+
+
+<a href="#echemplot.core.chdis" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Charge/discharge segmentation.</p>
+<p>Splits a raw DataFrame (from :func:<code>echemplot.io.reader.read_cell_dir</code>)
+into per-cycle charge/discharge segments. The output is a wide DataFrame
+with a 3-level column MultiIndex:</p>
+<pre><code>level 0  cycle    — int cycle number (1, 2, 3, ...). Sourced from
+                    ``総サイクル`` (the global cycle counter) when the
+                    column is present, otherwise from ``サイクル`` (per-
+                    mode counter). Multi-mode TOYO programs reset
+                    ``サイクル`` at every mode boundary so two physically
+                    distinct cycles can share ``サイクル=1`` — preferring
+                    ``総サイクル`` keeps them as separate groups so the
+                    running-max filter below does not have to disentangle
+                    sub-runs across mode boundaries.
+level 1  side     — "ch" or "dis"
+level 2  quantity — "電気量"/"電圧" (or EN equivalents) as in the input
+</code></pre>
+<p>Capacity sign: real TOYO data has <code>電気量</code> reset to 0 at the start of each
+segment and accumulate monotone-non-decreasing within it — the native
+<code>連続データ.csv</code> supplies such values inline, and the raw-6-digit path
+reproduces the same convention because its <code>経過時間[Sec]</code> resets at
+state transitions and its <code>電流[mA]</code> is unsigned. The reversal filter
+nonetheless takes <code>|電気量|</code> so that <em>any</em> signed input (e.g. a
+hand-crafted dataset with polarity applied) segments correctly. Rows
+whose <code>|電気量|</code> falls below the segment's running maximum are dropped.
+This handles both single-row tester glitches (e.g. 500→400→600, the 400
+is dropped) and sustained discontinuities such as the raw-6-digit CC→CV
+sub-step boundary where <code>経過時間[Sec]</code> resets and a fresh <code>t*I</code>
+series begins below the prior segment's peak. Such CV-hold <code>t*I</code>
+values are not true cumulative <code>∫I dt</code> capacity anyway, so dropping
+them is the correct behavior for V-Q plotting.</p>
+<p>First-cycle-is-charge normalization: if cycle 1 begins with 放電 (discharge),
+<em>all</em> 状態 labels in the frame are swapped (充電 ↔ 放電). This is the TOYO
+convention for half-cells characterized discharge-first. Callers with an
+unusual dataset where only cycle 1 is discharge-first (e.g. a one-off
+formation discharge followed by normal charge-first cycles) must relabel
+before calling this function. A test pins the global-swap behavior so
+regressions are visible.</p>
+<p>Rewrite note (vs. legacy TOYO_Origin_2.01): the original used string
+MultiIndex labels like <code>"1-ch"</code> and checked the first-cycle direction
+from <code>df.at[1, "状態"]</code> (row <em>1</em>, not row 0). This implementation uses
+tuple labels <code>(1, "ch", "電気量")</code> and checks the first row of the first
+cycle, which is also more robust against a rest row at position 0 that
+v2.01 could misread.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="echemplot.core.chdis.get_chdis_df" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_chdis_df</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">column_lang</span><span class="o">=</span><span class="s1">&#39;ja&#39;</span><span class="p">)</span></code>
+
+<a href="#echemplot.core.chdis.get_chdis_df" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Segment a raw cell DataFrame into per-cycle ch/dis pairs.</p>
+<h5 id="echemplot.core.chdis.get_chdis_df--parameters">Parameters<a class="headerlink" href="#echemplot.core.chdis.get_chdis_df--parameters" title="Permanent link">&para;</a></h5>
+<p>df
+    Output of :func:<code>echemplot.io.reader.read_cell_dir</code>. Must contain
+    サイクル/状態/電圧/電気量 columns (or their EN equivalents when
+    <code>column_lang="en"</code>). <code>状態</code> cell values follow <code>column_lang</code>:
+    JA literals (<code>充電</code>/<code>放電</code>/<code>休止</code>/<code>充電休止</code>/<code>放電休止</code>/
+    <code>中断</code>) when <code>column_lang='ja'</code>, EN equivalents (<code>charge</code>/
+    <code>discharge</code>/<code>rest</code>/<code>charge_rest</code>/<code>discharge_rest</code>/<code>abort</code>)
+    when <code>column_lang='en'</code>.
+column_lang
+    Language of the input column names and the <code>quantity</code> level of
+    the returned MultiIndex.</p>
+<h5 id="echemplot.core.chdis.get_chdis_df--returns">Returns<a class="headerlink" href="#echemplot.core.chdis.get_chdis_df--returns" title="Permanent link">&para;</a></h5>
+<p>DataFrame
+    Columns: MultiIndex with levels <code>cycle</code>, <code>side</code>, <code>quantity</code>.
+    For missing pairs (e.g. a cycle that only has a charge segment),
+    rows are padded with NaN so all segments share a single row axis.</p>
+<h5 id="echemplot.core.chdis.get_chdis_df--raises">Raises<a class="headerlink" href="#echemplot.core.chdis.get_chdis_df--raises" title="Permanent link">&para;</a></h5>
+<p>KeyError
+    If the input frame is missing any of the required columns for the
+    requested <code>column_lang</code>.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/echemplot/core/chdis.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_chdis_df</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">column_lang</span><span class="p">:</span> <span class="n">ColumnLang</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Segment a raw cell DataFrame into per-cycle ch/dis pairs.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    df</span>
+<span class="sd">        Output of :func:`echemplot.io.reader.read_cell_dir`. Must contain</span>
+<span class="sd">        サイクル/状態/電圧/電気量 columns (or their EN equivalents when</span>
+<span class="sd">        ``column_lang=&quot;en&quot;``). ``状態`` cell values follow ``column_lang``:</span>
+<span class="sd">        JA literals (``充電``/``放電``/``休止``/``充電休止``/``放電休止``/</span>
+<span class="sd">        ``中断``) when ``column_lang=&#39;ja&#39;``, EN equivalents (``charge``/</span>
+<span class="sd">        ``discharge``/``rest``/``charge_rest``/``discharge_rest``/``abort``)</span>
+<span class="sd">        when ``column_lang=&#39;en&#39;``.</span>
+<span class="sd">    column_lang</span>
+<span class="sd">        Language of the input column names and the ``quantity`` level of</span>
+<span class="sd">        the returned MultiIndex.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    DataFrame</span>
+<span class="sd">        Columns: MultiIndex with levels ``cycle``, ``side``, ``quantity``.</span>
+<span class="sd">        For missing pairs (e.g. a cycle that only has a charge segment),</span>
+<span class="sd">        rows are padded with NaN so all segments share a single row axis.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    KeyError</span>
+<span class="sd">        If the input frame is missing any of the required columns for the</span>
+<span class="sd">        requested ``column_lang``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cols</span> <span class="o">=</span> <span class="n">_resolve_cols</span><span class="p">(</span><span class="n">column_lang</span><span class="p">)</span>
+    <span class="n">required</span> <span class="o">=</span> <span class="p">[</span><span class="n">cols</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;cycle&quot;</span><span class="p">,</span> <span class="s2">&quot;state&quot;</span><span class="p">,</span> <span class="s2">&quot;voltage&quot;</span><span class="p">,</span> <span class="s2">&quot;capacity&quot;</span><span class="p">)]</span>
+    <span class="n">missing</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">required</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">missing</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;input missing required columns </span><span class="si">{</span><span class="n">missing</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;for column_lang=</span><span class="si">{</span><span class="n">column_lang</span><span class="si">!r}</span><span class="s2">; got columns=</span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">cap_col</span><span class="p">,</span> <span class="n">v_col</span><span class="p">,</span> <span class="n">state_col</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">cols</span><span class="p">[</span><span class="s2">&quot;capacity&quot;</span><span class="p">],</span>
+        <span class="n">cols</span><span class="p">[</span><span class="s2">&quot;voltage&quot;</span><span class="p">],</span>
+        <span class="n">cols</span><span class="p">[</span><span class="s2">&quot;state&quot;</span><span class="p">],</span>
+    <span class="p">)</span>
+    <span class="n">cycle_col</span> <span class="o">=</span> <span class="n">_resolve_cycle_col</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">column_lang</span><span class="p">,</span> <span class="n">fallback</span><span class="o">=</span><span class="n">cols</span><span class="p">[</span><span class="s2">&quot;cycle&quot;</span><span class="p">])</span>
+    <span class="n">charge_lbl</span><span class="p">,</span> <span class="n">discharge_lbl</span><span class="p">,</span> <span class="n">state_to_side</span> <span class="o">=</span> <span class="n">_resolve_states</span><span class="p">(</span><span class="n">column_lang</span><span class="p">)</span>
+
+    <span class="n">working</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="n">state_col</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="n">charge_lbl</span><span class="p">,</span> <span class="n">discharge_lbl</span><span class="p">])]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">working</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_empty_result</span><span class="p">()</span>
+
+    <span class="n">first_cycle</span> <span class="o">=</span> <span class="n">working</span><span class="p">[</span><span class="n">cycle_col</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+    <span class="n">first_state</span> <span class="o">=</span> <span class="n">working</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">working</span><span class="p">[</span><span class="n">cycle_col</span><span class="p">]</span> <span class="o">==</span> <span class="n">first_cycle</span><span class="p">,</span> <span class="n">state_col</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">first_state</span> <span class="o">==</span> <span class="n">discharge_lbl</span><span class="p">:</span>
+        <span class="n">working</span> <span class="o">=</span> <span class="n">working</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span>
+            <span class="o">**</span><span class="p">{</span>
+                <span class="n">state_col</span><span class="p">:</span> <span class="n">working</span><span class="p">[</span><span class="n">state_col</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+                    <span class="p">{</span><span class="n">charge_lbl</span><span class="p">:</span> <span class="n">discharge_lbl</span><span class="p">,</span> <span class="n">discharge_lbl</span><span class="p">:</span> <span class="n">charge_lbl</span><span class="p">}</span>
+                <span class="p">)</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+
+    <span class="n">pieces</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">total_dropped</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">segments_with_drops</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">cycle_val</span><span class="p">,</span> <span class="n">state_val</span><span class="p">),</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">working</span><span class="o">.</span><span class="n">groupby</span><span class="p">([</span><span class="n">cycle_col</span><span class="p">,</span> <span class="n">state_col</span><span class="p">],</span> <span class="n">sort</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="n">side</span> <span class="o">=</span> <span class="n">state_to_side</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">state_val</span><span class="p">)]</span>
+        <span class="c1"># Drop rows whose |電気量| falls below the segment&#39;s running maximum.</span>
+        <span class="c1"># Local diff()&lt;0 was insufficient: in raw-6-digit data 経過時間[Sec]</span>
+        <span class="c1"># resets at CC→CV sub-step boundaries (not just state boundaries),</span>
+        <span class="c1"># so capacity drops by ~200 mAh/g and a row whose t*I happens to</span>
+        <span class="c1"># inch up vs. its immediate predecessor would leak through and</span>
+        <span class="c1"># produce a spurious connecting line in plot_chdis.</span>
+        <span class="n">cap</span> <span class="o">=</span> <span class="n">g</span><span class="p">[</span><span class="n">cap_col</span><span class="p">]</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">keep</span> <span class="o">=</span> <span class="p">(</span><span class="n">cap</span> <span class="o">==</span> <span class="n">cap</span><span class="o">.</span><span class="n">cummax</span><span class="p">())</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+        <span class="n">dropped</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">keep</span><span class="p">)</span> <span class="o">-</span> <span class="nb">int</span><span class="p">(</span><span class="n">keep</span><span class="o">.</span><span class="n">sum</span><span class="p">()))</span>
+        <span class="k">if</span> <span class="n">dropped</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">total_dropped</span> <span class="o">+=</span> <span class="n">dropped</span>
+            <span class="n">segments_with_drops</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">segment</span> <span class="o">=</span> <span class="n">g</span><span class="p">[[</span><span class="n">cap_col</span><span class="p">,</span> <span class="n">v_col</span><span class="p">]]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">keep</span><span class="p">]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">pieces</span><span class="p">[(</span><span class="nb">int</span><span class="p">(</span><span class="n">cycle_val</span><span class="p">),</span> <span class="n">side</span><span class="p">)]</span> <span class="o">=</span> <span class="n">segment</span>
+
+    <span class="k">if</span> <span class="n">total_dropped</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="n">DataIntegrityWarning</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;chdis: dropped </span><span class="si">{</span><span class="n">total_dropped</span><span class="si">}</span><span class="s2"> rows below segment running-max &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;across </span><span class="si">{</span><span class="n">segments_with_drops</span><span class="si">}</span><span class="s2"> segments&quot;</span>
+            <span class="p">),</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">out</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">pieces</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">out</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">set_names</span><span class="p">([</span><span class="s2">&quot;cycle&quot;</span><span class="p">,</span> <span class="s2">&quot;side&quot;</span><span class="p">,</span> <span class="s2">&quot;quantity&quot;</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">out</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="capacity">capacity<a class="headerlink" href="#capacity" title="Permanent link">&para;</a></h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="echemplot.core.capacity" class="doc doc-heading">
+            <code>echemplot.core.capacity</code>
+
+
+<a href="#echemplot.core.capacity" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Per-cycle charge/discharge capacity and Coulombic efficiency.</p>
+<p>Computes, from a :mod:<code>echemplot.core.chdis</code> output, one row per cycle
+with the maximum charge capacity (<code>q_ch</code>), maximum discharge capacity
+(<code>q_dis</code>), and Coulombic efficiency <code>ce = 100 * q_dis / q_ch</code> (in %).</p>
+<p>The derived column names are <strong>fixed English</strong> (<code>q_ch</code>, <code>q_dis</code>,
+<code>ce</code>) regardless of the <code>column_lang</code> used for the input frame —
+<code>column_lang</code> selects which <em>input</em> quantity label (JA <code>電気量</code> or EN
+<code>capacity</code>) to read from, not the output schema.</p>
+<p>Sign convention: <code>ce</code> inherits its sign arithmetically from
+<code>q_dis / q_ch</code>. The :mod:<code>chdis</code> contract guarantees
+<code>|capacity|</code> is monotone non-decreasing per segment, so for well-formed
+real data both maxes are non-negative and <code>ce</code> sits in roughly
+<code>[0, 100 + epsilon]</code>.</p>
+<p>Rewrite note (vs. legacy TOYO_Origin_2.01): v2.01's <code>get_cap_df</code> pivoted
+through <code>df.query('状態 in [...]')</code> on the raw frame and used
+<code>df["状態"][1]</code> to decide whether the first cycle was charge- or
+discharge-first. That check is positionally brittle (row index 1 can be a
+rest row) and ties capacity computation to raw-state string semantics.
+Here we operate on the already-segmented <code>chdis_df</code>, whose
+charge-first normalization is resolved once in :mod:<code>chdis</code>. This frees
+<code>get_cap_df</code> from ever touching raw state labels.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="echemplot.core.capacity.get_cap_df" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_cap_df</span><span class="p">(</span><span class="n">chdis_df</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">column_lang</span><span class="o">=</span><span class="s1">&#39;ja&#39;</span><span class="p">)</span></code>
+
+<a href="#echemplot.core.capacity.get_cap_df" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Per-cycle charge/discharge capacity and Coulombic efficiency.</p>
+<h5 id="echemplot.core.capacity.get_cap_df--parameters">Parameters<a class="headerlink" href="#echemplot.core.capacity.get_cap_df--parameters" title="Permanent link">&para;</a></h5>
+<p>chdis_df
+    Output of :func:<code>echemplot.core.chdis.get_chdis_df</code>. Must have a
+    3-level column MultiIndex <code>(cycle, side, quantity)</code> where
+    <code>side</code> is in <code>{"ch", "dis"}</code> and <code>quantity</code> contains the
+    capacity label (<code>電気量</code> or <code>capacity</code>).
+column_lang
+    Language of the input's <code>quantity</code> level. Does <em>not</em> affect the
+    output column names — those are always English.</p>
+<h5 id="echemplot.core.capacity.get_cap_df--returns">Returns<a class="headerlink" href="#echemplot.core.capacity.get_cap_df--returns" title="Permanent link">&para;</a></h5>
+<p>DataFrame
+    Index is <code>cycle</code> (int). Columns are <code>["q_ch", "q_dis", "ce"]</code>
+    (all float). <code>ce</code> is in percent. <code>ce</code> is <code>NaN</code> when
+    <code>q_ch == 0</code> (not <code>inf</code>). Missing ch or dis for a cycle yields
+    <code>NaN</code> for that column; the cycle row is preserved — including
+    the degenerate case where both sides are all-NaN (e.g. a cycle
+    whose columns exist but whose values were wiped by the reversal
+    filter), which produces a row of <code>NaN</code> values rather than being
+    dropped.</p>
+<h5 id="echemplot.core.capacity.get_cap_df--raises">Raises<a class="headerlink" href="#echemplot.core.capacity.get_cap_df--raises" title="Permanent link">&para;</a></h5>
+<p>KeyError
+    If <code>chdis_df.columns</code> is not a 3-level <code>(cycle, side, quantity)</code>
+    MultiIndex (structural violation), or if the <code>quantity</code> level
+    does not contain the capacity label for the requested
+    <code>column_lang</code> (missing-quantity violation).</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/echemplot/core/capacity.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_cap_df</span><span class="p">(</span><span class="n">chdis_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">column_lang</span><span class="p">:</span> <span class="n">ColumnLang</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Per-cycle charge/discharge capacity and Coulombic efficiency.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    chdis_df</span>
+<span class="sd">        Output of :func:`echemplot.core.chdis.get_chdis_df`. Must have a</span>
+<span class="sd">        3-level column MultiIndex ``(cycle, side, quantity)`` where</span>
+<span class="sd">        ``side`` is in ``{&quot;ch&quot;, &quot;dis&quot;}`` and ``quantity`` contains the</span>
+<span class="sd">        capacity label (``電気量`` or ``capacity``).</span>
+<span class="sd">    column_lang</span>
+<span class="sd">        Language of the input&#39;s ``quantity`` level. Does *not* affect the</span>
+<span class="sd">        output column names — those are always English.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    DataFrame</span>
+<span class="sd">        Index is ``cycle`` (int). Columns are ``[&quot;q_ch&quot;, &quot;q_dis&quot;, &quot;ce&quot;]``</span>
+<span class="sd">        (all float). ``ce`` is in percent. ``ce`` is ``NaN`` when</span>
+<span class="sd">        ``q_ch == 0`` (not ``inf``). Missing ch or dis for a cycle yields</span>
+<span class="sd">        ``NaN`` for that column; the cycle row is preserved — including</span>
+<span class="sd">        the degenerate case where both sides are all-NaN (e.g. a cycle</span>
+<span class="sd">        whose columns exist but whose values were wiped by the reversal</span>
+<span class="sd">        filter), which produces a row of ``NaN`` values rather than being</span>
+<span class="sd">        dropped.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    KeyError</span>
+<span class="sd">        If ``chdis_df.columns`` is not a 3-level ``(cycle, side, quantity)``</span>
+<span class="sd">        MultiIndex (structural violation), or if the ``quantity`` level</span>
+<span class="sd">        does not contain the capacity label for the requested</span>
+<span class="sd">        ``column_lang`` (missing-quantity violation).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cols</span> <span class="o">=</span> <span class="n">_resolve_cols</span><span class="p">(</span><span class="n">column_lang</span><span class="p">)</span>
+    <span class="n">cap_col</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="s2">&quot;capacity&quot;</span><span class="p">]</span>
+
+    <span class="c1"># Structural check runs *before* the empty short-circuit so a</span>
+    <span class="c1"># flat-columns empty frame surfaces the same ``KeyError`` as a</span>
+    <span class="c1"># flat-columns populated frame — the error surface for a given bug</span>
+    <span class="c1"># should not depend on whether the input happened to contain rows.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chdis_df</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">MultiIndex</span><span class="p">)</span> <span class="ow">or</span> <span class="n">chdis_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">nlevels</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="c1"># Exception: a truly empty frame (no rows, no columns — `pd.DataFrame()`)</span>
+        <span class="c1"># is the one shape we accept without a 3-level MultiIndex, because</span>
+        <span class="c1"># ``chdis._empty_result`` is the canonical empty contract and we want</span>
+        <span class="c1"># ``get_cap_df(empty) -&gt; empty`` to round-trip.</span>
+        <span class="k">if</span> <span class="n">chdis_df</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="n">chdis_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_empty_result</span><span class="p">()</span>
+        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+            <span class="s2">&quot;chdis_df.columns must be a 3-level MultiIndex &quot;</span>
+            <span class="s2">&quot;(cycle, side, quantity); &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;got </span><span class="si">{</span><span class="n">chdis_df</span><span class="o">.</span><span class="n">columns</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Empty on either axis → empty result with correct schema. Using ``or``</span>
+    <span class="c1"># so a frame with column structure but zero rows (e.g. chdis after</span>
+    <span class="c1"># every segment was reversal-filtered clean) also short-circuits,</span>
+    <span class="c1"># rather than producing a frame with cycle rows of all-NaN that would</span>
+    <span class="c1"># surprise callers expecting ``cap_df.empty`` to track input-emptiness.</span>
+    <span class="k">if</span> <span class="n">chdis_df</span><span class="o">.</span><span class="n">empty</span> <span class="ow">or</span> <span class="n">chdis_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_empty_result</span><span class="p">()</span>
+
+    <span class="n">quantity_values</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">chdis_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s2">&quot;quantity&quot;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">cap_col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">quantity_values</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;chdis_df missing required quantity </span><span class="si">{</span><span class="n">cap_col</span><span class="si">!r}</span><span class="s2"> &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;for column_lang=</span><span class="si">{</span><span class="n">column_lang</span><span class="si">!r}</span><span class="s2">; got quantities=</span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">quantity_values</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Cross-section the capacity quantity → columns become (cycle, side).</span>
+    <span class="n">cap_only</span> <span class="o">=</span> <span class="n">chdis_df</span><span class="o">.</span><span class="n">xs</span><span class="p">(</span><span class="n">cap_col</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="s2">&quot;quantity&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Max per segment, skipping NaN. Result indexed by (cycle, side).</span>
+    <span class="c1"># Explicit cast to float64: for an all-NaN or 0-row input, pandas may</span>
+    <span class="c1"># return a Series with dtype=object which would poison downstream</span>
+    <span class="c1"># arithmetic; the cast pins the numeric contract end-to-end.</span>
+    <span class="n">per_segment_max</span> <span class="o">=</span> <span class="n">cap_only</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">skipna</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;float64&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Unstack side → rows=cycle, columns=side. Reindex to ensure both</span>
+    <span class="c1"># &quot;ch&quot; and &quot;dis&quot; exist even if only one side has any data globally.</span>
+    <span class="n">wide</span> <span class="o">=</span> <span class="n">per_segment_max</span><span class="o">.</span><span class="n">unstack</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s2">&quot;side&quot;</span><span class="p">)</span>
+    <span class="n">wide</span> <span class="o">=</span> <span class="n">wide</span><span class="o">.</span><span class="n">reindex</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ch&quot;</span><span class="p">,</span> <span class="s2">&quot;dis&quot;</span><span class="p">])</span>
+
+    <span class="c1"># Preserve every cycle from the input, including ones with only one side.</span>
+    <span class="c1"># chdis already sorts by cycle via ``groupby(..., sort=True)``, but</span>
+    <span class="c1"># ``.unique().sort_values()`` is explicit and enforces the ``int64``</span>
+    <span class="c1"># contract on the index dtype in one pass.</span>
+    <span class="n">cycles</span> <span class="o">=</span> <span class="n">chdis_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s2">&quot;cycle&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;int64&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">sort_values</span><span class="p">()</span>
+    <span class="n">wide</span> <span class="o">=</span> <span class="n">wide</span><span class="o">.</span><span class="n">reindex</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="n">cycles</span><span class="p">)</span>
+
+    <span class="n">q_ch</span> <span class="o">=</span> <span class="n">wide</span><span class="p">[</span><span class="s2">&quot;ch&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;float64&quot;</span><span class="p">)</span>
+    <span class="n">q_dis</span> <span class="o">=</span> <span class="n">wide</span><span class="p">[</span><span class="s2">&quot;dis&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;float64&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Coulombic efficiency — guard q_ch == 0 as NaN (not inf / not error).</span>
+    <span class="c1"># pandas Series division returns ``inf`` without raising for float</span>
+    <span class="c1"># divide-by-zero, so no ``np.errstate`` wrapper is needed; the</span>
+    <span class="c1"># ``where(q_ch != 0, NaN)`` below overrides ``inf`` to NaN.</span>
+    <span class="n">ce</span> <span class="o">=</span> <span class="p">(</span><span class="mf">100.0</span> <span class="o">*</span> <span class="n">q_dis</span> <span class="o">/</span> <span class="n">q_ch</span><span class="p">)</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">q_ch</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">other</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+
+    <span class="c1"># Build DataFrame directly from the Series trio so dtypes round-trip</span>
+    <span class="c1"># without a numpy detour; name the index in place.</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;q_ch&quot;</span><span class="p">:</span> <span class="n">q_ch</span><span class="p">,</span> <span class="s2">&quot;q_dis&quot;</span><span class="p">:</span> <span class="n">q_dis</span><span class="p">,</span> <span class="s2">&quot;ce&quot;</span><span class="p">:</span> <span class="n">ce</span><span class="p">})</span>
+    <span class="n">out</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;cycle&quot;</span>
+    <span class="k">return</span> <span class="n">out</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="dqdv">dqdv<a class="headerlink" href="#dqdv" title="Permanent link">&para;</a></h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="echemplot.core.dqdv" class="doc doc-heading">
+            <code>echemplot.core.dqdv</code>
+
+
+<a href="#echemplot.core.dqdv" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>dQ/dV computation via interpolation + Savitzky-Golay derivative.</p>
+<p>For each <code>(cycle, side)</code> segment in a <code>chdis_df</code> (produced by
+:func:<code>echemplot.core.chdis.get_chdis_df</code>), this module:</p>
+<ol>
+<li>Extracts the voltage and capacity series, drops NaN rows, sorts by V,
+   and removes duplicate V values (<code>keep="last"</code> to preserve CC-CV tail
+   capacity, which accumulates at <code>V_max</code>/<code>V_min</code> plateaus).</li>
+<li>Linearly interpolates Q onto a uniform V grid
+   (<code>np.linspace(V.min(), V.max(), ipnum)</code> with
+   <code>ipnum = max(int(inter_num * (V.max() - V.min())), 2)</code>).</li>
+<li>Applies :func:<code>scipy.signal.savgol_filter</code> with <code>deriv=1</code> and
+   <code>delta=dx</code> to compute <code>dQ/dV</code> in physical units on the resampled
+   curve.</li>
+</ol>
+<p>Output shape: a wide DataFrame whose column MultiIndex mirrors <code>chdis_df</code>
+(levels <code>cycle</code>, <code>side</code>, <code>quantity</code>). The <code>quantity</code> level holds
+<code>{"電圧", "dQ/dV"}</code> when <code>column_lang="ja"</code> and
+<code>{"voltage", "dq_dv"}</code> when <code>column_lang="en"</code>. The row axis is a
+<code>RangeIndex</code> shared across all segments; shorter segments are NaN-padded
+to the longest.</p>
+<p>Numerical caveats:</p>
+<ul>
+<li>The leading and trailing <code>window_length // 2</code> samples of each
+  <code>dQ/dV</code> column are edge-approximated (savgol <code>mode="nearest"</code>) and
+  should be trimmed when precise slopes matter.</li>
+<li>Discharge segments enter with V decreasing but Q still monotone
+  non-decreasing per the chdis invariant. After the ascending V sort, Q
+  becomes decreasing along the grid, so <code>dQ/dV</code> for discharge is
+  <strong>negative</strong> by construction. Callers plotting charge and discharge on
+  the same axis commonly take <code>abs(dQ/dV)</code> for a magnitude comparison;
+  the raw signed value is retained here so the direction of accumulation
+  is not lost.</li>
+</ul>
+<p>Rewrite notes (vs. legacy TOYO_Origin_2.01 <code>plot_dQdV_curve</code> L378-453):</p>
+<ul>
+<li>v2.01 read the voltage bounds via <code>chdis_df[cycle].at[1, "電圧"]</code> and
+  <code>chdis_df[cycle].at[len(...)-1, "電圧"]</code>. <code>.at[1, ...]</code> reads the
+  <em>second</em> row, not the first, so the original implicitly skipped the
+  first sample and was sensitive to whichever row landed at position 1
+  before sorting. This rewrite uses <code>V.min()</code>/<code>V.max()</code> after an
+  explicit ascending sort with duplicate removal — deterministic,
+  monotone, and works whether the source segment is charge or discharge.</li>
+<li>v2.01's <code>savgol_filter</code> call (L423-429) omitted <code>delta=</code>, so its
+  output was <code>d(Q)/d(sample-index)</code> rather than <code>d(Q)/d(V)</code> — the
+  legacy plots carried a sample-count-scaled axis labeled <code>dQ/dV</code>.
+  This rewrite passes <code>delta=dx</code> so the output is in physical units
+  (mAh/g per V).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="echemplot.core.dqdv.get_dqdv_df" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_dqdv_df</span><span class="p">(</span><span class="n">chdis_df</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">inter_num</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">window_length</span><span class="o">=</span><span class="mi">11</span><span class="p">,</span> <span class="n">polyorder</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">column_lang</span><span class="o">=</span><span class="s1">&#39;ja&#39;</span><span class="p">)</span></code>
+
+<a href="#echemplot.core.dqdv.get_dqdv_df" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute dQ/dV per (cycle, side) segment from a chdis DataFrame.</p>
+<h5 id="echemplot.core.dqdv.get_dqdv_df--parameters">Parameters<a class="headerlink" href="#echemplot.core.dqdv.get_dqdv_df--parameters" title="Permanent link">&para;</a></h5>
+<p>chdis_df
+    Output of :func:<code>echemplot.core.chdis.get_chdis_df</code>. Its column
+    MultiIndex must have levels <code>cycle</code>, <code>side</code>, <code>quantity</code> with
+    the <code>quantity</code> level using the names resolved by <code>column_lang</code>
+    (voltage + capacity).
+inter_num
+    Interpolation density. The number of samples on the uniform V grid
+    is <code>max(int(inter_num * (V.max() - V.min())), 2)</code> per segment.
+    Segments whose interpolated length is below <code>window_length</code> yield
+    all-NaN columns (Savitzky-Golay requires at least <code>window_length</code>
+    samples). Must be <code>&gt;= 1</code>.
+window_length
+    Savitzky-Golay window length. Must be a positive odd integer
+    strictly greater than <code>polyorder</code>. (scipy 1.13+ accepts even,
+    but the project floor is <code>scipy&gt;=1.10</code> where odd is required;
+    enforcing odd uniformly avoids a version-dependent failure mode.)
+polyorder
+    Savitzky-Golay polynomial order. Must be <code>&gt;= 0</code> and strictly
+    less than <code>window_length</code>.
+column_lang
+    Language of the <code>quantity</code> level on both input and output. When
+    <code>"ja"</code> the output uses <code>{"電圧", "dQ/dV"}</code>; when <code>"en"</code> it
+    uses <code>{"voltage", "dq_dv"}</code>.</p>
+<h5 id="echemplot.core.dqdv.get_dqdv_df--returns">Returns<a class="headerlink" href="#echemplot.core.dqdv.get_dqdv_df--returns" title="Permanent link">&para;</a></h5>
+<p>DataFrame
+    Columns: MultiIndex with levels <code>cycle</code>, <code>side</code>, <code>quantity</code>.
+    Row axis: <code>RangeIndex</code> sized to the longest segment; shorter
+    segments are NaN-padded.</p>
+<h5 id="echemplot.core.dqdv.get_dqdv_df--raises">Raises<a class="headerlink" href="#echemplot.core.dqdv.get_dqdv_df--raises" title="Permanent link">&para;</a></h5>
+<p>ValueError
+    If <code>inter_num</code> / <code>window_length</code> / <code>polyorder</code> violate the
+    Savitzky-Golay preconditions above.
+KeyError
+    If <code>chdis_df.columns</code> is not a 3-level <code>(cycle, side, quantity)</code>
+    MultiIndex, or if the <code>quantity</code> level is missing the voltage /
+    capacity labels for the requested <code>column_lang</code>.</p>
+<h5 id="echemplot.core.dqdv.get_dqdv_df--notes">Notes<a class="headerlink" href="#echemplot.core.dqdv.get_dqdv_df--notes" title="Permanent link">&para;</a></h5>
+<p>Non-default <code>inter_num</code> / <code>window_length</code> / <code>polyorder</code> must be
+passed by calling this function directly —
+:attr:<code>echemplot.core.cell.Cell.dqdv_df</code> uses the defaults.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/echemplot/core/dqdv.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_dqdv_df</span><span class="p">(</span>
+    <span class="n">chdis_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">inter_num</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
+    <span class="n">window_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">11</span><span class="p">,</span>
+    <span class="n">polyorder</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="n">column_lang</span><span class="p">:</span> <span class="n">ColumnLang</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute dQ/dV per (cycle, side) segment from a chdis DataFrame.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    chdis_df</span>
+<span class="sd">        Output of :func:`echemplot.core.chdis.get_chdis_df`. Its column</span>
+<span class="sd">        MultiIndex must have levels ``cycle``, ``side``, ``quantity`` with</span>
+<span class="sd">        the ``quantity`` level using the names resolved by ``column_lang``</span>
+<span class="sd">        (voltage + capacity).</span>
+<span class="sd">    inter_num</span>
+<span class="sd">        Interpolation density. The number of samples on the uniform V grid</span>
+<span class="sd">        is ``max(int(inter_num * (V.max() - V.min())), 2)`` per segment.</span>
+<span class="sd">        Segments whose interpolated length is below ``window_length`` yield</span>
+<span class="sd">        all-NaN columns (Savitzky-Golay requires at least ``window_length``</span>
+<span class="sd">        samples). Must be ``&gt;= 1``.</span>
+<span class="sd">    window_length</span>
+<span class="sd">        Savitzky-Golay window length. Must be a positive odd integer</span>
+<span class="sd">        strictly greater than ``polyorder``. (scipy 1.13+ accepts even,</span>
+<span class="sd">        but the project floor is ``scipy&gt;=1.10`` where odd is required;</span>
+<span class="sd">        enforcing odd uniformly avoids a version-dependent failure mode.)</span>
+<span class="sd">    polyorder</span>
+<span class="sd">        Savitzky-Golay polynomial order. Must be ``&gt;= 0`` and strictly</span>
+<span class="sd">        less than ``window_length``.</span>
+<span class="sd">    column_lang</span>
+<span class="sd">        Language of the ``quantity`` level on both input and output. When</span>
+<span class="sd">        ``&quot;ja&quot;`` the output uses ``{&quot;電圧&quot;, &quot;dQ/dV&quot;}``; when ``&quot;en&quot;`` it</span>
+<span class="sd">        uses ``{&quot;voltage&quot;, &quot;dq_dv&quot;}``.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    DataFrame</span>
+<span class="sd">        Columns: MultiIndex with levels ``cycle``, ``side``, ``quantity``.</span>
+<span class="sd">        Row axis: ``RangeIndex`` sized to the longest segment; shorter</span>
+<span class="sd">        segments are NaN-padded.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If ``inter_num`` / ``window_length`` / ``polyorder`` violate the</span>
+<span class="sd">        Savitzky-Golay preconditions above.</span>
+<span class="sd">    KeyError</span>
+<span class="sd">        If ``chdis_df.columns`` is not a 3-level ``(cycle, side, quantity)``</span>
+<span class="sd">        MultiIndex, or if the ``quantity`` level is missing the voltage /</span>
+<span class="sd">        capacity labels for the requested ``column_lang``.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Non-default ``inter_num`` / ``window_length`` / ``polyorder`` must be</span>
+<span class="sd">    passed by calling this function directly —</span>
+<span class="sd">    :attr:`echemplot.core.cell.Cell.dqdv_df` uses the defaults.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_validate_savgol_params</span><span class="p">(</span><span class="n">inter_num</span><span class="p">,</span> <span class="n">window_length</span><span class="p">,</span> <span class="n">polyorder</span><span class="p">)</span>
+
+    <span class="n">cols</span> <span class="o">=</span> <span class="n">_resolve_cols</span><span class="p">(</span><span class="n">column_lang</span><span class="p">)</span>
+    <span class="n">v_name</span><span class="p">,</span> <span class="n">q_name</span><span class="p">,</span> <span class="n">dqdv_name</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="s2">&quot;voltage&quot;</span><span class="p">],</span> <span class="n">cols</span><span class="p">[</span><span class="s2">&quot;capacity&quot;</span><span class="p">],</span> <span class="n">cols</span><span class="p">[</span><span class="s2">&quot;dqdv&quot;</span><span class="p">]</span>
+
+    <span class="c1"># Structural check runs *before* the empty short-circuit so a</span>
+    <span class="c1"># flat-columns empty frame surfaces the same ``KeyError`` as a</span>
+    <span class="c1"># flat-columns populated frame — the error surface for a given bug</span>
+    <span class="c1"># should not depend on whether the input happened to contain rows.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chdis_df</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">MultiIndex</span><span class="p">)</span> <span class="ow">or</span> <span class="n">chdis_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">nlevels</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="c1"># Exception: a truly empty frame (no rows, no columns — `pd.DataFrame()`)</span>
+        <span class="c1"># is the one shape we accept without a 3-level MultiIndex, because</span>
+        <span class="c1"># ``chdis._empty_result`` is the canonical empty contract and we want</span>
+        <span class="c1"># ``get_dqdv_df(empty) -&gt; empty`` to round-trip.</span>
+        <span class="k">if</span> <span class="n">chdis_df</span><span class="o">.</span><span class="n">empty</span> <span class="ow">and</span> <span class="n">chdis_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_empty_result</span><span class="p">()</span>
+        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+            <span class="s2">&quot;chdis_df.columns must be a 3-level MultiIndex &quot;</span>
+            <span class="s2">&quot;(cycle, side, quantity); &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;got </span><span class="si">{</span><span class="n">chdis_df</span><span class="o">.</span><span class="n">columns</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">chdis_df</span><span class="o">.</span><span class="n">empty</span> <span class="ow">or</span> <span class="n">chdis_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_empty_result</span><span class="p">()</span>
+
+    <span class="n">quantity_values</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">chdis_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">get_level_values</span><span class="p">(</span><span class="s2">&quot;quantity&quot;</span><span class="p">))</span>
+    <span class="n">missing_quantities</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">({</span><span class="n">v_name</span><span class="p">,</span> <span class="n">q_name</span><span class="p">}</span> <span class="o">-</span> <span class="n">quantity_values</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">missing_quantities</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;input missing required quantity level values </span><span class="si">{</span><span class="n">missing_quantities</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;for column_lang=</span><span class="si">{</span><span class="n">column_lang</span><span class="si">!r}</span><span class="s2">; got quantities=</span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">quantity_values</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">cols_tuples</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="s2">&quot;list[tuple[int, str, str]]&quot;</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">chdis_df</span><span class="o">.</span><span class="n">columns</span><span class="p">))</span>
+    <span class="c1"># Deterministic order: (cycle, side) with explicit side rank.</span>
+    <span class="c1"># ``ch`` before ``dis``, any future side lands after both (stable).</span>
+    <span class="n">_side_rank</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;ch&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;dis&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}</span>
+    <span class="n">cycle_side_pairs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span>
+        <span class="p">{(</span><span class="nb">int</span><span class="p">(</span><span class="n">c</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">s</span><span class="p">))</span> <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">_q</span> <span class="ow">in</span> <span class="n">cols_tuples</span><span class="p">},</span>
+        <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">_side_rank</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">2</span><span class="p">),</span> <span class="n">t</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+    <span class="p">)</span>
+
+    <span class="n">per_segment</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">_SegPair</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">cycle</span><span class="p">,</span> <span class="n">side</span> <span class="ow">in</span> <span class="n">cycle_side_pairs</span><span class="p">:</span>
+        <span class="c1"># Both quantities are guaranteed to exist: cycle_side_pairs is</span>
+        <span class="c1"># derived from chdis_df.columns, and the top-level missing_quantities</span>
+        <span class="c1"># check already verified v_name and q_name are present in the</span>
+        <span class="c1"># quantity level. A KeyError here would indicate a chdis contract</span>
+        <span class="c1"># violation — a per-(cycle,side) quantity asymmetry — which should</span>
+        <span class="c1"># propagate loudly rather than be silently masked.</span>
+        <span class="n">v_series</span> <span class="o">=</span> <span class="n">chdis_df</span><span class="p">[(</span><span class="n">cycle</span><span class="p">,</span> <span class="n">side</span><span class="p">,</span> <span class="n">v_name</span><span class="p">)]</span>
+        <span class="n">q_series</span> <span class="o">=</span> <span class="n">chdis_df</span><span class="p">[(</span><span class="n">cycle</span><span class="p">,</span> <span class="n">side</span><span class="p">,</span> <span class="n">q_name</span><span class="p">)]</span>
+
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">({</span><span class="s2">&quot;v&quot;</span><span class="p">:</span> <span class="n">v_series</span><span class="p">,</span> <span class="s2">&quot;q&quot;</span><span class="p">:</span> <span class="n">q_series</span><span class="p">},</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">frame</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+            <span class="n">per_segment</span><span class="p">[(</span><span class="n">cycle</span><span class="p">,</span> <span class="n">side</span><span class="p">)]</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># ``keep=&quot;last&quot;``: chdis guarantees Q is monotone non-decreasing within</span>
+        <span class="c1"># each segment. After a stable sort by V, the last row among duplicate</span>
+        <span class="c1"># V values preserves the highest Q — which is essential for CC-CV</span>
+        <span class="c1"># plateaus where V saturates at V_max (charge) or V_min (discharge)</span>
+        <span class="c1"># while Q continues to grow. ``keep=&quot;first&quot;`` would silently discard</span>
+        <span class="c1"># the CV tail capacity.</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">frame</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">&quot;v&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;mergesort&quot;</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">drop_duplicates</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="s2">&quot;v&quot;</span><span class="p">,</span> <span class="n">keep</span><span class="o">=</span><span class="s2">&quot;last&quot;</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">per_segment</span><span class="p">[(</span><span class="n">cycle</span><span class="p">,</span> <span class="n">side</span><span class="p">)]</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">continue</span>
+
+        <span class="n">v_arr</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[</span><span class="s2">&quot;v&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="n">q_arr</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span> <span class="o">=</span> <span class="n">frame</span><span class="p">[</span><span class="s2">&quot;q&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="n">v_min</span><span class="p">,</span> <span class="n">v_max</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">v_arr</span><span class="o">.</span><span class="n">min</span><span class="p">()),</span> <span class="nb">float</span><span class="p">(</span><span class="n">v_arr</span><span class="o">.</span><span class="n">max</span><span class="p">())</span>
+        <span class="c1"># Floor to 2 ensures ``linspace`` produces a usable array; segments</span>
+        <span class="c1"># where ``ipnum &lt; window_length`` will return None below and surface</span>
+        <span class="c1"># as NaN columns.</span>
+        <span class="n">ipnum</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">inter_num</span> <span class="o">*</span> <span class="p">(</span><span class="n">v_max</span> <span class="o">-</span> <span class="n">v_min</span><span class="p">)),</span> <span class="mi">2</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">ipnum</span> <span class="o">&lt;</span> <span class="n">window_length</span><span class="p">:</span>
+            <span class="n">per_segment</span><span class="p">[(</span><span class="n">cycle</span><span class="p">,</span> <span class="n">side</span><span class="p">)]</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">continue</span>
+
+        <span class="n">x_latent</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">v_min</span><span class="p">,</span> <span class="n">v_max</span><span class="p">,</span> <span class="n">ipnum</span><span class="p">)</span>
+        <span class="n">dx</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">x_latent</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">x_latent</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="c1"># ``np.interp`` replaces legacy ``scipy.interpolate.interp1d`` for</span>
+        <span class="c1"># 1-D linear interpolation (scipy flags interp1d as legacy in 1.10+).</span>
+        <span class="c1"># Preconditions: ``v_arr`` strictly increasing (guaranteed by the</span>
+        <span class="c1"># sort + drop_duplicates above) and ``x_latent`` within</span>
+        <span class="c1"># ``[v_min, v_max]`` (linspace over the same bounds). Under these</span>
+        <span class="c1"># conditions ``np.interp``&#39;s default clamping is equivalent to</span>
+        <span class="c1"># ``interp1d(..., fill_value=&quot;extrapolate&quot;)`` — no extrapolation</span>
+        <span class="c1"># actually occurs.</span>
+        <span class="n">q_latent</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">x_latent</span><span class="p">,</span> <span class="n">v_arr</span><span class="p">,</span> <span class="n">q_arr</span><span class="p">)</span>
+        <span class="n">dy</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span>
+            <span class="n">savgol_filter</span><span class="p">(</span>
+                <span class="n">q_latent</span><span class="p">,</span>
+                <span class="n">window_length</span><span class="o">=</span><span class="n">window_length</span><span class="p">,</span>
+                <span class="n">polyorder</span><span class="o">=</span><span class="n">polyorder</span><span class="p">,</span>
+                <span class="n">deriv</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">delta</span><span class="o">=</span><span class="n">dx</span><span class="p">,</span>
+                <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;nearest&quot;</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">per_segment</span><span class="p">[(</span><span class="n">cycle</span><span class="p">,</span> <span class="n">side</span><span class="p">)]</span> <span class="o">=</span> <span class="p">(</span><span class="n">x_latent</span><span class="p">,</span> <span class="n">dy</span><span class="p">)</span>
+
+    <span class="n">longest</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pair</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">pair</span> <span class="ow">in</span> <span class="n">per_segment</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">if</span> <span class="n">pair</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="c1"># The output MultiIndex is the same shape whether rows are populated</span>
+    <span class="c1"># or not — build it once and hand it to the DataFrame constructor.</span>
+    <span class="n">out_cols</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">MultiIndex</span><span class="o">.</span><span class="n">from_tuples</span><span class="p">(</span>
+        <span class="p">[(</span><span class="n">c</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">q</span><span class="p">)</span> <span class="k">for</span> <span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="ow">in</span> <span class="n">cycle_side_pairs</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="p">(</span><span class="n">v_name</span><span class="p">,</span> <span class="n">dqdv_name</span><span class="p">)],</span>
+        <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cycle&quot;</span><span class="p">,</span> <span class="s2">&quot;side&quot;</span><span class="p">,</span> <span class="s2">&quot;quantity&quot;</span><span class="p">],</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">longest</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="c1"># All segments degenerate — return a 0-row frame with the expected</span>
+        <span class="c1"># columns so downstream consumers can detect the empty case without</span>
+        <span class="c1"># KeyErrors.</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">out_cols</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+
+    <span class="n">data_matrix</span><span class="p">:</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="n">longest</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">out_cols</span><span class="p">)),</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">col_idx</span><span class="p">,</span> <span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">q</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">out_cols</span><span class="p">):</span>
+        <span class="n">pair</span> <span class="o">=</span> <span class="n">per_segment</span><span class="p">[(</span><span class="nb">int</span><span class="p">(</span><span class="n">c</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">s</span><span class="p">))]</span>
+        <span class="k">if</span> <span class="n">pair</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">x_latent_</span><span class="p">,</span> <span class="n">dy_</span> <span class="o">=</span> <span class="n">pair</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">x_latent_</span><span class="p">)</span>
+        <span class="n">data_matrix</span><span class="p">[:</span><span class="n">n</span><span class="p">,</span> <span class="n">col_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">x_latent_</span> <span class="k">if</span> <span class="n">q</span> <span class="o">==</span> <span class="n">v_name</span> <span class="k">else</span> <span class="n">dy_</span>
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data_matrix</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">out_cols</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="stats">stats<a class="headerlink" href="#stats" title="Permanent link">&para;</a></h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="echemplot.core.stats" class="doc doc-heading">
+            <code>echemplot.core.stats</code>
+
+
+<a href="#echemplot.core.stats" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Per-cell summary statistics (<code>stat_table</code>).</p>
+<p>Aggregates a list of :class:<code>echemplot.core.cell.Cell</code> objects into a
+single wide summary table — one row per cell, with a deterministic set of
+capacity / efficiency / retention columns keyed off a caller-supplied
+<code>target_cycles</code>. This is the table that downstream users typically
+export as CSV or feed into a plotting pipeline.</p>
+<p>Output columns (all float64, English-fixed regardless of each cell's
+<code>column_lang</code>):</p>
+<ul>
+<li><code>Q_dis_max</code> — <code>max(cap_df["q_dis"])</code> over all cycles for that cell.</li>
+<li><code>cycle_at_{pct}pct</code> — first cycle at which <code>q_dis</code> dips below
+  <code>retention_threshold * q_dis[1]</code>. <code>NaN</code> if the fade threshold is
+  never crossed, or if <code>q_dis[1]</code> is missing / zero. The <code>{pct}</code>
+  suffix is derived from the threshold: <code>retention_threshold=0.80</code>
+  yields <code>cycle_at_80pct</code>.</li>
+<li>
+<p>For each <code>n</code> in <code>target_cycles</code> (in caller-given order):</p>
+</li>
+<li>
+<p><code>Q_dis@{n}</code> — discharge capacity at cycle <code>n</code> (NaN if missing).</p>
+</li>
+<li><code>CE@{n}</code> — Coulombic efficiency at cycle <code>n</code> (NaN if missing).</li>
+<li><code>V_mean_dis@{n}</code> — energy-weighted mean discharge voltage at cycle
+    <code>n</code>: <code>(∫V dQ) / q_dis[n]</code> where the integral runs over the
+    discharge segment's <code>(V, Q)</code> curve.</li>
+<li><code>EE@{n}</code> — energy efficiency in percent:
+    <code>100 * ∫V dQ_dis / ∫V dQ_ch</code>. NaN if either integral is NaN or if
+    the charge-side integral is zero.</li>
+<li><code>retention@{n}</code> — <code>100 * q_dis[n] / q_dis[1]</code> in percent. Exactly
+    <code>100.0</code> for <code>n == 1</code> when <code>q_dis[1]</code> is non-NaN. NaN when
+    <code>q_dis[1]</code> or <code>q_dis[n]</code> is missing / zero-denominator.</li>
+<li><code>CE_mean_1to{n}</code> — mean of <code>cap_df.loc[1:n, "ce"]</code> skipping NaN.
+    NaN if cycle 1 is absent or the sub-range contains no finite values.</li>
+</ul>
+<p>Integration detail: each per-segment <code>∫V dQ</code> uses Q as the integration
+variable (the :mod:<code>chdis</code> contract guarantees Q is monotone non-decreasing
+within a segment). After sorting rows by Q ascending and dropping duplicate
+Q values (<code>keep="last"</code>, same convention as :mod:<code>dqdv</code> for CC-CV tail
+preservation), the integral is evaluated by:</p>
+<ul>
+<li>:func:<code>scipy.integrate.simpson</code> when <code>len &gt;= 3</code></li>
+<li>:func:<code>scipy.integrate.trapezoid</code> when <code>len == 2</code></li>
+<li><code>NaN</code> otherwise</li>
+</ul>
+<p>The deprecated <code>scipy.integrate.simps</code> is intentionally not used;
+<code>numpy.trapz</code> was removed in NumPy 2.0 and is likewise avoided in favour
+of :func:<code>scipy.integrate.trapezoid</code>.</p>
+<p>Rewrite note (vs. legacy TOYO_Origin_2.01 <code>stat_table</code> L579-656): v2.01
+passed positional args to <code>simpson</code> and read segment bounds from
+<code>chdis_df[str(n)+"-dis"].at[1, "電圧"]</code> (row 1, not 0), then wrapped the
+entire per-n block in a bare <code>except Exception</code> that silently masked
+structural bugs as missing data. This rewrite uses Q as the integration
+variable via explicit keyword args (<code>simpson(y=v, x=q)</code> ⇒ unambiguously
+<code>∫V dQ</code>), sorts + de-duplicates Q before reading bounds, and propagates
+NaN only for genuinely-missing data — structural mismatches raise loudly
+from upstream (:mod:<code>chdis</code>, :mod:<code>capacity</code>).</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="echemplot.core.stats.stat_table" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">stat_table</span><span class="p">(</span><span class="n">cells</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">target_cycles</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">50</span><span class="p">),</span> <span class="n">retention_threshold</span><span class="o">=</span><span class="mf">0.8</span><span class="p">)</span></code>
+
+<a href="#echemplot.core.stats.stat_table" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Summarize a list of cells into a per-cell wide statistics table.</p>
+<h5 id="echemplot.core.stats.stat_table--parameters">Parameters<a class="headerlink" href="#echemplot.core.stats.stat_table--parameters" title="Permanent link">&para;</a></h5>
+<p>cells
+    Sequence of :class:<code>echemplot.core.cell.Cell</code>. Each cell
+    contributes one row keyed by <code>cell.name</code>. An empty sequence
+    returns an empty DataFrame with the correct column schema.
+target_cycles
+    Cycle numbers at which to emit <code>Q_dis@n</code> / <code>CE@n</code> /
+    <code>V_mean_dis@n</code> / <code>EE@n</code> / <code>retention@n</code> / <code>CE_mean_1to{n}</code>.
+    Order is preserved in the output columns so callers can pin column
+    layout by tuple order. Cycles beyond a cell's maximum produce NaN
+    for that cell, but the row itself is still emitted. Duplicate
+    entries raise <code>ValueError</code> to avoid silently-duplicated columns.
+retention_threshold
+    Fade threshold as a fraction of <code>q_dis[1]</code>, in the open interval
+    <code>(0, 1)</code> (values at or outside the bounds raise <code>ValueError</code>).
+    The derived column name is
+    <code>f"cycle_at_{round(retention_threshold * 100)}pct"</code> so a
+    threshold of <code>0.80</code> yields <code>cycle_at_80pct</code> (default) and
+    <code>0.50</code> yields <code>cycle_at_50pct</code>. <code>round</code> (not <code>int</code>) avoids
+    the IEEE-754 truncation trap where e.g. <code>0.29 * 100</code> evaluates
+    to <code>28.999999999999996</code> and would otherwise mislabel the column
+    <code>cycle_at_28pct</code>. Python's <code>round</code> uses banker's rounding (tie
+    to even) — irrelevant for realistic thresholds but worth noting
+    if a caller passes an exact-half value like <code>0.125</code>. The value
+    in that column is the first cycle where <code>q_dis</code> dips below
+    <code>retention_threshold * q_dis[1]</code>; NaN if the threshold is never
+    crossed or if <code>q_dis[1]</code> is unusable.</p>
+<h5 id="echemplot.core.stats.stat_table--returns">Returns<a class="headerlink" href="#echemplot.core.stats.stat_table--returns" title="Permanent link">&para;</a></h5>
+<p>DataFrame
+    Index <code>cell</code> (<code>cell.name</code> strings). Columns in deterministic
+    order (see the module docstring). All values are float64; empty
+    positions are NaN.</p>
+<h5 id="echemplot.core.stats.stat_table--raises">Raises<a class="headerlink" href="#echemplot.core.stats.stat_table--raises" title="Permanent link">&para;</a></h5>
+<p>ValueError
+    If <code>retention_threshold</code> is not in the open interval <code>(0, 1)</code>,
+    or if <code>target_cycles</code> contains duplicate entries.</p>
+<h5 id="echemplot.core.stats.stat_table--notes">Notes<a class="headerlink" href="#echemplot.core.stats.stat_table--notes" title="Permanent link">&para;</a></h5>
+<p>Integration over <code>∫V dQ</code> uses :func:<code>scipy.integrate.simpson</code> when
+the segment has 3+ distinct-Q points, :func:<code>scipy.integrate.trapezoid</code>
+for exactly 2, and yields NaN for fewer. The deprecated
+<code>scipy.integrate.simps</code> is not used; <code>numpy.trapz</code> (removed in
+NumPy 2.0) is avoided in favour of <code>scipy.integrate.trapezoid</code>.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/echemplot/core/stats.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span>
+<span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">stat_table</span><span class="p">(</span>
+    <span class="n">cells</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Cell</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">target_cycles</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">50</span><span class="p">),</span>
+    <span class="n">retention_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.80</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Summarize a list of cells into a per-cell wide statistics table.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    cells</span>
+<span class="sd">        Sequence of :class:`echemplot.core.cell.Cell`. Each cell</span>
+<span class="sd">        contributes one row keyed by ``cell.name``. An empty sequence</span>
+<span class="sd">        returns an empty DataFrame with the correct column schema.</span>
+<span class="sd">    target_cycles</span>
+<span class="sd">        Cycle numbers at which to emit ``Q_dis@n`` / ``CE@n`` /</span>
+<span class="sd">        ``V_mean_dis@n`` / ``EE@n`` / ``retention@n`` / ``CE_mean_1to{n}``.</span>
+<span class="sd">        Order is preserved in the output columns so callers can pin column</span>
+<span class="sd">        layout by tuple order. Cycles beyond a cell&#39;s maximum produce NaN</span>
+<span class="sd">        for that cell, but the row itself is still emitted. Duplicate</span>
+<span class="sd">        entries raise ``ValueError`` to avoid silently-duplicated columns.</span>
+<span class="sd">    retention_threshold</span>
+<span class="sd">        Fade threshold as a fraction of ``q_dis[1]``, in the open interval</span>
+<span class="sd">        ``(0, 1)`` (values at or outside the bounds raise ``ValueError``).</span>
+<span class="sd">        The derived column name is</span>
+<span class="sd">        ``f&quot;cycle_at_{round(retention_threshold * 100)}pct&quot;`` so a</span>
+<span class="sd">        threshold of ``0.80`` yields ``cycle_at_80pct`` (default) and</span>
+<span class="sd">        ``0.50`` yields ``cycle_at_50pct``. ``round`` (not ``int``) avoids</span>
+<span class="sd">        the IEEE-754 truncation trap where e.g. ``0.29 * 100`` evaluates</span>
+<span class="sd">        to ``28.999999999999996`` and would otherwise mislabel the column</span>
+<span class="sd">        ``cycle_at_28pct``. Python&#39;s ``round`` uses banker&#39;s rounding (tie</span>
+<span class="sd">        to even) — irrelevant for realistic thresholds but worth noting</span>
+<span class="sd">        if a caller passes an exact-half value like ``0.125``. The value</span>
+<span class="sd">        in that column is the first cycle where ``q_dis`` dips below</span>
+<span class="sd">        ``retention_threshold * q_dis[1]``; NaN if the threshold is never</span>
+<span class="sd">        crossed or if ``q_dis[1]`` is unusable.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    DataFrame</span>
+<span class="sd">        Index ``cell`` (``cell.name`` strings). Columns in deterministic</span>
+<span class="sd">        order (see the module docstring). All values are float64; empty</span>
+<span class="sd">        positions are NaN.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If ``retention_threshold`` is not in the open interval ``(0, 1)``,</span>
+<span class="sd">        or if ``target_cycles`` contains duplicate entries.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    Integration over ``∫V dQ`` uses :func:`scipy.integrate.simpson` when</span>
+<span class="sd">    the segment has 3+ distinct-Q points, :func:`scipy.integrate.trapezoid`</span>
+<span class="sd">    for exactly 2, and yields NaN for fewer. The deprecated</span>
+<span class="sd">    ``scipy.integrate.simps`` is not used; ``numpy.trapz`` (removed in</span>
+<span class="sd">    NumPy 2.0) is avoided in favour of ``scipy.integrate.trapezoid``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="mf">0.0</span> <span class="o">&lt;</span> <span class="n">retention_threshold</span> <span class="o">&lt;</span> <span class="mf">1.0</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;retention_threshold must lie in the open interval (0, 1); got </span><span class="si">{</span><span class="n">retention_threshold</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    <span class="n">target_cycles_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">target_cycles</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">target_cycles_list</span><span class="p">))</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">target_cycles_list</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;target_cycles must not contain duplicates; got </span><span class="si">{</span><span class="n">target_cycles_list</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># ``round`` (not ``int``) because ``0.29 * 100 == 28.999999999999996``</span>
+    <span class="c1"># under IEEE-754 and ``int`` would truncate to ``28``, silently</span>
+    <span class="c1"># mislabelling the column. See the ``retention_threshold`` docstring.</span>
+    <span class="n">pct</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">retention_threshold</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
+    <span class="n">columns</span> <span class="o">=</span> <span class="n">_build_column_order</span><span class="p">(</span><span class="n">target_cycles_list</span><span class="p">,</span> <span class="n">pct</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">cells</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_empty_result</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span>
+
+    <span class="c1"># Seed the accumulator with the full column set so every row has the</span>
+    <span class="c1"># same key set and ``DataFrame.from_records`` doesn&#39;t need a manual</span>
+    <span class="c1"># reindex after the fact. The dict preserves insertion order (py 3.7+)</span>
+    <span class="c1"># so column order round-trips cleanly from ``_build_column_order``.</span>
+    <span class="n">names</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">rows</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="n">cells</span><span class="p">:</span>
+        <span class="n">names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_per_cell_row</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">target_cycles_list</span><span class="p">,</span> <span class="n">retention_threshold</span><span class="p">,</span> <span class="n">pct</span><span class="p">))</span>
+
+    <span class="c1"># ``dtype=&quot;object&quot;`` for the populated path too, matching ``_empty_result``</span>
+    <span class="c1"># so ``pd.concat`` of an empty + populated stat_table doesn&#39;t trigger</span>
+    <span class="c1"># dtype-coercion warnings on the index.</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">names</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;object&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;cell&quot;</span><span class="p">))</span>
+    <span class="c1"># Enforce column order + float64 dtype end-to-end. ``reindex`` also</span>
+    <span class="c1"># guards against any runtime dict-mutation slip that silently dropped</span>
+    <span class="c1"># a key — an absent column would surface here as a silent all-NaN</span>
+    <span class="c1"># column, which is the correct degraded behaviour anyway. The explicit</span>
+    <span class="c1"># ``pd.DataFrame`` wrap pins the mypy return type against pandas-stubs</span>
+    <span class="c1"># occasionally inferring ``.astype`` as ``Any``.</span>
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">out</span><span class="o">.</span><span class="n">reindex</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;float64&quot;</span><span class="p">))</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "content.code.copy", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

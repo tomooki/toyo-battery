@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://tomooki.github.io/toyo-battery/</loc>
+         <lastmod>2026-04-28</lastmod>
+    </url>
+    <url>
+         <loc>https://tomooki.github.io/toyo-battery/ORIGIN_SETUP/</loc>
+         <lastmod>2026-04-28</lastmod>
+    </url>
+    <url>
+         <loc>https://tomooki.github.io/toyo-battery/quickstart/</loc>
+         <lastmod>2026-04-28</lastmod>
+    </url>
+    <url>
+         <loc>https://tomooki.github.io/toyo-battery/api/cell/</loc>
+         <lastmod>2026-04-28</lastmod>
+    </url>
+    <url>
+         <loc>https://tomooki.github.io/toyo-battery/api/core/</loc>
+         <lastmod>2026-04-28</lastmod>
+    </url>
+    <url>
+         <loc>https://tomooki.github.io/toyo-battery/api/io/</loc>
+         <lastmod>2026-04-28</lastmod>
+    </url>
+    <url>
+         <loc>https://tomooki.github.io/toyo-battery/api/plotting/</loc>
+         <lastmod>2026-04-28</lastmod>
+    </url>
+</urlset>
