@@ -105,6 +105,56 @@ def test_launch_gui_passes_callback_that_calls_push_to_origin(
     assert call["sg_window"] == 11
 
 
+def test_push_callback_closes_figures_when_push_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The injected ``on_complete`` callback must close every figure even
+    when ``push_to_origin`` raises. Otherwise the figures leak in
+    pyplot's global registry across repeated ``launch_gui()`` calls
+    within a single Origin session, and Origin's "is a Python script
+    running?" probe sees the residual matplotlib state on the way out.
+    """
+    _install_mock_originpro(monkeypatch)
+
+    captured: dict[str, object] = {}
+
+    def fake_tk_launch(**kwargs: object) -> None:
+        captured.update(kwargs)
+
+    import echemplot.gui as gui_pkg
+
+    monkeypatch.setattr(gui_pkg, "launch_gui", fake_tk_launch)
+
+    def raising_push(_cells: object, **_kw: object) -> None:
+        raise RuntimeError("simulated push_to_origin failure")
+
+    import echemplot.origin as origin_mod
+
+    monkeypatch.setattr(origin_mod, "push_to_origin", raising_push)
+
+    origin_mod.launch_gui()
+
+    on_complete = captured.get("on_complete")
+    assert callable(on_complete)
+
+    import matplotlib
+
+    matplotlib.use("Agg")  # headless backend
+    import matplotlib.pyplot as plt
+
+    fig_a = plt.figure()
+    fig_b = plt.figure()
+    fig_nums = [fig_a.number, fig_b.number]
+    assert all(n in plt.get_fignums() for n in fig_nums)
+
+    with pytest.raises(RuntimeError, match="simulated push_to_origin failure"):
+        on_complete(["c"], [fig_a, fig_b], 11)  # type: ignore[operator]
+
+    assert all(n not in plt.get_fignums() for n in fig_nums), (
+        "figures must be closed even when push_to_origin raises"
+    )
+
+
 def test_launch_gui_defaults_match_push_to_origin_defaults(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

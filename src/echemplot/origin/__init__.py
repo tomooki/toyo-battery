@@ -228,22 +228,28 @@ def launch_gui(
         # defaults and can't surface per-run overrides on its own (see
         # issue #60), so ``push_to_origin`` recomputes the frame when the
         # caller supplies a non-default window.
-        push_to_origin(
-            cells,
-            project_path=project_path,
-            stat_cycles=stat_cycles,
-            sg_window=sg_window,
-        )
-        # Close the figures the controller built. The Origin path
-        # bypasses ``_show_figure`` (which would otherwise own the close
-        # via ``WM_DELETE_WINDOW``), so a single Run still leaves several
-        # figures pinned in pyplot's global registry — the Tk root is
-        # destroyed right after this callback returns, but pyplot doesn't
-        # know about that and would keep the figures alive indefinitely.
         import matplotlib.pyplot as plt
 
-        for fig in figures:
-            plt.close(fig)
+        try:
+            push_to_origin(
+                cells,
+                project_path=project_path,
+                stat_cycles=stat_cycles,
+                sg_window=sg_window,
+            )
+        finally:
+            # Close the figures the controller built. The Origin path
+            # bypasses ``_show_figure`` (which would otherwise own the
+            # close via ``WM_DELETE_WINDOW``), so a single Run still
+            # leaves several figures pinned in pyplot's global registry
+            # — the Tk root is destroyed right after this callback
+            # returns, but pyplot doesn't know about that and would keep
+            # the figures alive indefinitely. ``finally`` so the cleanup
+            # also runs when ``push_to_origin`` raises (otherwise figures
+            # accumulate across repeated ``launch_gui()`` calls within
+            # the same Origin session).
+            for fig in figures:
+                plt.close(fig)
 
     _launch_tk_gui(on_complete=_push, origin_mode=True)
 
