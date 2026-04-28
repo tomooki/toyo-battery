@@ -872,6 +872,9 @@ def test_compute_global_ranges_handles_cells_with_different_column_counts() -> N
 
     assert ranges.chdis_x == (0.0, 800.0)
     assert ranges.chdis_y == (3.0, 4.2)
+    assert ranges.cycle_x == (1.0, 2.0)
+    assert ranges.cycle_left_y == (760.0, 990.0)
+    assert ranges.cycle_right_y == (95.0, 99.0)
     assert ranges.dqdv_x == (3.0, 4.1)
     assert ranges.dqdv_y == (-8.0, 20.0)
 
