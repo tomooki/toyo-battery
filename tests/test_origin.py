@@ -851,9 +851,9 @@ def test_compute_global_ranges_handles_cells_with_different_column_counts() -> N
             "ce": [99.0, 98.9],
         }
     ).set_index("cycle")
-    cap_b = pd.DataFrame(
-        {"cycle": [1], "q_ch": [800.0], "q_dis": [760.0], "ce": [95.0]}
-    ).set_index("cycle")
+    cap_b = pd.DataFrame({"cycle": [1], "q_ch": [800.0], "q_dis": [760.0], "ce": [95.0]}).set_index(
+        "cycle"
+    )
 
     dqdv_a = pd.DataFrame(
         {
