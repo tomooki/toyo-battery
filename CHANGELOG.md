@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-04-28
+
+### Fixed
+- `compute_global_ranges` (Origin push path) no longer raises
+  `ValueError: along dimension 1, the array at index 0 has size N and
+  the array at index 1 has size M` when Run-ing multiple cells whose
+  `chdis_df` / `dqdv_df` contain differing numbers of `(cycle, side)`
+  column pairs. The 2D extracts are now ravelled to 1D before
+  `np.concatenate`, eliminating the axis-1 shape constraint;
+  `_safe_range` already ravels its input internally, so the 2D shape
+  was never load-bearing for the min/max calculation. ([#125])
+
 ## [0.2.0] - 2026-04-28
 
 ### Breaking
@@ -333,7 +345,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pre-alpha.** Public API is unstable and may change without deprecation in
   0.0.x releases.
 
-[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/tomooki/toyo-battery/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tomooki/toyo-battery/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/tomooki/toyo-battery/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/tomooki/toyo-battery/compare/v0.1.6...v0.1.7
@@ -369,6 +382,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#104]: https://github.com/tomooki/toyo-battery/issues/104
 [#107]: https://github.com/tomooki/toyo-battery/pull/107
 [#108]: https://github.com/tomooki/toyo-battery/pull/108
+[#125]: https://github.com/tomooki/toyo-battery/pull/125
 [0.0.3]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/tomooki/toyo-battery/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/tomooki/toyo-battery/releases/tag/v0.0.1
