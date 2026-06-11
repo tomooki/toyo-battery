@@ -24,12 +24,15 @@ state transitions and its ``電流[mA]`` is unsigned. The reversal filter
 nonetheless takes ``|電気量|`` so that *any* signed input (e.g. a
 hand-crafted dataset with polarity applied) segments correctly. Rows
 whose ``|電気量|`` falls below the segment's running maximum are dropped.
-This handles both single-row tester glitches (e.g. 500→400→600, the 400
-is dropped) and sustained discontinuities such as the raw-6-digit CC→CV
-sub-step boundary where ``経過時間[Sec]`` resets and a fresh ``t*I``
-series begins below the prior segment's peak. Such CV-hold ``t*I``
-values are not true cumulative ``∫I dt`` capacity anyway, so dropping
-them is the correct behavior for V-Q plotting.
+This guards against single-row tester glitches (e.g. 500→400→600, where
+the 400 is dropped). It is *not* relied on to handle constant-voltage
+(CV) holds: the raw-6-digit reader accumulates ``電気量`` as a true
+cumulative integral ``∫I dt`` per step (see
+:func:`echemplot.io.reader._ensure_capacity`), so a CC→CV charge is
+already monotone and its CV tail is preserved here rather than clipped.
+Earlier revisions computed an instantaneous ``I·t`` product that peaked
+at the CC→CV transition and would have been silently dropped by this
+filter, undercounting the charge capacity.
 
 First-cycle-is-charge normalization: if cycle 1 begins with 放電 (discharge),
 *all* 状態 labels in the frame are swapped (充電 ↔ 放電). This is the TOYO
