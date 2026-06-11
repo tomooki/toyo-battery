@@ -38,9 +38,10 @@ The active-material mass (grams) is resolved in this priority order:
 
 1. Explicit ``mass=`` argument (grams)
 2. ``重量[mg]`` from ``連続データ.csv`` metadata row 3 (converted mg → g)
-3. A ``*.PTN`` file whose first line's 3rd whitespace-separated token parses
-   as float (grams). Other ``.PTN`` files (e.g. ``*_OPTION.PTN`` config
-   files shipped alongside the main pattern file) are skipped automatically.
+3. A ``*.PTN`` file whose first line carries a 9-byte ``<flag><mass>``
+   composite at *byte* offset 45 (grams). Other ``.PTN`` files (e.g.
+   ``*_OPTION.PTN`` config files shipped alongside the main pattern file)
+   are skipped automatically. See :func:`read_ptn_mass`.
 
 On the raw 6-digit path the formula is::
 
@@ -200,25 +201,35 @@ _METADATA_MASS_KEY = "重量[mg]"
 _METADATA_SCAN_ROWS = 4
 
 # Fixed-column layout for the PTN mass field on line 0. The TOYO PTN format
-# always places a 9-character ``<flag><mass>`` composite at character offset
-# 44 (after a 42-char operator field + the literal ``"2 "`` electrode-count
-# prefix). The 9-char composite is one of two known dialects:
+# is fixed-column **in Shift-JIS bytes**: the 9-byte ``<flag><mass>``
+# composite always begins at *byte* offset 45 (a 42-byte operator/electrode
+# field, a right-justified numeric count field ending at byte 43, and a
+# single separator space at byte 44 precede it). The 9-byte composite is one
+# of two known dialects:
 #
 # * "concat" (cyclers No5 / No1):  ``flag(1) + mass(%.6f, 8 chars)``
-#                                  e.g. ``"00.000358"`` — flag at index 0,
+#                                  e.g. ``b"00.000358"`` — flag at index 0,
 #                                  mass at index 1..8.
 # * "spaced" (cycler No6):         ``flag(1) + " "(1) + mass(%.5f, 7 chars)``
-#                                  e.g. ``"0 0.00116"`` — mass at index 2..8.
+#                                  e.g. ``b"0 0.00116"`` — mass at index 2..8.
 #
-# Detection: examine the byte at index 1 of the 9-char composite. ``" "`` →
-# spaced dialect; otherwise concat. ``tests/conftest.py:write_ptn_main`` is
-# the synthetic-fixture truth source; real-data validation against No1 / No5
-# / No6 cyclers is recorded in PR #90 (issue #90). Character indexing is safe
-# even when the operator field contains multi-byte JP names because the file
-# is decoded Shift-JIS first and ``str.ljust`` pads in characters.
-_PTN_MASS_FIELD_START = 44
+# Detection: examine the byte at index 1 of the 9-byte composite. ``" "`` →
+# spaced dialect; otherwise concat.
+#
+# Indexing must be done on the **raw bytes**, not the Shift-JIS-decoded
+# string: a multi-byte operator name (e.g. a Japanese technician name) takes
+# two bytes but one character, so decoded-string indexing shifts the mass
+# field left and silently misreads it. The offset was 44 against the decoded
+# string in v0.2.x (PR #122); validation against ~2400 real PTN files across
+# cyclers No0-No6 showed the composite sits at byte 45 (the count field is
+# right-justified, so its width does not move the mass), and that byte-offset
+# indexing is the only layout robust to multi-byte and space-containing
+# operator names. See issue #129. ``tests/conftest.py:write_ptn_main`` is the
+# synthetic-fixture truth source and now assembles line 0 in bytes to mirror
+# this layout.
+_PTN_MASS_FIELD_START = 45
 _PTN_MASS_FIELD_LEN = 9
-_PTN_MASS_FIELD_END = _PTN_MASS_FIELD_START + _PTN_MASS_FIELD_LEN  # 53
+_PTN_MASS_FIELD_END = _PTN_MASS_FIELD_START + _PTN_MASS_FIELD_LEN  # 54
 
 # Escape hatch: when this env var is set to a truthy value the legacy
 # ``TOYO_Origin_2.01`` heuristic (``str.split()`` + ``token[2] / token[3]``
@@ -232,22 +243,50 @@ def _is_legacy_ptn_mode() -> bool:
     return val in {"1", "true", "yes", "on"}
 
 
-def _parse_ptn_mass_fixed_column(first_line: str, path: Path) -> float:
-    """Parse the 9-char fixed-column mass field on line 0.
+def _parse_ptn_mass_fixed_column(raw_line: bytes, path: Path) -> float:
+    """Parse the 9-byte fixed-column mass field at byte offset 45 of line 0.
 
-    Detects the dialect by inspecting index 1 of the 9-char composite. Raises
-    ``ValueError`` on a short line, a non-numeric mass, or a non-positive
-    parsed value — :func:`_resolve_mass_from_ptn` relies on this to skip
-    auxiliary PTN files (e.g. ``*_OPTION.PTN``).
+    ``raw_line`` is the **raw bytes** of line 0 (Shift-JIS, undecoded). The
+    mass field is ASCII (digits, ``.``, ``" "``, and a leading flag digit),
+    so the 9-byte composite is sliced positionally and decoded as ASCII.
+    Slicing on bytes — rather than the Shift-JIS-decoded string — is what
+    makes the position correct regardless of whether the preceding operator
+    field holds a single-byte or multi-byte (Japanese) name.
+
+    Dialect is detected by inspecting index 1 of the composite. Raises
+    ``ValueError`` on a short line, a non-ASCII composite, a flag byte that
+    is not a digit (the layout-mismatch signature), a non-numeric mass, or a
+    non-positive value — :func:`_resolve_mass_from_ptn` relies on this to
+    skip auxiliary PTN files (e.g. ``*_OPTION.PTN``).
     """
-    if len(first_line) < _PTN_MASS_FIELD_END:
+    composite_bytes = raw_line[_PTN_MASS_FIELD_START:_PTN_MASS_FIELD_END]
+    if len(composite_bytes) < _PTN_MASS_FIELD_LEN:
         raise ValueError(
             f"{path} line 0 is too short for the fixed-column PTN format "
-            f"(need {_PTN_MASS_FIELD_END} chars, got {len(first_line)}); "
+            f"(need {_PTN_MASS_FIELD_END} bytes, got {len(raw_line)}); "
             f"set {_PTN_LEGACY_ENV_VAR}=1 to fall back to the legacy "
             "whitespace-split parser if your file uses a different layout."
         )
-    composite = first_line[_PTN_MASS_FIELD_START:_PTN_MASS_FIELD_END]
+    try:
+        composite = composite_bytes.decode("ascii")
+    except UnicodeDecodeError as e:
+        raise ValueError(
+            f"{path} fixed-column mass field at byte "
+            f"{_PTN_MASS_FIELD_START}..{_PTN_MASS_FIELD_END} is not ASCII "
+            f"({composite_bytes!r}); set {_PTN_LEGACY_ENV_VAR}=1 to fall back "
+            "to the legacy parser if needed."
+        ) from e
+    # The composite always opens with a flag digit (0 for the primary
+    # electrode block). A non-digit here means the fixed-column window does
+    # not line up with the mass field — fail loudly instead of silently
+    # returning a mis-sliced number (the v0.2.x byte/char-offset bug).
+    if not composite[0].isdigit():
+        raise ValueError(
+            f"{path} fixed-column mass field {composite!r} does not start with "
+            f"a flag digit at byte {_PTN_MASS_FIELD_START}; line 0 does not "
+            f"match the expected TOYO PTN layout. Pass `mass=<grams>` or set "
+            f"{_PTN_LEGACY_ENV_VAR}=1 to use the legacy whitespace-split parser."
+        )
     if composite[1] == " ":
         dialect = "spaced"
         mass_str = composite[2:].strip()
@@ -258,13 +297,13 @@ def _parse_ptn_mass_fixed_column(first_line: str, path: Path) -> float:
         mass = float(mass_str)
     except ValueError as e:
         raise ValueError(
-            f"{path} line 0 fixed-column mass field {composite!r} (dialect={dialect!r}) "
+            f"{path} fixed-column mass field {composite!r} (dialect={dialect!r}) "
             f"is not a valid float; "
             f"set {_PTN_LEGACY_ENV_VAR}=1 to fall back to the legacy parser if needed."
         ) from e
     if not math.isfinite(mass) or mass <= 0:
         raise ValueError(
-            f"{path} line 0 fixed-column mass field {composite!r} (dialect={dialect!r}) "
+            f"{path} fixed-column mass field {composite!r} (dialect={dialect!r}) "
             f"parsed as non-positive value {mass!r}"
         )
     return mass
@@ -303,8 +342,8 @@ def read_ptn_mass(ptn_path: str | Path) -> float:
     """Extract active-material mass (grams) from a ``.PTN`` file.
 
     Uses a **fixed-column parser** by default: the TOYO PTN format places a
-    9-char ``<flag><mass>`` composite at character offset 44 of line 0, in
-    one of two known dialects:
+    9-byte ``<flag><mass>`` composite at *byte* offset 45 of line 0, in one
+    of two known dialects:
 
     * "concat" (cyclers No5 / No1): flag glued to a ``%.6f`` mass —
       ``"00.000358"``.
@@ -313,7 +352,8 @@ def read_ptn_mass(ptn_path: str | Path) -> float:
 
     Dialect is auto-detected by the byte at index 1 of the composite (a
     space implies spaced; otherwise concat). Both decode to the same numeric
-    mass.
+    mass. The field is located by **byte** offset (not decoded-string
+    offset) so a multi-byte Shift-JIS operator name does not shift it.
 
     The previous :data:`TOYO_Origin_2.01`-derived whitespace-split heuristic
     (``tokens[2]``, falling back to ``tokens[3]`` when ``tokens[2]==0``) is
@@ -326,17 +366,25 @@ def read_ptn_mass(ptn_path: str | Path) -> float:
     and whose tokens don't form a positive mass; calling this on them will
     raise ``ValueError``, which :func:`_resolve_mass_from_ptn` relies on to
     skip them.
+
+    Genuinely undecodable Shift-JIS bytes anywhere in line 0 raise
+    :class:`EncodingError` (a ``ValueError`` subclass) rather than a
+    downstream parse error.
     """
     path = Path(ptn_path)
     encoding = "shift_jis"
+    with path.open("rb") as f:
+        raw_line = f.readline().rstrip(b"\r\n")
+    # Validate that line 0 decodes cleanly so corrupt Shift-JIS bytes surface
+    # as EncodingError (issue #96). The decoded form also feeds the legacy
+    # whitespace parser; the fixed-column parser slices the raw bytes.
     try:
-        with path.open(encoding=encoding) as f:
-            first_line = f.readline()
+        decoded = raw_line.decode(encoding)
     except UnicodeDecodeError as e:
         raise EncodingError(path, expected_encoding=encoding, original=e) from e
     if _is_legacy_ptn_mode():
-        return _parse_ptn_mass_legacy(first_line, path)
-    return _parse_ptn_mass_fixed_column(first_line, path)
+        return _parse_ptn_mass_legacy(decoded, path)
+    return _parse_ptn_mass_fixed_column(raw_line, path)
 
 
 def read_cell_dir(
