@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-06-11
+
 ### Fixed
 - Raw 6-digit `電気量` is now the per-step cumulative charge integral
   `∫I dt` (cumulative-trapezoidal in `経過時間[Sec]`) instead of the
@@ -406,6 +408,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0.0.x releases.
 
 [Unreleased]: https://github.com/tomooki/toyo-battery/compare/v0.2.2...HEAD
+[0.2.3]: https://github.com/tomooki/toyo-battery/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/tomooki/toyo-battery/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/tomooki/toyo-battery/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tomooki/toyo-battery/compare/v0.1.8...v0.2.0
