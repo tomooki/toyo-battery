@@ -724,9 +724,11 @@ def _ensure_capacity(df: pd.DataFrame, mass: float | None) -> pd.DataFrame:
     # splitting there would reset 電気量 mid-step and the post-中断 tail would
     # be dropped by chdis' running-max filter, undercounting the capacity.
     segment = (elapsed < elapsed.shift()).cumsum()
-    # Cumulative-trapezoidal ∫ I dt within each segment. ``dt`` is clipped at 0
-    # so an (already validation-guarded) unflagged reset cannot subtract
-    # charge; the first row of each segment contributes nothing (dt → 0).
+    # Cumulative-trapezoidal ∫ I dt within each segment. Within a segment
+    # elapsed is non-decreasing by construction (any decrease opens a new
+    # segment), so ``dt`` is ≥ 0; the ``clip`` is defensive belt-and-braces
+    # should that invariant ever change. The first row of each segment
+    # contributes nothing (its diff/shift are NaN → 0).
     dt = elapsed.groupby(segment).diff().clip(lower=0.0)
     i_avg = 0.5 * (current + current.groupby(segment).shift())
     increment = (i_avg * dt / 3600.0).fillna(0.0)
