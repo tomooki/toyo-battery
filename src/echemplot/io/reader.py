@@ -43,14 +43,16 @@ The active-material mass (grams) is resolved in this priority order:
    ``*_OPTION.PTN`` config files shipped alongside the main pattern file)
    are skipped automatically. See :func:`read_ptn_mass`.
 
-On the raw 6-digit path the formula is::
+On the raw 6-digit path 電気量 is the per-step cumulative charge integral::
 
-    電気量 = 経過時間[Sec] / 3600  * 電流[mA] / mass
+    電気量 = (1/mass) * ∫ 電流[mA] dt    (cumulative-trapezoidal in 経過時間[Sec])
 
-Real TOYO raw files set ``経過時間[Sec]`` to reset at each state transition
-and emit ``電流[mA]`` as an unsigned magnitude, so this formula produces
-per-segment monotone-non-decreasing 電気量 (matching the convention that
-``連続データ.csv`` already uses inline).
+Real TOYO raw files reset ``経過時間[Sec]`` at each step boundary and emit
+``電流[mA]`` as an unsigned magnitude, so this yields per-segment
+monotone-non-decreasing 電気量 (matching the convention that
+``連続データ.csv`` already uses inline). Integrating — rather than taking the
+instantaneous ``I·t`` product — is what makes constant-voltage (CV) holds
+count correctly; see :func:`_ensure_capacity`.
 """
 
 from __future__ import annotations
@@ -665,12 +667,37 @@ def _drop_unnamed(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _ensure_capacity(df: pd.DataFrame, mass: float | None) -> pd.DataFrame:
-    """Add 電気量 = elapsed_s / 3600 * current_mA / mass, if missing.
+    """Add 電気量 as the per-step cumulative charge integral ``∫ I dt``, if missing.
 
-    The TOYO raw 6-digit format emits ``経過時間[Sec]`` reset at each
-    state transition and ``電流[mA]`` as an unsigned magnitude, so the
-    formula produces per-segment monotone-non-decreasing 電気量 matching
-    the convention that 連続データ.csv uses inline.
+    The TOYO raw 6-digit format carries no capacity column, so it is derived
+    from ``経過時間[Sec]`` and the unsigned ``電流[mA]`` magnitude as the
+    running charge integral within each step, normalized by the
+    active-material mass and expressed in mAh/g::
+
+        電気量[k] = (1/mass) * Σ_{j≤k} ½·(I[j] + I[j-1])·(t[j] - t[j-1]) / 3600
+
+    computed cumulatively (trapezoidal) within each segment. A new segment
+    starts wherever ``経過時間[Sec]`` resets (drops below the previous row) —
+    the firmware's per-step elapsed clock. We deliberately do *not* split on
+    every ``状態`` change: a momentary ``中断`` (abort) marker can interrupt a
+    charge while the elapsed clock keeps running, and TOYO accumulates
+    straight through it (one charge value in ``CAPACITY.LOG``); splitting
+    there would reset 電気量 mid-step and the post-``中断`` tail would be
+    dropped by chdis' running-max filter, undercounting the charge. Within a
+    segment ``経過時間[Sec]`` is monotone-non-decreasing (enforced by
+    :func:`_validate_raw_frame_continuity`).
+
+    Using the cumulative integral — rather than the instantaneous product
+    ``I·t`` — is what makes constant-voltage (CV) holds count correctly. In a
+    CV hold the current decays while ``経過時間`` keeps growing, so ``I·t``
+    *peaks at the CC→CV transition and then declines*; the running-max filter
+    in :mod:`echemplot.core.chdis` would then drop the entire CV tail and the
+    reported charge capacity would collapse to the CC-only value (verified
+    against TOYO ``CAPACITY.LOG``: a real CC-CV charge read 0.0999 mAh under
+    the old ``I·t`` formula vs. 0.2663 mAh actual — a 62% undercount). For a
+    constant-current (CC) step with ``経過時間`` starting at 0 the integral
+    reduces exactly to ``I·t``, so CC-only data is unchanged. ``連続データ.csv``
+    supplies 電気量 inline and is returned untouched.
     """
     if COL_CAPACITY in df.columns:
         return df
@@ -686,7 +713,26 @@ def _ensure_capacity(df: pd.DataFrame, mass: float | None) -> pd.DataFrame:
             f"and has no precomputed {COL_CAPACITY}"
         )
     out = df.copy()
-    out[COL_CAPACITY] = out[COL_ELAPSED_S] / 3600.0 * out[COL_CURRENT_MA] / mass
+    elapsed = pd.to_numeric(out[COL_ELAPSED_S], errors="coerce")
+    current = pd.to_numeric(out[COL_CURRENT_MA], errors="coerce")
+    # A new step begins exactly where the firmware's per-step elapsed clock
+    # resets — i.e. where 経過時間[Sec] drops below the previous row. cumsum
+    # over that boolean mask gives a monotone 0,1,2,... segment id. We do
+    # *not* split on every 状態 change: a momentary 中断 (abort) marker can
+    # interrupt a charge while the elapsed clock keeps running, and TOYO
+    # accumulates straight through it (one charge value in CAPACITY.LOG), so
+    # splitting there would reset 電気量 mid-step and the post-中断 tail would
+    # be dropped by chdis' running-max filter, undercounting the capacity.
+    segment = (elapsed < elapsed.shift()).cumsum()
+    # Cumulative-trapezoidal ∫ I dt within each segment. Within a segment
+    # elapsed is non-decreasing by construction (any decrease opens a new
+    # segment), so ``dt`` is ≥ 0; the ``clip`` is defensive belt-and-braces
+    # should that invariant ever change. The first row of each segment
+    # contributes nothing (its diff/shift are NaN → 0).
+    dt = elapsed.groupby(segment).diff().clip(lower=0.0)
+    i_avg = 0.5 * (current + current.groupby(segment).shift())
+    increment = (i_avg * dt / 3600.0).fillna(0.0)
+    out[COL_CAPACITY] = increment.groupby(segment).cumsum() / mass
     return cast("pd.DataFrame", out)
 
 

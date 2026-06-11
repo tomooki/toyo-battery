@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Raw 6-digit `電気量` is now the per-step cumulative charge integral
+  `∫I dt` (cumulative-trapezoidal in `経過時間[Sec]`) instead of the
+  instantaneous product `経過時間 × 電流`. The old `I·t` product is only
+  correct for constant-current (CC) steps; during a constant-voltage (CV)
+  hold the current decays while elapsed grows, so `I·t` peaked at the CC→CV
+  transition and then declined, and `chdis`' running-max filter dropped the
+  entire CV tail — silently undercounting the charge capacity of any CC-CV
+  cell. Verified against TOYO `CAPACITY.LOG`: a real CC-CV charge
+  (`Nakazawa_c283_L-KMnHCF_K-0_CCCV100h/29`, cycle 1) read `0.0999` mAh
+  before and `0.2663` mAh after (actual `0.266347`), and its Coulombic
+  efficiency dropped from an impossible 173 % to a physical 65 %. CC-only
+  data is unchanged (the integral reduces exactly to `I·t` when the current
+  is constant and elapsed starts at 0); validated across ~1700 real
+  charge/discharge segments (11 of them CC-CV) on cyclers No0-No6 with a
+  worst-case CC-CV error of 1.2 % (trapezoidal discretization). The same
+  change fixes a related undercount where a momentary `中断` (abort) marker
+  interrupts a charge: the elapsed clock runs through the marker, so the
+  integral now accumulates straight across it instead of resetting at the
+  `状態` change and letting chdis drop the post-`中断` tail (a real cell read
+  0.665 vs 0.781 mAh actual; segment boundaries are now keyed only on an
+  elapsed reset, not on every state change). The native `連続データ.csv` path,
+  which carries `電気量` inline, is unaffected. ([#131])
 - `read_ptn_mass` now locates the active-material mass by **byte** offset on
   the raw Shift-JIS line (the 9-byte `<flag><mass>` composite at byte 45)
   instead of by character offset 44 on the decoded string. The previous
@@ -424,6 +446,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#125]: https://github.com/tomooki/toyo-battery/pull/125
 [#127]: https://github.com/tomooki/toyo-battery/pull/127
 [#129]: https://github.com/tomooki/toyo-battery/issues/129
+[#131]: https://github.com/tomooki/toyo-battery/issues/131
 [0.0.3]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/tomooki/toyo-battery/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/tomooki/toyo-battery/releases/tag/v0.0.1

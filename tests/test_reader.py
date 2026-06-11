@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
+import warnings
 from pathlib import Path
 from typing import Callable
 
@@ -218,8 +219,10 @@ def test_read_raw_6digit_computes_per_segment_positive_capacity(
 ) -> None:
     """Real raw convention: 経過時間 resets per segment, 電流 is unsigned.
 
-    The formula ``elapsed/3600 * current / mass`` therefore produces
-    per-segment monotone-non-decreasing 電気量.
+    The cumulative ``∫I dt`` integral therefore produces per-segment
+    monotone-non-decreasing 電気量. For this constant-current fixture
+    (elapsed starting at 0 each segment) the integral reduces exactly to
+    ``elapsed/3600 * current / mass``, so the values are unchanged.
     """
     d = make_cell_dir("raw_6digit", mass=0.001)
     df, mass_g = read_cell_dir(d)
@@ -234,6 +237,113 @@ def test_read_raw_6digit_computes_per_segment_positive_capacity(
     assert df["電気量"].tolist() == pytest.approx([0.0, 1000.0, 0.0, 0.0, 1000.0])
     # State codes mapped to simple 3-value set (no substates in raw format)
     assert df["状態"].tolist() == ["充電", "充電", "休止", "放電", "放電"]
+
+
+def test_read_raw_6digit_cc_cv_charge_integrates_cv_tail(tmp_path: Path) -> None:
+    """CC-CV charge: 電気量 must be the cumulative ``∫I dt``, not ``I·t``.
+
+    Regression for issue #131. During the constant-voltage hold the current
+    decays while 経過時間 keeps growing, so the old instantaneous ``I·t``
+    product peaked at the CC→CV transition and then *declined*; chdis'
+    running-max filter then dropped the entire CV tail, undercounting the
+    charge capacity (verified against TOYO CAPACITY.LOG: 0.0999 vs 0.2663
+    mAh actual). The cumulative integral keeps 電気量 monotone so the CV
+    contribution is retained.
+    """
+    from echemplot.core import DataIntegrityWarning
+    from echemplot.core.capacity import get_cap_df
+    from echemplot.core.chdis import get_chdis_df
+    from tests.conftest import write_ptn_main, write_raw_6digit_file
+
+    mass_g = 0.001
+    # CC: I=10 mA constant, elapsed 0→3600→7200 (V ramps to 4.2).
+    # CV: V pinned at 4.2, I decays 5→2 mA, elapsed continues 10800→14400.
+    # Discharge: CC I=10 mA, elapsed resets 0→3600.
+    rows = [
+        (1, "1", 1, 3.0, 0.0, 10.0),
+        (1, "1", 1, 3.6, 3600.0, 10.0),
+        (1, "1", 1, 4.2, 7200.0, 10.0),
+        (1, "1", 1, 4.2, 10800.0, 5.0),
+        (1, "1", 1, 4.2, 14400.0, 2.0),
+        (1, "1", 2, 4.2, 0.0, 10.0),
+        (1, "1", 2, 3.0, 3600.0, 10.0),
+    ]
+    cell_dir = tmp_path / "cccv"
+    cell_dir.mkdir()
+    write_raw_6digit_file(cell_dir / "000001", rows)
+    write_ptn_main(cell_dir / "pattern.PTN", mass_g=mass_g, dialect="spaced")
+
+    df, _ = read_cell_dir(cell_dir)
+    # Cumulative ∫I dt (mAh/g): CC 0→10000→20000, CV →27500→31000, monotone.
+    charge_q = df.loc[df["状態"] == "充電", "電気量"].tolist()
+    assert charge_q == pytest.approx([0.0, 10000.0, 20000.0, 27500.0, 31000.0])
+    # The CV tail (31000) exceeds the CC-only peak (20000): the old I·t
+    # formula would have reported 20000 and dropped everything after it.
+    assert charge_q[-1] > charge_q[2]
+
+    # End-to-end: chdis must NOT drop the CV tail (no DataIntegrityWarning),
+    # and q_ch must be the full integral including the CV contribution.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DataIntegrityWarning)
+        chdis = get_chdis_df(df)
+    cap = get_cap_df(chdis)
+    assert cap.loc[1, "q_ch"] == pytest.approx(31000.0)  # CC 20000 + CV 11000
+    assert cap.loc[1, "q_dis"] == pytest.approx(10000.0)
+    # Coulombic efficiency is now physical (< 100%); the I·t undercount made
+    # q_ch too small and inflated CE above 100%.
+    assert cap.loc[1, "ce"] == pytest.approx(100.0 * 10000.0 / 31000.0)
+
+
+def test_read_raw_6digit_charge_integrates_through_abort_marker(tmp_path: Path) -> None:
+    """A 中断 (abort) marker mid-charge must not split the capacity segment.
+
+    Regression for issue #131. A real cell
+    (``No3/.../021-tomoi-M(25903)-0/77``, total-cycle 53) charges, is briefly
+    interrupted by a single 中断 row, then resumes — and the firmware's
+    elapsed clock runs *straight through* the interruption (it does not
+    reset). TOYO accumulates the whole charge as one value; segmenting on the
+    ``状態`` change would reset 電気量 at the 中断 and chdis' running-max filter
+    would drop the post-中断 tail (the cell read 0.665 vs 0.781 mAh actual).
+    Segmenting only on an elapsed *reset* keeps the charge whole.
+    """
+    from echemplot.core import DataIntegrityWarning
+    from echemplot.core.capacity import get_cap_df
+    from echemplot.core.chdis import get_chdis_df
+    from tests.conftest import write_ptn_main, write_raw_6digit_file
+
+    mass_g = 0.001
+    # Charge CC (I=10): elapsed 0→3600→7200 (q→20000). A 中断 marker (state 9)
+    # at the same elapsed (no reset), then charge resumes to elapsed 10800
+    # (q→30000). Discharge resets the elapsed clock (q_dis 10000).
+    rows = [
+        (1, "1", 1, 3.0, 0.0, 10.0),
+        (1, "1", 1, 3.6, 3600.0, 10.0),
+        (1, "1", 1, 4.0, 7200.0, 10.0),
+        (1, "1", 9, 4.0, 7200.0, 0.0),  # 中断: elapsed continues (no reset)
+        (1, "1", 1, 4.1, 7200.0, 10.0),
+        (1, "1", 1, 4.2, 10800.0, 10.0),
+        (1, "1", 2, 4.2, 0.0, 10.0),
+        (1, "1", 2, 3.0, 3600.0, 10.0),
+    ]
+    cell_dir = tmp_path / "abort"
+    cell_dir.mkdir()
+    write_raw_6digit_file(cell_dir / "000001", rows)
+    write_ptn_main(cell_dir / "pattern.PTN", mass_g=mass_g, dialect="spaced")
+
+    df, _ = read_cell_dir(cell_dir)
+    # 電気量 accumulates straight through the 中断 row (monotone, reaches 30000).
+    charge_q = df.loc[df["状態"] == "充電", "電気量"].tolist()
+    assert charge_q == sorted(charge_q)  # monotone non-decreasing
+    assert charge_q[-1] == pytest.approx(30000.0)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DataIntegrityWarning)
+        chdis = get_chdis_df(df)
+    cap = get_cap_df(chdis)
+    # Full charge (20000 pre-中断 + 10000 post) — not the 20000 the old
+    # 状態-split segmentation would have reported.
+    assert cap.loc[1, "q_ch"] == pytest.approx(30000.0)
+    assert cap.loc[1, "q_dis"] == pytest.approx(10000.0)
 
 
 def test_raw_6digit_main_ptn_picked_when_option_ptn_present(
