@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `read_ptn_mass` now locates the active-material mass by **byte** offset on
+  the raw Shift-JIS line (the 9-byte `<flag><mass>` composite at byte 45)
+  instead of by character offset 44 on the decoded string. The previous
+  fixed-column parser (introduced in v0.2.0, PR #122) misread real TOYO data
+  two ways: (1) a multi-byte Japanese operator name shifted the
+  decoded-string position and the composite was sliced mid-number, silently
+  returning a mass off by ~10⁶ (e.g. `784.0` g for a `0.000784` g cell); and
+  (2) a right-justified two-digit count field pushed the composite one column
+  right, so the slice contained an embedded space and `float()` raised —
+  surfacing as the visible "mass could not be read" error on cells such as
+  `Z:\TOYO\No1\DAT\ss_281_NaMnHCF_NaPF6ECPC\73`. Byte-offset slicing is
+  immune to multi-byte and space-containing operator names; it was validated
+  against ~2400 real `.PTN` files across cyclers No0-No6, agreeing with the
+  legacy whitespace parser on every well-formed file and reading correctly
+  even the files where the whitespace parser was itself wrong. A composite
+  that no longer starts with a flag digit now raises loudly instead of
+  returning a mis-sliced number, so future layout drift fails fast rather
+  than corrupting capacities silently. ([#129])
+
 ## [0.2.2] - 2026-04-29
 
 ### Fixed
@@ -403,6 +423,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#108]: https://github.com/tomooki/toyo-battery/pull/108
 [#125]: https://github.com/tomooki/toyo-battery/pull/125
 [#127]: https://github.com/tomooki/toyo-battery/pull/127
+[#129]: https://github.com/tomooki/toyo-battery/issues/129
 [0.0.3]: https://github.com/tomooki/toyo-battery/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/tomooki/toyo-battery/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/tomooki/toyo-battery/releases/tag/v0.0.1

@@ -282,23 +282,43 @@ def write_ptn_main(
     dialect: PtnDialect = "concat",
     operator: str = "Synthetic",
     sample: str = "TestCell",
+    count: int = 2,
 ) -> None:
     """Write a single main ``.PTN`` first-line in the requested TOYO dialect.
 
+    The line is assembled in **Shift-JIS bytes** to faithfully reproduce the
+    real TOYO fixed-column layout. The parser slices the mass field by *byte*
+    offset, so a character-based fixture would not exercise multi-byte
+    operator names (the v0.2.x byte/char-offset bug, issue #129):
+
+      * bytes ``[0:42]``  operator/electrode field, byte-padded (may be JP)
+      * bytes ``[42:44]`` sample/electrode count, right-justified ASCII digits
+      * byte  ``[44]``    separator space
+      * bytes ``[45:54]`` 9-byte ``<flag><mass>`` composite
+      * then 7 spaces, the companion (flag ``1``) composite, and the sample name
+
     ``concat`` is the newer dialect (cyclers No5/No1) where the per-electrode
-    flag is glued to the mass: ``"00.001000"``. ``spaced`` is the older
+    flag is glued to the mass: ``b"00.001000"``. ``spaced`` is the older
     dialect (cycler No6) where flag and mass are space-separated and the
-    mass uses ``%.5f``: ``"0 0.00100"``. Both occupy a 9-char composite
-    field and the surrounding fixed-width layout is otherwise identical.
+    mass uses ``%.5f``: ``b"0 0.00100"``.
     """
-    operator_field = f" 1{operator}".ljust(42)
+    operator_field = (" 1" + operator).encode("shift_jis").ljust(42)
+    count_field = str(count).encode("ascii").rjust(2)
     if dialect == "concat":
-        field1 = f"0{mass_g:.6f}".rjust(9)
-        field2 = f"1{mass_g:.6f}".rjust(9)
+        field1 = f"0{mass_g:.6f}".encode("ascii").rjust(9)
+        field2 = f"1{mass_g:.6f}".encode("ascii").rjust(9)
     elif dialect == "spaced":
-        field1 = f"0 {mass_g:.5f}".rjust(9)
-        field2 = f"1 {mass_g:.5f}".rjust(9)
+        field1 = f"0 {mass_g:.5f}".encode("ascii").rjust(9)
+        field2 = f"1 {mass_g:.5f}".encode("ascii").rjust(9)
     else:
         raise ValueError(f"unknown dialect: {dialect}")
-    line0 = f"{operator_field}2 {field1}       {field2}{sample}"
-    path.write_text(line0 + "\n", encoding="shift_jis")
+    line0 = (
+        operator_field
+        + count_field
+        + b" "
+        + field1
+        + b"       "
+        + field2
+        + sample.encode("shift_jis")
+    )
+    path.write_bytes(line0 + b"\n")

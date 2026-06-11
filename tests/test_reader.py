@@ -24,18 +24,19 @@ from echemplot.io.schema import CANONICAL_COLUMNS_EN, CANONICAL_COLUMNS_JA
 
 
 def _write_fixed_column_ptn(path: Path, mass_g: float) -> None:
-    """Write a TOYO-style fixed-column PTN whose first line has the mass at token[2].
+    """Write a TOYO-style fixed-column PTN (concat dialect) with the mass at byte 45.
 
-    Layout matches ``conftest.write_ptn_main`` (concat dialect): a 42-char
-    operator/electrode field, the literal ``"2 "`` electrode-count prefix,
-    a 9-char ``<flag><mass>`` composite at columns 44..52, 7 spaces, then a
-    9-char companion electrode block.
+    Byte layout mirrors ``conftest.write_ptn_main``: a 42-byte operator field,
+    a right-justified count ending at byte 43, a separator space at byte 44,
+    then the 9-byte ``<flag><mass>`` composite at bytes 45..53, 7 spaces, and
+    the companion electrode block.
     """
-    operator_field = " 1TestName".ljust(42)
-    field1 = f"0{mass_g:.6f}".rjust(9)
-    field2 = f"1{mass_g:.6f}".rjust(9)
-    line = f"{operator_field}2 {field1}       {field2}TestCell"
-    path.write_text(line + "\n", encoding="shift_jis")
+    operator_field = " 1TestName".encode("shift_jis").ljust(42)
+    count_field = b" 2"
+    field1 = f"0{mass_g:.6f}".encode("ascii").rjust(9)
+    field2 = f"1{mass_g:.6f}".encode("ascii").rjust(9)
+    line = operator_field + count_field + b" " + field1 + b"       " + field2 + b"TestCell"
+    path.write_bytes(line + b"\n")
 
 
 # ---- renzoku (native 連続データ.csv) path ----------------------------------
@@ -776,14 +777,27 @@ def test_read_ptn_mass_legacy_short_line_raises(
 
 
 def test_read_ptn_mass_non_numeric_field_raises(tmp_path: Path) -> None:
-    """A 53+-char line whose 9-char composite field at columns 44..52 contains
-    non-numeric content raises ``ValueError`` mentioning the dialect."""
+    """A line whose 9-byte composite at bytes 45..53 holds a digit flag but
+    non-numeric mass bytes raises ``ValueError`` mentioning the dialect."""
     ptn = tmp_path / "x.PTN"
-    # 44 leading chars (canonical operator+"2 " block) followed by a 9-char
-    # garbage composite at the mass position.
-    junk = "X" * 44 + "0XXNOTANUM" + "extra"
+    # 45 leading bytes, then a composite that opens with a flag digit (passes
+    # the alignment guard) but whose mass bytes are non-numeric.
+    junk = "X" * 45 + "0XXNOTANU" + "extra"
     ptn.write_text(junk + "\n", encoding="shift_jis")
     with pytest.raises(ValueError, match="not a valid float"):
+        read_ptn_mass(ptn)
+
+
+def test_read_ptn_mass_misaligned_flag_byte_raises(tmp_path: Path) -> None:
+    """A composite that does not open with a flag digit (the layout-mismatch
+    signature of the v0.2.x byte/char-offset bug) fails loudly rather than
+    silently returning a mis-sliced number."""
+    ptn = tmp_path / "x.PTN"
+    # Byte 45 is a space, not a flag digit — e.g. a layout where the mass
+    # field landed one column off.
+    junk = "X" * 45 + " 0.000784" + "extra"
+    ptn.write_text(junk + "\n", encoding="shift_jis")
+    with pytest.raises(ValueError, match="does not start with"):
         read_ptn_mass(ptn)
 
 
@@ -820,9 +834,13 @@ def test_read_ptn_mass_spaced_dialect(tmp_path: Path) -> None:
 
 
 def test_read_ptn_mass_japanese_operator_name(tmp_path: Path) -> None:
-    """Multi-byte JP operator names don't shift the fixed-column position
-    because the file is decoded Shift-JIS first and ``ljust`` pads in
-    characters, not bytes."""
+    """Multi-byte JP operator names don't shift the mass field because it is
+    sliced by *byte* offset on the raw Shift-JIS bytes.
+
+    Regression for issue #129: the v0.2.x parser sliced the decoded string at
+    char offset 44, so a Japanese technician name (2 bytes / 1 char each)
+    shifted the field left and silently misread the mass — the symptom that
+    surfaced as ``ss_281_NaMnHCF_NaPF6ECPC/73`` failing to read its weight."""
     from .conftest import write_ptn_main
 
     ptn = tmp_path / "x.PTN"
@@ -830,12 +848,33 @@ def test_read_ptn_mass_japanese_operator_name(tmp_path: Path) -> None:
     assert read_ptn_mass(ptn) == pytest.approx(0.00116)
 
 
+def test_read_ptn_mass_japanese_operator_name_concat(tmp_path: Path) -> None:
+    """Real No1/No2 cells pair a multi-byte JP operator name with the concat
+    dialect (e.g. ``00.000784``); the byte-offset parser must read it exactly."""
+    from .conftest import write_ptn_main
+
+    ptn = tmp_path / "x.PTN"
+    write_ptn_main(ptn, mass_g=0.000784, dialect="concat", operator="田とも", count=35)
+    assert read_ptn_mass(ptn) == pytest.approx(0.000784)
+
+
+def test_read_ptn_mass_two_digit_count_does_not_shift_field(tmp_path: Path) -> None:
+    """A 2-digit right-justified count must not shift the mass field. Mirrors
+    real cell ``ss_281_NaMnHCF_NaPF6ECPC/73`` (count ``55``, spaced dialect,
+    mass ``0.00014``) which raised the original weight-read error."""
+    from .conftest import write_ptn_main
+
+    ptn = tmp_path / "x.PTN"
+    write_ptn_main(ptn, mass_g=0.00014, dialect="spaced", operator="Sugayama2", count=55)
+    assert read_ptn_mass(ptn) == pytest.approx(0.00014)
+
+
 def test_read_ptn_mass_negative_mass_field_raises(tmp_path: Path) -> None:
     """A composite that parses but yields a non-positive mass raises so the
     file is skipped (defensive against malformed flag bytes)."""
     ptn = tmp_path / "x.PTN"
-    # 44-char prefix + composite "0-0.00100" (concat-shape, parses to -0.00100).
-    junk = "X" * 44 + "0-0.00100" + "tail"
+    # 45-byte prefix + composite "0-0.00100" (concat-shape, parses to -0.00100).
+    junk = "X" * 45 + "0-0.00100" + "tail"
     ptn.write_text(junk + "\n", encoding="shift_jis")
     with pytest.raises(ValueError, match="non-positive"):
         read_ptn_mass(ptn)
