@@ -22,8 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   data is unchanged (the integral reduces exactly to `I·t` when the current
   is constant and elapsed starts at 0); validated across ~1700 real
   charge/discharge segments (11 of them CC-CV) on cyclers No0-No6 with a
-  worst-case CC-CV error of 1.2 % (trapezoidal discretization). The native
-  `連続データ.csv` path, which carries `電気量` inline, is unaffected. ([#131])
+  worst-case CC-CV error of 1.2 % (trapezoidal discretization). The same
+  change fixes a related undercount where a momentary `中断` (abort) marker
+  interrupts a charge: the elapsed clock runs through the marker, so the
+  integral now accumulates straight across it instead of resetting at the
+  `状態` change and letting chdis drop the post-`中断` tail (a real cell read
+  0.665 vs 0.781 mAh actual; segment boundaries are now keyed only on an
+  elapsed reset, not on every state change). The native `連続データ.csv` path,
+  which carries `電気量` inline, is unaffected. ([#131])
 - `read_ptn_mass` now locates the active-material mass by **byte** offset on
   the raw Shift-JIS line (the 9-byte `<flag><mass>` composite at byte 45)
   instead of by character offset 44 on the decoded string. The previous

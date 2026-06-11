@@ -677,10 +677,14 @@ def _ensure_capacity(df: pd.DataFrame, mass: float | None) -> pd.DataFrame:
         電気量[k] = (1/mass) * Σ_{j≤k} ½·(I[j] + I[j-1])·(t[j] - t[j-1]) / 3600
 
     computed cumulatively (trapezoidal) within each segment. A new segment
-    starts wherever ``経過時間[Sec]`` resets (drops below the previous row) or
-    ``状態`` changes — the boundaries at which the firmware restarts its
-    per-step elapsed clock. Within a segment ``経過時間[Sec]`` is
-    monotone-non-decreasing (enforced by
+    starts wherever ``経過時間[Sec]`` resets (drops below the previous row) —
+    the firmware's per-step elapsed clock. We deliberately do *not* split on
+    every ``状態`` change: a momentary ``中断`` (abort) marker can interrupt a
+    charge while the elapsed clock keeps running, and TOYO accumulates
+    straight through it (one charge value in ``CAPACITY.LOG``); splitting
+    there would reset 電気量 mid-step and the post-``中断`` tail would be
+    dropped by chdis' running-max filter, undercounting the charge. Within a
+    segment ``経過時間[Sec]`` is monotone-non-decreasing (enforced by
     :func:`_validate_raw_frame_continuity`).
 
     Using the cumulative integral — rather than the instantaneous product
@@ -711,13 +715,15 @@ def _ensure_capacity(df: pd.DataFrame, mass: float | None) -> pd.DataFrame:
     out = df.copy()
     elapsed = pd.to_numeric(out[COL_ELAPSED_S], errors="coerce")
     current = pd.to_numeric(out[COL_CURRENT_MA], errors="coerce")
-    # Segment at each per-step elapsed reset (elapsed drops vs. the previous
-    # row) and, defensively, at each 状態 change. cumsum over the boolean
-    # reset mask gives a monotone 0,1,2,... segment id.
-    reset = elapsed < elapsed.shift()
-    if "状態" in out.columns:
-        reset = reset | out["状態"].ne(out["状態"].shift())
-    segment = reset.cumsum()
+    # A new step begins exactly where the firmware's per-step elapsed clock
+    # resets — i.e. where 経過時間[Sec] drops below the previous row. cumsum
+    # over that boolean mask gives a monotone 0,1,2,... segment id. We do
+    # *not* split on every 状態 change: a momentary 中断 (abort) marker can
+    # interrupt a charge while the elapsed clock keeps running, and TOYO
+    # accumulates straight through it (one charge value in CAPACITY.LOG), so
+    # splitting there would reset 電気量 mid-step and the post-中断 tail would
+    # be dropped by chdis' running-max filter, undercounting the capacity.
+    segment = (elapsed < elapsed.shift()).cumsum()
     # Cumulative-trapezoidal ∫ I dt within each segment. ``dt`` is clipped at 0
     # so an (already validation-guarded) unflagged reset cannot subtract
     # charge; the first row of each segment contributes nothing (dt → 0).

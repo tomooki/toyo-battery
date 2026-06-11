@@ -294,6 +294,58 @@ def test_read_raw_6digit_cc_cv_charge_integrates_cv_tail(tmp_path: Path) -> None
     assert cap.loc[1, "ce"] == pytest.approx(100.0 * 10000.0 / 31000.0)
 
 
+def test_read_raw_6digit_charge_integrates_through_abort_marker(tmp_path: Path) -> None:
+    """A 中断 (abort) marker mid-charge must not split the capacity segment.
+
+    Regression for issue #131. A real cell
+    (``No3/.../021-tomoi-M(25903)-0/77``, total-cycle 53) charges, is briefly
+    interrupted by a single 中断 row, then resumes — and the firmware's
+    elapsed clock runs *straight through* the interruption (it does not
+    reset). TOYO accumulates the whole charge as one value; segmenting on the
+    ``状態`` change would reset 電気量 at the 中断 and chdis' running-max filter
+    would drop the post-中断 tail (the cell read 0.665 vs 0.781 mAh actual).
+    Segmenting only on an elapsed *reset* keeps the charge whole.
+    """
+    from echemplot.core import DataIntegrityWarning
+    from echemplot.core.capacity import get_cap_df
+    from echemplot.core.chdis import get_chdis_df
+    from tests.conftest import write_ptn_main, write_raw_6digit_file
+
+    mass_g = 0.001
+    # Charge CC (I=10): elapsed 0→3600→7200 (q→20000). A 中断 marker (state 9)
+    # at the same elapsed (no reset), then charge resumes to elapsed 10800
+    # (q→30000). Discharge resets the elapsed clock (q_dis 10000).
+    rows = [
+        (1, "1", 1, 3.0, 0.0, 10.0),
+        (1, "1", 1, 3.6, 3600.0, 10.0),
+        (1, "1", 1, 4.0, 7200.0, 10.0),
+        (1, "1", 9, 4.0, 7200.0, 0.0),  # 中断: elapsed continues (no reset)
+        (1, "1", 1, 4.1, 7200.0, 10.0),
+        (1, "1", 1, 4.2, 10800.0, 10.0),
+        (1, "1", 2, 4.2, 0.0, 10.0),
+        (1, "1", 2, 3.0, 3600.0, 10.0),
+    ]
+    cell_dir = tmp_path / "abort"
+    cell_dir.mkdir()
+    write_raw_6digit_file(cell_dir / "000001", rows)
+    write_ptn_main(cell_dir / "pattern.PTN", mass_g=mass_g, dialect="spaced")
+
+    df, _ = read_cell_dir(cell_dir)
+    # 電気量 accumulates straight through the 中断 row (monotone, reaches 30000).
+    charge_q = df.loc[df["状態"] == "充電", "電気量"].tolist()
+    assert charge_q == sorted(charge_q)  # monotone non-decreasing
+    assert charge_q[-1] == pytest.approx(30000.0)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DataIntegrityWarning)
+        chdis = get_chdis_df(df)
+    cap = get_cap_df(chdis)
+    # Full charge (20000 pre-中断 + 10000 post) — not the 20000 the old
+    # 状態-split segmentation would have reported.
+    assert cap.loc[1, "q_ch"] == pytest.approx(30000.0)
+    assert cap.loc[1, "q_dis"] == pytest.approx(10000.0)
+
+
 def test_raw_6digit_main_ptn_picked_when_option_ptn_present(
     make_cell_dir: Callable[..., Path],
 ) -> None:
