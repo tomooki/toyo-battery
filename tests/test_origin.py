@@ -10,6 +10,7 @@ separately in issue #15.
 from __future__ import annotations
 
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -553,6 +554,12 @@ def test_cycle_plot_binds_both_layers(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert all(call.kwargs["colx"] == 0 for call in call_list), call_list
 
 
+def _layer_call_order(layer: MagicMock) -> str:
+    """Compress ``layer.mock_calls`` to a string of ``a`` (add_plot) / ``r`` (rescale)."""
+    codes = {"add_plot": "a", "rescale": "r"}
+    return "".join(codes[c[0]] for c in layer.mock_calls if c[0] in codes)
+
+
 def test_every_per_cell_graph_layer_is_rescaled(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -563,7 +570,10 @@ def test_every_per_cell_graph_layer_is_rescaled(
     clipped — the autoscale-not-working regression this test guards.
     ``MagicMock.__getitem__`` returns the same inner mock for every
     index, so the cycle graph's two layers share a single ``rescale``
-    counter; we assert ``>= 1`` rather than an exact count.
+    counter. The cycle graph therefore asserts ``call_count >= 2`` (one
+    per layer) and the layer indices accessed, so dropping either
+    layer's ``rescale()`` is caught. Each layer must also be rescaled
+    only *after* its ``add_plot`` loop (module docstring contract).
     """
     _stub_templates(monkeypatch, tmp_path)
     _, _, graph_objs = _install_tracking_originpro(monkeypatch)
@@ -573,9 +583,51 @@ def test_every_per_cell_graph_layer_is_rescaled(
 
     push_to_origin([cell], stat_cycles=(1,))
 
-    for graph in graph_objs[:3]:
+    chdis_graph, cycle_graph, dqdv_graph = graph_objs[:3]
+    for graph in (chdis_graph, dqdv_graph):
         layer = graph.__getitem__.return_value
         assert layer.rescale.called, f"rescale not called on layer of {graph!r}"
+        order = _layer_call_order(layer)
+        assert re.fullmatch(r"a+r", order), f"rescale must follow add_plot loop: {order}"
+
+    cycle_layer = cycle_graph.__getitem__.return_value
+    assert cycle_layer.rescale.call_count >= 2, "both cycle layers must be rescaled"
+    # Dual-Y layout: two add_plot (one per layer), then two rescale.
+    assert _layer_call_order(cycle_layer) == "aarr"
+
+
+def test_comparison_graph_layers_are_rescaled_per_cell(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Comparison graphs rebind every cell and rescale after each cell's bind.
+
+    ``_bind_xy_pairs`` / ``_bind_cycle`` are called once per cell on the
+    same layer(s); the idempotence claim in their docstrings only holds if
+    each invocation really rescales, so two cells must yield two rescales
+    (four on the shared dual-Y cycle mock), each after its ``add_plot``.
+    """
+    _stub_templates(monkeypatch, tmp_path)
+    _, _, graph_objs = _install_tracking_originpro(monkeypatch)
+    cell_a = _linear_cell("A")
+    cell_b = _linear_cell("B", q_ch=800.0, q_dis=760.0)
+
+    from echemplot.origin import push_to_origin
+
+    push_to_origin([cell_a, cell_b], stat_cycles=(1,))
+
+    # Order: per-cell A (3), per-cell B (3), comparison (3).
+    assert len(graph_objs) == 9
+    chdis_graph, cycle_graph, dqdv_graph = graph_objs[6:9]
+
+    for graph in (chdis_graph, dqdv_graph):
+        layer = graph.__getitem__.return_value
+        assert layer.rescale.call_count == 2, f"expected one rescale per cell on {graph!r}"
+        order = _layer_call_order(layer)
+        assert re.fullmatch(r"(a+r){2}", order), f"rescale must follow each cell's binds: {order}"
+
+    cycle_layer = cycle_graph.__getitem__.return_value
+    assert cycle_layer.rescale.call_count == 4, "2 layers x 2 cells"
+    assert _layer_call_order(cycle_layer) == "aarr" * 2
 
 
 def test_cols_axis_is_set_per_category(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
